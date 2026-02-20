@@ -281,6 +281,45 @@ class CommandRequestRecord(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=now_utc, index=True)
 
 
+class AlertType(StrEnum):
+    LOW_BATTERY = "LOW_BATTERY"
+    LINK_LOSS = "LINK_LOSS"
+    GEOFENCE_BREACH = "GEOFENCE_BREACH"
+
+
+class AlertSeverity(StrEnum):
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
+
+
+class AlertStatus(StrEnum):
+    OPEN = "OPEN"
+    ACKED = "ACKED"
+    CLOSED = "CLOSED"
+
+
+class AlertRecord(SQLModel, table=True):
+    __tablename__ = "alerts"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    drone_id: str = Field(index=True)
+    alert_type: AlertType = Field(index=True)
+    severity: AlertSeverity = Field(index=True)
+    status: AlertStatus = Field(default=AlertStatus.OPEN, index=True)
+    message: str
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    first_seen_at: datetime = Field(default_factory=now_utc, index=True)
+    last_seen_at: datetime = Field(default_factory=now_utc, index=True)
+    acked_by: str | None = Field(default=None, index=True)
+    acked_at: datetime | None = Field(default=None, index=True)
+    closed_by: str | None = Field(default=None, index=True)
+    closed_at: datetime | None = Field(default=None, index=True)
+
+
 class Command(BaseModel):
     tenant_id: str
     command_id: str = PydanticField(default_factory=lambda: str(uuid4()))
@@ -481,3 +520,24 @@ class CommandRead(ORMReadModel):
     issued_by: str | None
     issued_at: datetime
     updated_at: datetime
+
+
+class AlertRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    drone_id: str
+    alert_type: AlertType
+    severity: AlertSeverity
+    status: AlertStatus
+    message: str
+    detail: dict[str, Any]
+    first_seen_at: datetime
+    last_seen_at: datetime
+    acked_by: str | None
+    acked_at: datetime | None
+    closed_by: str | None
+    closed_at: datetime | None
+
+
+class AlertActionRequest(BaseModel):
+    comment: str | None = None

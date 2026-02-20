@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.domain.models import TelemetryNormalized
 from app.infra import redis_state
 from app.infra.events import event_bus
+from app.services.alert_service import AlertService
 
 
 class TelemetryError(Exception):
@@ -14,6 +15,9 @@ class NotFoundError(TelemetryError):
 
 
 class TelemetryService:
+    def __init__(self, *, alert_service: AlertService | None = None) -> None:
+        self._alert_service = alert_service or AlertService()
+
     @staticmethod
     def _state_key(tenant_id: str, drone_id: str) -> str:
         return f"state:{tenant_id}:{drone_id}"
@@ -28,6 +32,7 @@ class TelemetryService:
             tenant_id,
             normalized.model_dump(mode="json"),
         )
+        self._alert_service.evaluate_telemetry(tenant_id, normalized)
         return normalized
 
     def get_latest(self, tenant_id: str, drone_id: str) -> TelemetryNormalized:
