@@ -19,6 +19,7 @@ app.include_router(identity.router, prefix="/api/identity", tags=["identity"])
 app.include_router(registry.router, prefix="/api/registry", tags=["registry"])
 app.include_router(mission.router, prefix="/api/mission", tags=["mission"])
 app.include_router(telemetry.router, prefix="/api/telemetry", tags=["telemetry"])
+app.include_router(telemetry.ws_router, tags=["telemetry-ws"])
 app.include_router(command.router, prefix="/api/command", tags=["command"])
 app.include_router(alert.router, prefix="/api/alert", tags=["alert"])
 
@@ -42,4 +43,3 @@ def readyz() -> dict[str, object]:
             detail={"status": "not_ready", "checks": checks},
         )
     return {"status": "ready", "checks": checks}
-
