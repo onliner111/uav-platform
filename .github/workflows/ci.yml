@@ -26,7 +26,12 @@ jobs:
       - name: Migrate
         run: make migrate
 
+      - name: Generate OpenAPI Artifacts
+        run: make openapi
+
+      - name: OpenAPI Client Smoke
+        run: make openapi-smoke APP_BASE_URL=http://app:8000
+
       - name: Stop compose
         if: always()
         run: docker compose -f infra/docker-compose.yml down -v --remove-orphans
-

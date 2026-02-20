@@ -41,3 +41,26 @@ services:
       - "${APP_PORT:-8000}:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
+  app-tools:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    working_dir: /work
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-uav}:${POSTGRES_PASSWORD:-uav}@db:5432/${POSTGRES_DB:-uav_platform}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_ALGORITHM: HS256
+    volumes:
+      - ..:/work
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  openapi-generator:
+    image: openapitools/openapi-generator-cli:v7.10.0
+    working_dir: /work
+    volumes:
+      - ..:/work
