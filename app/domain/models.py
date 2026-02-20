@@ -245,6 +245,42 @@ class CommandType(StrEnum):
     RESUME = "RESUME"
 
 
+class CommandStatus(StrEnum):
+    PENDING = "PENDING"
+    ACKED = "ACKED"
+    FAILED = "FAILED"
+    TIMEOUT = "TIMEOUT"
+
+
+class CommandRequestRecord(SQLModel, table=True):
+    __tablename__ = "command_requests"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_command_requests_tenant_idempotency",
+        ),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    drone_id: str = Field(foreign_key="drones.id", index=True)
+    command_type: CommandType = Field(index=True)
+    params: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    idempotency_key: str = Field(index=True)
+    expect_ack: bool = Field(default=True)
+    status: CommandStatus = Field(default=CommandStatus.PENDING, index=True)
+    ack_ok: bool | None = Field(default=None)
+    ack_message: str | None = None
+    attempts: int = Field(default=0)
+    issued_by: str | None = Field(default=None, index=True)
+    issued_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
 class Command(BaseModel):
     tenant_id: str
     command_id: str = PydanticField(default_factory=lambda: str(uuid4()))
@@ -420,3 +456,28 @@ class ApprovalRead(ORMReadModel):
 
 class MissionTransitionRequest(BaseModel):
     target_state: MissionState
+
+
+class CommandDispatchRequest(BaseModel):
+    drone_id: str
+    type: CommandType
+    params: dict[str, Any] = PydanticField(default_factory=dict)
+    idempotency_key: str
+    expect_ack: bool = True
+
+
+class CommandRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    drone_id: str
+    command_type: CommandType
+    params: dict[str, Any]
+    idempotency_key: str
+    expect_ack: bool
+    status: CommandStatus
+    ack_ok: bool | None
+    ack_message: str | None
+    attempts: int
+    issued_by: str | None
+    issued_at: datetime
+    updated_at: datetime
