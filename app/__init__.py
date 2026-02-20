@@ -1,0 +1,2 @@
+"""uav-platform application package."""
+

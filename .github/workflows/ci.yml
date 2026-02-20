@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  phase0:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start dependencies
+        run: docker compose -f infra/docker-compose.yml up -d --build db redis
+
+      - name: Lint
+        run: make lint
+
+      - name: Typecheck
+        run: make typecheck
+
+      - name: Test
+        run: make test
+
+      - name: Migrate
+        run: make migrate
+
+      - name: Stop compose
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down -v --remove-orphans
+
