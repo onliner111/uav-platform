@@ -10,6 +10,8 @@ from pydantic import Field as PydanticField
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from app.domain.state_machine import MissionState
+
 
 def now_utc() -> datetime:
     return datetime.now(UTC)
@@ -103,6 +105,97 @@ class RolePermission(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
+class DroneVendor(StrEnum):
+    DJI = "DJI"
+    MAVLINK = "MAVLINK"
+    FAKE = "FAKE"
+
+
+class Drone(SQLModel, table=True):
+    __tablename__ = "drones"
+    __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_drones_tenant_name"),)
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(index=True)
+    vendor: DroneVendor
+    capabilities: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class DroneCredential(SQLModel, table=True):
+    __tablename__ = "drone_credentials"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    drone_id: str = Field(foreign_key="drones.id", index=True, unique=True)
+    secret: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class ApprovalDecision(StrEnum):
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
+
+
+class MissionPlanType(StrEnum):
+    AREA_GRID = "AREA_GRID"
+    ROUTE_WAYPOINTS = "ROUTE_WAYPOINTS"
+    POINT_TASK = "POINT_TASK"
+
+
+class Mission(SQLModel, table=True):
+    __tablename__ = "missions"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(index=True)
+    drone_id: str | None = Field(default=None, foreign_key="drones.id", index=True)
+    plan_type: MissionPlanType
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    constraints: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    state: MissionState = Field(default=MissionState.DRAFT, index=True)
+    created_by: str
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class Approval(SQLModel, table=True):
+    __tablename__ = "approvals"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    mission_id: str = Field(foreign_key="missions.id", index=True)
+    approver_id: str = Field(index=True)
+    decision: ApprovalDecision
+    comment: str | None = None
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class MissionRun(SQLModel, table=True):
+    __tablename__ = "mission_runs"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    mission_id: str = Field(foreign_key="missions.id", index=True)
+    state: MissionState = Field(index=True)
+    started_at: datetime = Field(default_factory=now_utc, index=True)
+    ended_at: datetime | None = Field(default=None, index=True)
+
+
 class EventEnvelope(BaseModel):
     event_id: str = PydanticField(default_factory=lambda: str(uuid4()))
     event_type: str
@@ -161,12 +254,6 @@ class Command(BaseModel):
     params: dict[str, Any] = PydanticField(default_factory=dict)
     idempotency_key: str
     expect_ack: bool = True
-
-
-class MissionPlanType(StrEnum):
-    AREA_GRID = "AREA_GRID"
-    ROUTE_WAYPOINTS = "ROUTE_WAYPOINTS"
-    POINT_TASK = "POINT_TASK"
 
 
 class MissionPlan(BaseModel):
@@ -263,3 +350,73 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     permissions: list[str]
+
+
+class DroneCreate(BaseModel):
+    name: str
+    vendor: DroneVendor
+    capabilities: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class DroneUpdate(BaseModel):
+    name: str | None = None
+    vendor: DroneVendor | None = None
+    capabilities: dict[str, Any] | None = None
+
+
+class DroneRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    vendor: DroneVendor
+    capabilities: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class MissionCreate(BaseModel):
+    name: str
+    drone_id: str | None = None
+    type: MissionPlanType
+    payload: dict[str, Any] = PydanticField(default_factory=dict)
+    constraints: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class MissionUpdate(BaseModel):
+    name: str | None = None
+    drone_id: str | None = None
+    payload: dict[str, Any] | None = None
+    constraints: dict[str, Any] | None = None
+
+
+class MissionRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    drone_id: str | None
+    plan_type: MissionPlanType
+    payload: dict[str, Any]
+    constraints: dict[str, Any]
+    state: MissionState
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MissionApprovalRequest(BaseModel):
+    decision: ApprovalDecision
+    comment: str | None = None
+
+
+class ApprovalRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    mission_id: str
+    approver_id: str
+    decision: ApprovalDecision
+    comment: str | None = None
+    created_at: datetime
+
+
+class MissionTransitionRequest(BaseModel):
+    target_state: MissionState

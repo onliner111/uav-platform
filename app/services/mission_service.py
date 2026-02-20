@@ -1,6 +1,268 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, select
+
+from app.domain.models import (
+    Approval,
+    ApprovalDecision,
+    Mission,
+    MissionApprovalRequest,
+    MissionCreate,
+    MissionRun,
+    MissionTransitionRequest,
+    MissionUpdate,
+)
+from app.domain.permissions import PERM_MISSION_FASTLANE, PERM_WILDCARD
+from app.domain.state_machine import MissionState, can_transition
+from app.infra.db import get_engine
+from app.infra.events import event_bus
+
+
+class MissionError(Exception):
+    pass
+
+
+class NotFoundError(MissionError):
+    pass
+
+
+class ConflictError(MissionError):
+    pass
+
+
+class PermissionDeniedError(MissionError):
+    pass
+
 
 class MissionService:
-    """Phase 0 service placeholder."""
+    def _session(self) -> Session:
+        return Session(get_engine(), expire_on_commit=False)
 
+    def _has_permission(self, permissions: list[str], required: str) -> bool:
+        return required in permissions or PERM_WILDCARD in permissions
+
+    def _enforce_fastlane(
+        self,
+        *,
+        constraints: dict[str, object],
+        permissions: list[str],
+        actor_id: str,
+    ) -> dict[str, object]:
+        emergency = bool(constraints.get("emergency_fastlane", False))
+        if not emergency:
+            return constraints
+        if not self._has_permission(permissions, PERM_MISSION_FASTLANE):
+            raise PermissionDeniedError(f"Missing permission: {PERM_MISSION_FASTLANE}")
+        enriched = dict(constraints)
+        enriched["emergency_fastlane"] = True
+        enriched["fastlane_authorized_by"] = actor_id
+        enriched["fastlane_authorized_at"] = datetime.now(UTC).isoformat()
+        return enriched
+
+    def create_mission(
+        self,
+        tenant_id: str,
+        actor_id: str,
+        permissions: list[str],
+        payload: MissionCreate,
+    ) -> Mission:
+        with self._session() as session:
+            constraints = self._enforce_fastlane(
+                constraints=payload.constraints,
+                permissions=permissions,
+                actor_id=actor_id,
+            )
+            mission = Mission(
+                tenant_id=tenant_id,
+                name=payload.name,
+                drone_id=payload.drone_id,
+                plan_type=payload.type,
+                payload=payload.payload,
+                constraints=constraints,
+                created_by=actor_id,
+                state=MissionState.DRAFT,
+            )
+            session.add(mission)
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise ConflictError("mission create conflict") from exc
+            session.refresh(mission)
+
+        event_bus.publish_dict(
+            "mission.created",
+            tenant_id,
+            {"mission_id": mission.id, "state": mission.state, "name": mission.name},
+        )
+        return mission
+
+    def list_missions(self, tenant_id: str) -> list[Mission]:
+        with self._session() as session:
+            statement = select(Mission).where(Mission.tenant_id == tenant_id)
+            return list(session.exec(statement).all())
+
+    def get_mission(self, tenant_id: str, mission_id: str) -> Mission:
+        with self._session() as session:
+            mission = session.get(Mission, mission_id)
+            if mission is None or mission.tenant_id != tenant_id:
+                raise NotFoundError("mission not found")
+            return mission
+
+    def update_mission(
+        self,
+        tenant_id: str,
+        mission_id: str,
+        actor_id: str,
+        permissions: list[str],
+        payload: MissionUpdate,
+    ) -> Mission:
+        with self._session() as session:
+            mission = session.get(Mission, mission_id)
+            if mission is None or mission.tenant_id != tenant_id:
+                raise NotFoundError("mission not found")
+            if mission.state not in {MissionState.DRAFT, MissionState.REJECTED}:
+                raise ConflictError("mission can only be edited in DRAFT/REJECTED state")
+            if payload.name is not None:
+                mission.name = payload.name
+            if payload.drone_id is not None:
+                mission.drone_id = payload.drone_id
+            if payload.payload is not None:
+                mission.payload = payload.payload
+            if payload.constraints is not None:
+                mission.constraints = self._enforce_fastlane(
+                    constraints=payload.constraints,
+                    permissions=permissions,
+                    actor_id=actor_id,
+                )
+            mission.updated_at = datetime.now(UTC)
+            session.add(mission)
+            session.commit()
+            session.refresh(mission)
+
+        event_bus.publish_dict(
+            "mission.updated",
+            tenant_id,
+            {"mission_id": mission.id, "state": mission.state},
+        )
+        return mission
+
+    def delete_mission(self, tenant_id: str, mission_id: str) -> None:
+        with self._session() as session:
+            mission = session.get(Mission, mission_id)
+            if mission is None or mission.tenant_id != tenant_id:
+                raise NotFoundError("mission not found")
+            if mission.state not in {MissionState.DRAFT, MissionState.REJECTED}:
+                raise ConflictError("mission can only be deleted in DRAFT/REJECTED state")
+            session.delete(mission)
+            session.commit()
+
+    def approve_mission(
+        self,
+        tenant_id: str,
+        mission_id: str,
+        actor_id: str,
+        payload: MissionApprovalRequest,
+    ) -> tuple[Mission, Approval]:
+        with self._session() as session:
+            mission = session.get(Mission, mission_id)
+            if mission is None or mission.tenant_id != tenant_id:
+                raise NotFoundError("mission not found")
+            target_state = (
+                MissionState.APPROVED
+                if payload.decision == ApprovalDecision.APPROVE
+                else MissionState.REJECTED
+            )
+            if not can_transition(mission.state, target_state):
+                raise ConflictError(f"illegal transition: {mission.state} -> {target_state}")
+            approval = Approval(
+                tenant_id=tenant_id,
+                mission_id=mission_id,
+                approver_id=actor_id,
+                decision=payload.decision,
+                comment=payload.comment,
+            )
+            mission.state = target_state
+            mission.updated_at = datetime.now(UTC)
+            session.add(approval)
+            session.add(mission)
+            session.commit()
+            session.refresh(approval)
+            session.refresh(mission)
+
+        event_name = "mission.approved" if target_state == MissionState.APPROVED else "mission.rejected"
+        event_bus.publish_dict(
+            event_name,
+            tenant_id,
+            {"mission_id": mission.id, "state": mission.state, "approval_id": approval.id},
+        )
+        return mission, approval
+
+    def list_approvals(self, tenant_id: str, mission_id: str) -> list[Approval]:
+        with self._session() as session:
+            mission = session.get(Mission, mission_id)
+            if mission is None or mission.tenant_id != tenant_id:
+                raise NotFoundError("mission not found")
+            statement = select(Approval).where(Approval.tenant_id == tenant_id).where(
+                Approval.mission_id == mission_id
+            )
+            return list(session.exec(statement).all())
+
+    def transition_mission(
+        self,
+        tenant_id: str,
+        mission_id: str,
+        actor_id: str,
+        permissions: list[str],
+        payload: MissionTransitionRequest,
+    ) -> Mission:
+        with self._session() as session:
+            mission = session.get(Mission, mission_id)
+            if mission is None or mission.tenant_id != tenant_id:
+                raise NotFoundError("mission not found")
+            if not can_transition(mission.state, payload.target_state):
+                raise ConflictError(f"illegal transition: {mission.state} -> {payload.target_state}")
+            if mission.constraints.get("emergency_fastlane", False) and payload.target_state == MissionState.RUNNING:
+                self._enforce_fastlane(
+                    constraints=mission.constraints,
+                    permissions=permissions,
+                    actor_id=actor_id,
+                )
+
+            mission.state = payload.target_state
+            mission.updated_at = datetime.now(UTC)
+            session.add(mission)
+
+            if payload.target_state == MissionState.RUNNING:
+                run = MissionRun(
+                    tenant_id=tenant_id,
+                    mission_id=mission_id,
+                    state=MissionState.RUNNING,
+                    started_at=datetime.now(UTC),
+                )
+                session.add(run)
+
+            if payload.target_state in {MissionState.COMPLETED, MissionState.ABORTED}:
+                runs = session.exec(
+                    select(MissionRun)
+                    .where(MissionRun.tenant_id == tenant_id)
+                    .where(MissionRun.mission_id == mission_id)
+                ).all()
+                active_runs = [run for run in runs if run.ended_at is None]
+                for run in active_runs:
+                    run.state = payload.target_state
+                    run.ended_at = datetime.now(UTC)
+                    session.add(run)
+
+            session.commit()
+            session.refresh(mission)
+
+        event_bus.publish_dict(
+            "mission.state_changed",
+            tenant_id,
+            {"mission_id": mission.id, "state": mission.state},
+        )
+        return mission
