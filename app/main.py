@@ -1,8 +1,25 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from pathlib import Path
 
-from app.api.routers import alert, command, identity, mission, registry, telemetry
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+
+from app.api.routers import (
+    alert,
+    approval,
+    command,
+    dashboard,
+    defect,
+    identity,
+    incident,
+    inspection,
+    mission,
+    registry,
+    reporting,
+    telemetry,
+    ui,
+)
 from app.infra.audit import AuditMiddleware
 from app.infra.db import check_db_ready
 from app.infra.redis_state import check_redis_ready
@@ -22,6 +39,17 @@ app.include_router(telemetry.router, prefix="/api/telemetry", tags=["telemetry"]
 app.include_router(telemetry.ws_router, tags=["telemetry-ws"])
 app.include_router(command.router, prefix="/api/command", tags=["command"])
 app.include_router(alert.router, prefix="/api/alert", tags=["alert"])
+app.include_router(inspection.router, prefix="/api/inspection", tags=["inspection"])
+app.include_router(defect.router, prefix="/api/defects", tags=["defects"])
+app.include_router(incident.router, prefix="/api/incidents", tags=["incidents"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(dashboard.ws_router, tags=["dashboard-ws"])
+app.include_router(approval.router, prefix="/api/approvals", tags=["approvals"])
+app.include_router(reporting.router, prefix="/api/reporting", tags=["reporting"])
+app.include_router(ui.router, tags=["ui"])
+
+static_dir = Path("app") / "web" / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 @app.get("/healthz")

@@ -55,6 +55,12 @@ openapi-smoke:
 
 e2e: up migrate openapi
 	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/demo_e2e.py
+	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/demo_inspection_phase1.py
+	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/demo_defect_phase2.py
+	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/demo_emergency_phase3.py
+	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/demo_command_center_phase4.py
+	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/demo_compliance_phase5.py
+	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/demo_reporting_phase6.py
 	$(COMPOSE) run --rm --build -e APP_BASE_URL=$(APP_BASE_URL) app-tools python infra/scripts/verify_smoke.py
 
 verify-phase0: up lint typecheck test migrate

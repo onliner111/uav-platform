@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emergency Mode</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/ui.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+  <div class="shell">
+    <div class="bar">
+      <h1>Emergency 3-Minute Launch</h1>
+      <a href="/ui/inspection?token={{ token }}">Back</a>
+    </div>
+
+    <div class="panel">
+      <div class="grid cols-2">
+        <div>
+          <label>Title</label>
+          <input id="incident-title" value="Urban fire response">
+        </div>
+        <div>
+          <label>Level</label>
+          <select id="incident-level">
+            <option value="HIGH">HIGH</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LOW">LOW</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">Click map to set incident point.</div>
+      <div id="map"></div>
+      <button id="create-incident-btn" style="margin-top:10px;">Create Incident</button>
+      <button id="create-task-btn" style="margin-top:10px;">One-click Create Task</button>
+      <div class="hint" id="emergency-result"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Recent Incidents</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Title</th><th>Level</th><th>Status</th><th>Task</th></tr>
+        </thead>
+        <tbody>
+          {% for item in incidents %}
+          <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.title }}</td>
+            <td>{{ item.level }}</td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.linked_task_id }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    window.__TOKEN = "{{ token }}";
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/emergency.js"></script>
+</body>
+</html>

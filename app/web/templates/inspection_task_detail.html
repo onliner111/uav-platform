@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inspection Task {{ task.id }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/ui.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+  <div class="shell">
+    <div class="bar">
+      <h1>Task {{ task.name }}</h1>
+      <a href="/ui/inspection?token={{ token }}">Back</a>
+    </div>
+
+    <div class="panel">
+      <div class="grid cols-2">
+        <div>
+          <div><strong>Task ID:</strong> {{ task.id }}</div>
+          <div><strong>Status:</strong> {{ task.status }}</div>
+          <div><strong>Mission:</strong> {{ task.mission_id }}</div>
+        </div>
+        <div>
+          <button id="export-btn" data-task-id="{{ task.id }}" data-token="{{ token }}">Export HTML</button>
+          <div class="hint" id="export-result">No export yet.</div>
+        </div>
+      </div>
+      <div id="map"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Observations</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Item</th>
+            <th>Severity</th>
+            <th>Position</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in observations %}
+          <tr>
+            <td>{{ item.ts }}</td>
+            <td>{{ item.item_code }}</td>
+            <td>{{ item.severity }}</td>
+            <td>{{ item.position_lat }}, {{ item.position_lon }}</td>
+            <td>{{ item.note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    window.__OBS = {{ observations_json | tojson }};
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/inspection_task.js"></script>
+</body>
+</html>

@@ -541,3 +541,361 @@ class AlertRead(ORMReadModel):
 
 class AlertActionRequest(BaseModel):
     comment: str | None = None
+
+
+class InspectionTaskStatus(StrEnum):
+    DRAFT = "DRAFT"
+    SCHEDULED = "SCHEDULED"
+    RUNNING = "RUNNING"
+    DONE = "DONE"
+
+
+class DefectStatus(StrEnum):
+    OPEN = "OPEN"
+    ASSIGNED = "ASSIGNED"
+    IN_PROGRESS = "IN_PROGRESS"
+    FIXED = "FIXED"
+    VERIFIED = "VERIFIED"
+    CLOSED = "CLOSED"
+
+
+class IncidentStatus(StrEnum):
+    OPEN = "OPEN"
+    TASK_CREATED = "TASK_CREATED"
+    CLOSED = "CLOSED"
+
+
+class InspectionTemplate(SQLModel, table=True):
+    __tablename__ = "inspection_templates"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=100, index=True)
+    category: str = Field(max_length=50, index=True)
+    description: str | None = None
+    is_active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class InspectionTemplateItem(SQLModel, table=True):
+    __tablename__ = "inspection_template_items"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    template_id: str = Field(foreign_key="inspection_templates.id", index=True)
+    code: str = Field(max_length=50, index=True)
+    title: str = Field(max_length=100)
+    severity_default: int = 1
+    required: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class InspectionTask(SQLModel, table=True):
+    __tablename__ = "inspection_tasks"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=100, index=True)
+    template_id: str = Field(foreign_key="inspection_templates.id", index=True)
+    mission_id: str | None = Field(default=None, foreign_key="missions.id", index=True)
+    area_geom: str = Field(default="")
+    priority: int = Field(default=5, index=True)
+    status: InspectionTaskStatus = Field(default=InspectionTaskStatus.DRAFT, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class InspectionObservation(SQLModel, table=True):
+    __tablename__ = "inspection_observations"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_id: str = Field(foreign_key="inspection_tasks.id", index=True)
+    drone_id: str | None = Field(default=None, foreign_key="drones.id", index=True)
+    ts: datetime = Field(default_factory=now_utc, index=True)
+    position_lat: float
+    position_lon: float
+    alt_m: float
+    item_code: str = Field(max_length=50, index=True)
+    severity: int = 1
+    note: str = ""
+    media_url: str | None = None
+    confidence: float | None = None
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class InspectionExport(SQLModel, table=True):
+    __tablename__ = "inspection_exports"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_id: str = Field(foreign_key="inspection_tasks.id", index=True)
+    format: str = Field(max_length=10, index=True)
+    file_path: str
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class Defect(SQLModel, table=True):
+    __tablename__ = "defects"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    observation_id: str = Field(foreign_key="inspection_observations.id", index=True)
+    title: str = Field(max_length=200)
+    description: str | None = None
+    severity: int = 1
+    status: DefectStatus = Field(default=DefectStatus.OPEN, index=True)
+    assigned_to: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class DefectAction(SQLModel, table=True):
+    __tablename__ = "defect_actions"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    defect_id: str = Field(foreign_key="defects.id", index=True)
+    action_type: str = Field(max_length=50, index=True)
+    note: str = ""
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class Incident(SQLModel, table=True):
+    __tablename__ = "incidents"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    title: str = Field(max_length=200)
+    level: str = Field(max_length=20, index=True)
+    location_geom: str
+    status: IncidentStatus = Field(default=IncidentStatus.OPEN, index=True)
+    linked_task_id: str | None = Field(default=None, foreign_key="inspection_tasks.id", index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class ApprovalRecord(SQLModel, table=True):
+    __tablename__ = "approval_records"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    entity_type: str = Field(max_length=50, index=True)
+    entity_id: str = Field(index=True)
+    status: str = Field(max_length=20, index=True)
+    approved_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class InspectionTemplateCreate(BaseModel):
+    name: str
+    category: str
+    description: str | None = None
+    is_active: bool = True
+
+
+class InspectionTemplateRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    category: str
+    description: str | None
+    is_active: bool
+    created_at: datetime
+
+
+class InspectionTemplateItemCreate(BaseModel):
+    code: str
+    title: str
+    severity_default: int = 1
+    required: bool = True
+    sort_order: int = 0
+
+
+class InspectionTemplateItemRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    template_id: str
+    code: str
+    title: str
+    severity_default: int
+    required: bool
+    sort_order: int
+    created_at: datetime
+
+
+class InspectionTaskCreate(BaseModel):
+    name: str
+    template_id: str
+    mission_id: str | None = None
+    area_geom: str = ""
+    priority: int = 5
+    status: InspectionTaskStatus = InspectionTaskStatus.SCHEDULED
+
+
+class InspectionTaskRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    template_id: str
+    mission_id: str | None
+    area_geom: str
+    priority: int
+    status: InspectionTaskStatus
+    created_at: datetime
+
+
+class InspectionObservationCreate(BaseModel):
+    drone_id: str | None = None
+    ts: datetime = PydanticField(default_factory=now_utc)
+    position_lat: float
+    position_lon: float
+    alt_m: float
+    item_code: str
+    severity: int = 1
+    note: str = ""
+    media_url: str | None = None
+    confidence: float | None = None
+
+
+class InspectionObservationRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_id: str
+    drone_id: str | None
+    ts: datetime
+    position_lat: float
+    position_lon: float
+    alt_m: float
+    item_code: str
+    severity: int
+    note: str
+    media_url: str | None
+    confidence: float | None
+    created_at: datetime
+
+
+class InspectionExportRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_id: str
+    format: str
+    file_path: str
+    created_at: datetime
+
+
+class DefectCreateFromObservationRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    observation_id: str
+    title: str
+    description: str | None
+    severity: int
+    status: DefectStatus
+    assigned_to: str | None
+    created_at: datetime
+
+
+class DefectAssignRequest(BaseModel):
+    assigned_to: str
+    note: str | None = None
+
+
+class DefectStatusRequest(BaseModel):
+    status: DefectStatus
+    note: str | None = None
+
+
+class DefectActionRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    defect_id: str
+    action_type: str
+    note: str
+    created_at: datetime
+
+
+class DefectDetailRead(BaseModel):
+    defect: DefectCreateFromObservationRead
+    actions: list[DefectActionRead]
+
+
+class DefectStatsRead(BaseModel):
+    total: int
+    closed: int
+    by_status: dict[str, int]
+    closure_rate: float
+
+
+class IncidentCreate(BaseModel):
+    title: str
+    level: str
+    location_geom: str
+
+
+class IncidentRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    title: str
+    level: str
+    location_geom: str
+    status: IncidentStatus
+    linked_task_id: str | None
+    created_at: datetime
+
+
+class IncidentCreateTaskRequest(BaseModel):
+    template_id: str | None = None
+    task_name: str | None = None
+
+
+class IncidentCreateTaskRead(BaseModel):
+    incident_id: str
+    mission_id: str
+    task_id: str
+
+
+class DashboardStatsRead(BaseModel):
+    online_devices: int
+    today_inspections: int
+    defects_total: int
+    realtime_alerts: int
+
+
+class ApprovalRecordCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    status: str
+
+
+class ApprovalRecordRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    entity_type: str
+    entity_id: str
+    status: str
+    approved_by: str
+    created_at: datetime
+
+
+class ReportingOverviewRead(BaseModel):
+    missions_total: int
+    inspections_total: int
+    defects_total: int
+    defects_closed: int
+    closure_rate: float
+
+
+class ReportingClosureRateRead(BaseModel):
+    total: int
+    closed: int
+    closure_rate: float
+
+
+class DeviceUtilizationRead(BaseModel):
+    drone_id: str
+    drone_name: str
+    missions: int
+    inspections: int
+
+
+class ReportingExportRequest(BaseModel):
+    title: str = "Quarterly UAV Governance Report"

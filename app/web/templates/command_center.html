@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/ui.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    .shell { max-width: 100%; padding: 14px; }
+    #live-map { height: calc(100vh - 220px); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="bar">
+      <h1>UAV Command Center</h1>
+      <a href="/ui/inspection?token={{ token }}">Exit</a>
+    </div>
+    <div class="cards">
+      <div class="card"><div>Online Devices</div><div id="stat-online" class="value">{{ stats.online_devices }}</div></div>
+      <div class="card"><div>Today Inspections</div><div id="stat-inspection" class="value">{{ stats.today_inspections }}</div></div>
+      <div class="card"><div>Defects</div><div id="stat-defect" class="value">{{ stats.defects_total }}</div></div>
+      <div class="card"><div>Realtime Alerts</div><div id="stat-alert" class="value">{{ stats.realtime_alerts }}</div></div>
+    </div>
+    <div class="panel">
+      <div id="live-map"></div>
+    </div>
+    <div class="hint">WebSocket stream: <code>/ws/dashboard</code></div>
+  </div>
+  <script>
+    window.__TOKEN = "{{ token }}";
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/command_center.js"></script>
+</body>
+</html>

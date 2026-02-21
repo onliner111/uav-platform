@@ -4,33 +4,40 @@ set -euo pipefail
 STATE_FILE="phases/state.md"
 PROGRESS_FILE="logs/PROGRESS.md"
 
+# ------------------------------------------------------------
+# Preflight: Docker
+# ------------------------------------------------------------
+if ! command -v docker >/dev/null 2>&1; then
+  echo "[ERROR] docker not found."
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "[ERROR] Docker daemon is not running."
+  echo "Start Docker Desktop first."
+  exit 1
+fi
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "[ERROR] docker compose not available."
+  exit 1
+fi
+
+# ------------------------------------------------------------
+# Check state file
+# ------------------------------------------------------------
 if [[ ! -f "$STATE_FILE" ]]; then
   echo "[ERROR] Missing $STATE_FILE"
   exit 1
 fi
 
-# Helpers
+mkdir -p logs
+
 get_field() {
   local key="$1"
-  # grabs everything after "key:"
   grep -E "^- ${key}:" "$STATE_FILE" | sed -E "s/^- ${key}:[[:space:]]*//" || true
 }
 
-print_progress_tail() {
-  if [[ -f "$PROGRESS_FILE" ]]; then
-    echo ""
-    echo "--------------------------------------------"
-    echo "Progress (tail): $PROGRESS_FILE"
-    echo "--------------------------------------------"
-    tail -n 30 "$PROGRESS_FILE" || true
-    echo "--------------------------------------------"
-  else
-    echo ""
-    echo "[INFO] No $PROGRESS_FILE yet."
-  fi
-}
-
-# Read state
 current_phase="$(get_field current_phase | tr -d '\r')"
 last_success="$(get_field last_success_phase | tr -d '\r')"
 last_failure="$(get_field last_failure_phase | tr -d '\r')"
@@ -45,66 +52,47 @@ echo "  last_failure_phase : ${last_failure:-"(none)"}"
 echo "  status             : ${status:-"(none)"}"
 echo "--------------------------------------------"
 
-# Ensure logs folder exists (for reporting)
-mkdir -p logs
-
-if [[ "${status:-}" == "DONE" ]]; then
-  echo "[INFO] All phases completed successfully."
-  print_progress_tail
+if [[ "$status" == "DONE" ]]; then
+  echo "[INFO] All phases already completed."
   exit 0
 fi
 
-if [[ "${status:-}" == "FAILED" ]]; then
+if [[ "$status" == "FAILED" ]]; then
   echo ""
   echo "⚠️  Last execution FAILED."
-  echo "Failed Phase: ${last_failure:-"(unknown)"}"
+  echo "Failed Phase: $last_failure"
   echo ""
-
-  # Try to locate failure report
-  # Convention from phases/reporting.md: logs/<phase-name>.report.md
-  report_file=""
-  if [[ -n "${last_failure:-}" && "${last_failure}" != "(none)" ]]; then
-    base="$(basename "$last_failure")"
-    candidate="logs/${base}.report.md"
-    if [[ -f "$candidate" ]]; then
-      report_file="$candidate"
-    fi
-  fi
-
-  if [[ -n "$report_file" ]]; then
-    echo "Failure report: $report_file"
-    echo "--------------------------------------------"
-    # Print the first 120 lines (avoid dumping too much)
-    sed -n '1,120p' "$report_file" || true
-    echo "--------------------------------------------"
-  else
-    echo "[WARN] Failure report not found yet."
-  fi
-
-  if [[ -n "${last_error:-}" && "${last_error}" != "(none)" ]]; then
-    echo ""
-    echo "Error Summary (from state.md):"
-    echo "${last_error}"
-  fi
-
-  print_progress_tail
-
+  echo "Error Summary:"
+  echo "$last_error"
   echo ""
-  echo "Next actions:"
-  echo "  - To retry (resume from current_phase): ./infra/scripts/run_all_phases.sh"
-  echo "  - To inspect reports: ls -la logs/"
+  echo "Run again to retry:"
+  echo "./infra/scripts/run_all_phases.sh"
   exit 0
 fi
 
 echo "[INFO] Starting / Resuming autonomous execution..."
 echo ""
 
-# Run codex in resume + reporting mode
-codex run "Read AGENTS.md, phases/index.md, phases/state.md, phases/resume.md, phases/reporting.md, logs/PROGRESS.md. Resume execution from phases/state.md current_phase and execute remaining phases sequentially in autonomous mode with checkpoint + reporting updates."
+# ------------------------------------------------------------
+# 🔥 FULL AUTO MODE
+# ------------------------------------------------------------
+codex --full-auto \
+"Read AGENTS.md, phases/index.md, phases/state.md, phases/resume.md, phases/reporting.md, logs/PROGRESS.md.
+Resume execution from phases/state.md current_phase and execute remaining phases sequentially in autonomous mode
+with checkpoint updates, reporting generation, and strict Quality Gate enforcement."
 
-# After Codex run, print latest progress
-print_progress_tail
+# ------------------------------------------------------------
+# Auto Git Commit (only if changes exist)
+# ------------------------------------------------------------
+if [[ -n $(git status --porcelain) ]]; then
+  git add .
+  git commit -m "Phase progress: ${current_phase} auto-update"
+  echo "[INFO] Changes committed for ${current_phase}"
+else
+  echo "[INFO] No changes to commit."
+fi
 
 echo ""
-echo "[INFO] Run completed. If not DONE, re-run the script to continue/resume."
-echo "  ./infra/scripts/run_all_phases.sh"
+echo "[INFO] Run finished."
+echo "If not DONE, re-run:"
+echo "./infra/scripts/run_all_phases.sh"
