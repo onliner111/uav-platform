@@ -1,3 +1,8 @@
+## Responsibility Header
+- Role: Product milestones and outcomes (SSOT for what to deliver).
+- Includes: capability roadmap, milestone goals, and product-level acceptance direction.
+- Excludes: execution commands/runbooks and agent operation instructions (owned by `CODEX_PLAN.md` and `AGENTS.md`).
+
 # ROADMAP.md — 城市低空综合治理（城管巡查 B + 应急指挥 A）融合路线图
 
 > 目标：面向政府项目的“一网统飞”平台，先可展示、可验收、可汇报，再逐步增强真实接入与规模能力。

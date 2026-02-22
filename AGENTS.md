@@ -1,3 +1,8 @@
+## Responsibility Header
+- Role: Engineering Constitution (SSOT for engineering constraints and guardrails).
+- Includes: architecture constraints, quality gates, autonomy rules, and governance boundaries.
+- Excludes: phase task definitions and phase-by-phase execution content (owned by `phases/phase-*.md`).
+
 # AGENTS.md — Autonomous Engineering Rules (Standard Edition)
 
 本文件定义 Codex 在本仓库中的长期行为规则。

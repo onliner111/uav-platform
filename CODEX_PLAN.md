@@ -1,3 +1,8 @@
+## Responsibility Header
+- Role: Execution playbook (SSOT for how delivery is executed).
+- Includes: operational commands, validation flow, and implementation workflow constraints.
+- Excludes: phase definitions and phase acceptance content (owned by `phases/phase-*.md`) and product milestone strategy (owned by `ROADMAP.md`).
+
 # CODEX_PLAN.md — 一网统飞（单体 Monolith + 插件式 Adapter + 多租户）零预装依赖版
 
 > 读者：Codex（自动编码代理）
