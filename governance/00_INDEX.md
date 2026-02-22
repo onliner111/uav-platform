@@ -3,13 +3,13 @@
 ## 1. Document Hierarchy
 
 1. Governance Layer
-- `docs/00_INDEX.md`: documentation navigation and ownership boundaries.
-- `docs/01_GOVERNANCE.md`: SSOT and change-control rules.
+- `governance/00_INDEX.md`: documentation navigation and ownership boundaries.
+- `governance/01_GOVERNANCE.md`: SSOT and change-control rules.
 
 2. Repository SSOT Layer
-- `AGENTS.md`: engineering constitution and hard constraints.
-- `ROADMAP.md`: product milestones and capability progression.
-- `CODEX_PLAN.md`: execution playbook and delivery workflow.
+- `governance/AGENTS.md`: engineering constitution and hard constraints.
+- `governance/ROADMAP.md`: product milestones and capability progression.
+- `governance/EXECUTION_PLAYBOOK.md`: execution playbook and delivery workflow.
 
 3. Phase Execution Layer
 - `phases/index.md`: canonical phase order.
@@ -31,13 +31,13 @@
 
 | Domain | Single Source of Truth | Notes |
 | --- | --- | --- |
-| Engineering rules | `AGENTS.md` | Global engineering constraints only. |
-| Product milestones | `ROADMAP.md` | Outcome and milestone planning only. |
-| Execution workflow | `CODEX_PLAN.md` | How to execute, validate, and deliver. |
+| Engineering rules | `governance/AGENTS.md` | Global engineering constraints only. |
+| Product milestones | `governance/ROADMAP.md` | Outcome and milestone planning only. |
+| Execution workflow | `governance/EXECUTION_PLAYBOOK.md` | How to execute, validate, and deliver. |
 | Phase sequence | `phases/index.md` | Canonical execution order. |
 | Phase definition | `phases/phase-*.md` | Scope and acceptance per phase. |
 | Resume state | `phases/state.md` | Current phase pointer and execution status. |
-| Governance policy | `docs/01_GOVERNANCE.md` | Change-control and SSOT boundaries. |
+| Governance policy | `governance/01_GOVERNANCE.md` | Change-control and SSOT boundaries. |
 
 Conflict handling rule: if two documents disagree, follow the domain owner above instead of duplicating rules.
 
@@ -52,12 +52,13 @@ Current repository contains phase files for 01-06. Group B and Group C are reser
 ## 4. Auto-Generated Reports Reference
 
 - `docs/gpt_SYSTEM_SNAPSHOT.md`
-  - Source script: `gpt/gen_report1.sh`
+  - Source script: `tooling/gpt/gen_report1.sh`
   - Purpose: full repository/system snapshot.
 - `docs/gpt_ARCHITECTURE_RISK_REPORT.md`
-  - Source script: `gpt/gen_report2.sh`
+  - Source script: `tooling/gpt/gen_report2.sh`
   - Purpose: architecture and engineering risk scan.
 - `docs/SYSTEM_SNAPSHOT.md`
   - Legacy/baseline snapshot reference.
 
 Generated reports are evidence artifacts, not rule-defining SSOT documents.
+

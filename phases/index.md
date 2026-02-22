@@ -46,7 +46,7 @@ Before moving to next phase:
 
 Codex should:
 
-1. Read AGENTS.md
+1. Read governance/AGENTS.md
 2. Read phases/index.md
 3. Execute phase 1
 4. Verify

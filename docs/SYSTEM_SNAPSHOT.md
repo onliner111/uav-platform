@@ -86,7 +86,7 @@ doc/
   Deployment_Guide_V2.0.md
   User_Manual_V1.0.md
   User_Manual_V2.0.md
-gpt/
+tooling/gpt/
   gen_report1.sh
   gen_report2.sh
 infra/
@@ -153,16 +153,16 @@ tests/
 [app
 [internal]
 11.10.1
-AGENTS.md
+governance/AGENTS.md
 alembic.ini
-CODEX_PLAN.md
+governance/EXECUTION_PLAYBOOK.md
 docker-compose.yml
 Dockerfile
 Makefile
 pyproject.toml
 requirements-dev.txt
 requirements.txt
-ROADMAP.md
+governance/ROADMAP.md
 ```
 
 ## 2. Main Modules and Responsibilities
@@ -442,3 +442,4 @@ Scan scope: `app/`, `tests/`, `infra/`.
 | `f329dd8` | 2026-02-20 | wxx | Phase 3 |
 
 High-level trend: recent commits include phase milestone progression (`Phase 3` through `Phase 9`) followed by roadmap/process documentation updates.
+

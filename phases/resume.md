@@ -4,7 +4,7 @@
 Execute all phases sequentially with checkpointing and resume support.
 
 ## Inputs
-- AGENTS.md
+- governance/AGENTS.md
 - phases/index.md
 - phases/state.md
 - phases/resume.md
@@ -31,4 +31,4 @@ Execute all phases sequentially with checkpointing and resume support.
 6) After each phase (success or failure), follow phases/reporting.md to write reports in logs/.
 
 ## Output Policy
-Minimal output only (per AGENTS.md).
+Minimal output only (per governance/AGENTS.md).

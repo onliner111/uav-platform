@@ -3,7 +3,7 @@ Generate docs/gpt_ARCHITECTURE_RISK_REPORT.md.
 
 Analyze:
 - Tight coupling areas
-- Violations of AGENTS.md rules
+- Violations of governance/AGENTS.md rules
 - Potential scalability risks
 - Data model design risks
 - Permission model weaknesses
