@@ -50,7 +50,7 @@ def create_incident(payload: IncidentCreate, claims: Claims, service: Service) -
     dependencies=[Depends(require_perm(PERM_INCIDENT_READ))],
 )
 def list_incidents(claims: Claims, service: Service) -> list[IncidentRead]:
-    rows = service.list_incidents(claims["tenant_id"])
+    rows = service.list_incidents(claims["tenant_id"], viewer_user_id=claims["sub"])
     return [IncidentRead.model_validate(item) for item in rows]
 
 
@@ -66,7 +66,13 @@ def create_task(
     service: Service,
 ) -> IncidentCreateTaskRead:
     try:
-        return service.create_task_for_incident(claims["tenant_id"], claims["sub"], incident_id, payload)
+        return service.create_task_for_incident(
+            claims["tenant_id"],
+            claims["sub"],
+            incident_id,
+            payload,
+            viewer_user_id=claims["sub"],
+        )
     except (NotFoundError, ConflictError) as exc:
         _handle_incident_error(exc)
         raise

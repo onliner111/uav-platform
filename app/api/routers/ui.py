@@ -40,7 +40,7 @@ def ui_root(token: str | None = Query(default=None)) -> RedirectResponse:
 def ui_inspection(request: Request, token: str | None = Query(default=None)) -> Any:
     claims = _resolve_claims(token)
     service = InspectionService()
-    tasks = service.list_tasks(claims["tenant_id"])
+    tasks = service.list_tasks(claims["tenant_id"], viewer_user_id=claims["sub"])
     return templates.TemplateResponse(
         request=request,
         name="inspection_list.html",
@@ -52,8 +52,8 @@ def ui_inspection(request: Request, token: str | None = Query(default=None)) -> 
 def ui_inspection_task(request: Request, task_id: str, token: str | None = Query(default=None)) -> Any:
     claims = _resolve_claims(token)
     service = InspectionService()
-    task = service.get_task(claims["tenant_id"], task_id)
-    observations = service.list_observations(claims["tenant_id"], task_id)
+    task = service.get_task(claims["tenant_id"], task_id, viewer_user_id=claims["sub"])
+    observations = service.list_observations(claims["tenant_id"], task_id, viewer_user_id=claims["sub"])
     observations_json = [
         {
             "id": item.id,
@@ -83,7 +83,7 @@ def ui_inspection_task(request: Request, task_id: str, token: str | None = Query
 def ui_defects(request: Request, token: str | None = Query(default=None)) -> Any:
     claims = _resolve_claims(token)
     service = DefectService()
-    defects = service.list_defects(claims["tenant_id"])
+    defects = service.list_defects(claims["tenant_id"], viewer_user_id=claims["sub"])
     return templates.TemplateResponse(
         request=request,
         name="defects.html",
@@ -94,7 +94,7 @@ def ui_defects(request: Request, token: str | None = Query(default=None)) -> Any
 @router.get("/ui/emergency")
 def ui_emergency(request: Request, token: str | None = Query(default=None)) -> Any:
     claims = _resolve_claims(token)
-    incidents = IncidentService().list_incidents(claims["tenant_id"])
+    incidents = IncidentService().list_incidents(claims["tenant_id"], viewer_user_id=claims["sub"])
     return templates.TemplateResponse(
         request=request,
         name="emergency.html",

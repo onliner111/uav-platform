@@ -22,6 +22,12 @@ Codex MUST execute phases sequentially.
 12. phase-07a-lookup-hardening-execution-plan.md
 13. phase-07b-db-boundary-master.md
 14. phase-07c-tenant-export-purge.md
+15. phase-08-one-net-unified-flight-planning.md
+16. phase-08a-org-rbac-foundation.md
+17. phase-08b-data-perimeter-policy.md
+18. phase-08c-audit-hardening.md
+19. phase-08d-integration-acceptance.md
+20. phase-09-flight-resource-asset-management.md
 
 ---
 

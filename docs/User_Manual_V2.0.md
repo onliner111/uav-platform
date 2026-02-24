@@ -2,8 +2,8 @@
 # 用户使用手册（V2.0）
 
 - 文档版本：V2.0
-- 适用系统版本：阶段 `phase-01` 至 `phase-06` 已完成版本
-- 更新日期：2026-02-21
+- 适用系统版本：阶段 `phase-01` 至 `phase-07c` 已完成版本
+- 更新日期：2026-02-24
 
 ---
 
@@ -209,31 +209,83 @@ docker --context default compose -f infra/docker-compose.yml run --rm app alembi
 
 ---
 
-## 10. 常见问题（FAQ）
+## 10. 租户级数据导出与清理（Tenant Export / Purge）
 
-### 10.1 页面返回 401
+说明：本能力用于租户级备份与安全清理，默认仅管理员使用。
+
+### 10.1 租户导出
+
+1. 触发导出：`POST /api/tenants/{tenant_id}/export?include_zip=true`
+2. 查询状态：`GET /api/tenants/{tenant_id}/export/{export_id}`
+3. 下载压缩包：`GET /api/tenants/{tenant_id}/export/{export_id}/download`
+
+导出目录：
+- `logs/exports/<tenant_id>/<export_id>/manifest.json`
+- `logs/exports/<tenant_id>/<export_id>/tables/*.jsonl`
+
+### 10.2 清理 dry-run（不删除）
+
+接口：`POST /api/tenants/{tenant_id}/purge:dry_run`
+
+返回内容包括：
+- `plan`：按依赖顺序的删除计划
+- `counts`：每表行数
+- `estimated_rows`：预计删除总行数
+- `confirm_token`：执行清理时需要使用
+
+### 10.3 执行清理（真删）
+
+接口：`POST /api/tenants/{tenant_id}/purge`
+
+请求体示例：
+
+```json
+{
+  "dry_run_id": "<dry_run_id>",
+  "confirm_token": "<confirm_token>",
+  "mode": "hard"
+}
+```
+
+说明：
+- 必须先完成 dry-run。
+- `confirm_token` 与 `confirm_phrase` 至少提供一个。
+- 固定确认短语：`I_UNDERSTAND_THIS_WILL_DELETE_TENANT_DATA`。
+
+### 10.4 查询清理结果
+
+接口：`GET /api/tenants/{tenant_id}/purge/{purge_id}`
+
+清理报告目录：
+- `logs/purge/<tenant_id>/<purge_id>/report.json`
+
+---
+
+## 11. 常见问题（FAQ）
+
+### 11.1 页面返回 401
 
 原因：未传 token 或 token 无效。  
 处理：重新登录获取 `access_token`，并在 UI URL 追加 `?token=<token>`。
 
-### 10.2 页面返回 403
+### 11.2 页面返回 403
 
 原因：当前账号缺少模块权限。  
 处理：管理员在身份模块为角色绑定对应权限，再重新登录。
 
-### 10.3 看不到数据
+### 11.3 看不到数据
 
 原因：租户隔离导致只能看到当前租户数据。  
 处理：确认登录账号与业务数据处于同一 `tenant_id`。
 
-### 10.4 导出文件找不到
+### 11.4 导出文件找不到
 
 原因：导出成功但文件被清理或路径变化。  
 处理：检查 `logs/exports/`，必要时重新触发导出接口。
 
 ---
 
-## 11. 验收建议命令
+## 12. 验收建议命令
 
 ```powershell
 docker --context default compose -f infra/docker-compose.yml run --rm --build app-tools ruff check app tests infra/scripts
@@ -244,7 +296,7 @@ docker --context default compose -f infra/docker-compose.yml run --rm --build -e
 
 ---
 
-## 12. 附录：关键页面与接口索引
+## 13. 附录：关键页面与接口索引
 
 ### 页面
 
@@ -263,4 +315,5 @@ docker --context default compose -f infra/docker-compose.yml run --rm --build -e
 - 指挥大屏：`/api/dashboard/*` + `/ws/dashboard`
 - 合规审批：`/api/approvals/*`
 - 报表：`/api/reporting/*`
+- 租户导出与清理：`/api/tenants/*`
 

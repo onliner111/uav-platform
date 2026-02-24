@@ -17,6 +17,7 @@ from app.domain.models import (
 )
 from app.infra.db import get_engine
 from app.infra.events import event_bus
+from app.services.data_perimeter_service import DataPerimeterScope, DataPerimeterService
 
 
 class DefectError(Exception):
@@ -41,8 +42,19 @@ class DefectService:
         DefectStatus.CLOSED: set(),
     }
 
+    def __init__(self) -> None:
+        self._data_perimeter = DataPerimeterService()
+
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
+
+    def _scope(
+        self,
+        session: Session,
+        tenant_id: str,
+        viewer_user_id: str | None,
+    ) -> DataPerimeterScope:
+        return self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
 
     def _get_scoped_observation(
         self,
@@ -67,13 +79,22 @@ class DefectService:
             .where(InspectionObservation.id == observation_id)
         ).first()
 
-    def _get_scoped_defect(self, session: Session, tenant_id: str, defect_id: str) -> Defect:
+    def _get_scoped_defect(
+        self,
+        session: Session,
+        tenant_id: str,
+        defect_id: str,
+        viewer_user_id: str | None = None,
+    ) -> Defect:
         defect = session.exec(
             select(Defect)
             .where(Defect.tenant_id == tenant_id)
             .where(Defect.id == defect_id)
         ).first()
         if defect is None:
+            raise NotFoundError("defect not found")
+        scope = self._scope(session, tenant_id, viewer_user_id)
+        if not self._data_perimeter.defect_visible(defect, scope):
             raise NotFoundError("defect not found")
         return defect
 
@@ -93,9 +114,18 @@ class DefectService:
         )
         session.add(action)
 
-    def create_from_observation(self, tenant_id: str, observation_id: str) -> Defect:
+    def create_from_observation(
+        self,
+        tenant_id: str,
+        observation_id: str,
+        viewer_user_id: str | None = None,
+    ) -> Defect:
         with self._session() as session:
             observation = self._get_scoped_observation(session, tenant_id, observation_id)
+            source_task = self._find_scoped_task(session, tenant_id, observation.task_id)
+            scope = self._scope(session, tenant_id, viewer_user_id)
+            if source_task is None or not self._data_perimeter.inspection_task_visible(source_task, scope):
+                raise NotFoundError("observation not found")
 
             existing = session.exec(
                 select(Defect)
@@ -108,6 +138,10 @@ class DefectService:
             defect = Defect(
                 tenant_id=tenant_id,
                 observation_id=observation_id,
+                task_id=observation.task_id,
+                org_unit_id=source_task.org_unit_id,
+                project_code=source_task.project_code,
+                area_code=source_task.area_code,
                 title=f"Defect for item {observation.item_code}",
                 description=observation.note,
                 severity=observation.severity,
@@ -137,6 +171,7 @@ class DefectService:
         tenant_id: str,
         status: DefectStatus | None = None,
         assigned_to: str | None = None,
+        viewer_user_id: str | None = None,
     ) -> list[Defect]:
         with self._session() as session:
             statement = select(Defect).where(Defect.tenant_id == tenant_id)
@@ -144,11 +179,18 @@ class DefectService:
                 statement = statement.where(Defect.status == status)
             if assigned_to is not None:
                 statement = statement.where(Defect.assigned_to == assigned_to)
-            return list(session.exec(statement).all())
+            rows = list(session.exec(statement).all())
+            scope = self._scope(session, tenant_id, viewer_user_id)
+            return [item for item in rows if self._data_perimeter.defect_visible(item, scope)]
 
-    def get_defect(self, tenant_id: str, defect_id: str) -> tuple[Defect, list[DefectAction]]:
+    def get_defect(
+        self,
+        tenant_id: str,
+        defect_id: str,
+        viewer_user_id: str | None = None,
+    ) -> tuple[Defect, list[DefectAction]]:
         with self._session() as session:
-            defect = self._get_scoped_defect(session, tenant_id, defect_id)
+            defect = self._get_scoped_defect(session, tenant_id, defect_id, viewer_user_id)
             actions = list(
                 session.exec(
                     select(DefectAction)
@@ -158,9 +200,15 @@ class DefectService:
             )
             return defect, actions
 
-    def assign_defect(self, tenant_id: str, defect_id: str, payload: DefectAssignRequest) -> Defect:
+    def assign_defect(
+        self,
+        tenant_id: str,
+        defect_id: str,
+        payload: DefectAssignRequest,
+        viewer_user_id: str | None = None,
+    ) -> Defect:
         with self._session() as session:
-            defect = self._get_scoped_defect(session, tenant_id, defect_id)
+            defect = self._get_scoped_defect(session, tenant_id, defect_id, viewer_user_id)
             if defect.status == DefectStatus.CLOSED:
                 raise ConflictError("closed defect cannot be assigned")
             defect.assigned_to = payload.assigned_to
@@ -178,9 +226,15 @@ class DefectService:
         )
         return defect
 
-    def update_status(self, tenant_id: str, defect_id: str, payload: DefectStatusRequest) -> Defect:
+    def update_status(
+        self,
+        tenant_id: str,
+        defect_id: str,
+        payload: DefectStatusRequest,
+        viewer_user_id: str | None = None,
+    ) -> Defect:
         with self._session() as session:
-            defect = self._get_scoped_defect(session, tenant_id, defect_id)
+            defect = self._get_scoped_defect(session, tenant_id, defect_id, viewer_user_id)
             if defect.status == payload.status:
                 return defect
             allowed = self._allowed_transitions.get(defect.status, set())
@@ -200,6 +254,9 @@ class DefectService:
                         name=f"Review-{defect.id[:8]}",
                         template_id=self._resolve_template_id_for_review(session, tenant_id, observation.task_id),
                         mission_id=None,
+                        org_unit_id=defect.org_unit_id,
+                        project_code=defect.project_code,
+                        area_code=defect.area_code,
                         area_geom="",
                         priority=2,
                         status=InspectionTaskStatus.SCHEDULED,
@@ -232,8 +289,8 @@ class DefectService:
             raise ConflictError("cannot create review task without any inspection task template")
         return fallback.template_id
 
-    def stats(self, tenant_id: str) -> DefectStatsRead:
-        rows = self.list_defects(tenant_id)
+    def stats(self, tenant_id: str, viewer_user_id: str | None = None) -> DefectStatsRead:
+        rows = self.list_defects(tenant_id, viewer_user_id=viewer_user_id)
         by_status: dict[str, int] = {}
         for row in rows:
             key = row.status.value

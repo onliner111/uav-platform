@@ -16,21 +16,29 @@ from app.domain.models import (
     ReportingOverviewRead,
 )
 from app.infra.db import get_engine
+from app.services.data_perimeter_service import DataPerimeterService
 from app.services.defect_service import DefectService
 
 
 class ReportingService:
     def __init__(self) -> None:
         self._defect_service = DefectService()
+        self._data_perimeter = DataPerimeterService()
 
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
-    def overview(self, tenant_id: str) -> ReportingOverviewRead:
+    def overview(self, tenant_id: str, viewer_user_id: str | None = None) -> ReportingOverviewRead:
         with self._session() as session:
             missions = list(session.exec(select(Mission).where(Mission.tenant_id == tenant_id)).all())
             inspections = list(session.exec(select(InspectionTask).where(InspectionTask.tenant_id == tenant_id)).all())
             defects = list(session.exec(select(Defect).where(Defect.tenant_id == tenant_id)).all())
+            scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+            missions = [item for item in missions if self._data_perimeter.mission_visible(item, scope)]
+            inspections = [
+                item for item in inspections if self._data_perimeter.inspection_task_visible(item, scope)
+            ]
+            defects = [item for item in defects if self._data_perimeter.defect_visible(item, scope)]
         defects_total = len(defects)
         defects_closed = len([item for item in defects if item.status == DefectStatus.CLOSED])
         closure_rate = (defects_closed / defects_total) if defects_total else 0.0
@@ -42,19 +50,24 @@ class ReportingService:
             closure_rate=closure_rate,
         )
 
-    def closure_rate(self, tenant_id: str) -> ReportingClosureRateRead:
-        stats = self._defect_service.stats(tenant_id)
+    def closure_rate(self, tenant_id: str, viewer_user_id: str | None = None) -> ReportingClosureRateRead:
+        stats = self._defect_service.stats(tenant_id, viewer_user_id=viewer_user_id)
         return ReportingClosureRateRead(
             total=stats.total,
             closed=stats.closed,
             closure_rate=stats.closure_rate,
         )
 
-    def device_utilization(self, tenant_id: str) -> list[DeviceUtilizationRead]:
+    def device_utilization(self, tenant_id: str, viewer_user_id: str | None = None) -> list[DeviceUtilizationRead]:
         with self._session() as session:
             drones = list(session.exec(select(Drone).where(Drone.tenant_id == tenant_id)).all())
             missions = list(session.exec(select(Mission).where(Mission.tenant_id == tenant_id)).all())
             inspections = list(session.exec(select(InspectionTask).where(InspectionTask.tenant_id == tenant_id)).all())
+            scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+            missions = [item for item in missions if self._data_perimeter.mission_visible(item, scope)]
+            inspections = [
+                item for item in inspections if self._data_perimeter.inspection_task_visible(item, scope)
+            ]
 
         usage: list[DeviceUtilizationRead] = []
         for drone in drones:
@@ -71,9 +84,14 @@ class ReportingService:
             )
         return usage
 
-    def export_report(self, tenant_id: str, payload: ReportingExportRequest) -> str:
-        overview = self.overview(tenant_id)
-        closure = self.closure_rate(tenant_id)
+    def export_report(
+        self,
+        tenant_id: str,
+        payload: ReportingExportRequest,
+        viewer_user_id: str | None = None,
+    ) -> str:
+        overview = self.overview(tenant_id, viewer_user_id=viewer_user_id)
+        closure = self.closure_rate(tenant_id, viewer_user_id=viewer_user_id)
         export_dir = Path("logs") / "exports"
         export_dir.mkdir(parents=True, exist_ok=True)
         output_file = export_dir / f"report_{tenant_id}.pdf"

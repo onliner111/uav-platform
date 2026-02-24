@@ -10,26 +10,32 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 6. `governance/03_PHASE_LIFECYCLE.md`
 7. `governance/04_CHAT_INTERACTION_PROTOCOL.md`
 8. `governance/ROADMAP.md`
-9. `phases/state.md`
-10. `docs/PROJECT_STATUS.md`
-11. `phases/index.md`
-12. `logs/PROGRESS.md`
-13. `phases/phase-07c-tenant-export-purge.md`
+9. `项目最终目标.md`
+10. `phases/state.md`
+11. `docs/PROJECT_STATUS.md`
+12. `phases/index.md`
+13. `logs/PROGRESS.md`
+14. `phases/phase-08-one-net-unified-flight-planning.md`
+15. `phases/phase-08a-org-rbac-foundation.md`
+16. `phases/phase-08b-data-perimeter-policy.md`
+17. `phases/phase-08c-audit-hardening.md`
+18. `phases/phase-08d-integration-acceptance.md`
+19. `phases/phase-09-flight-resource-asset-management.md`
 
 Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-24T12:46:47Z`
+- updated_at_utc: `2026-02-24T18:25:07Z`
 - current_phase: `DONE`
 - phase_status: `DONE`
-- last_success_phase: `phase-07c-tenant-export-purge.md`
-- current_focus: `07C completed; full gate chain rerun passed via Docker Compose`
+- last_success_phase: `phase-09-flight-resource-asset-management.md`
+- current_focus: `Phase 09 closed; execution chain in phases/index.md is fully completed`
 
 ## Next TODO (Execution Target)
-1. No pending TODO in current `phases/index.md` execution chain (01..07C complete).
-2. Wait for next blueprint update (e.g., new phase file + index/state change) before implementation.
-3. Keep Docker Compose gate commands below as baseline regression checklist.
+1. No pending TODO in current index chain (phase 01..09 complete).
+2. Keep Docker Compose baseline gate commands below as regression checklist.
+3. Wait for next phase blueprint/index update before new implementation.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -42,5 +48,10 @@ Use Docker Compose commands directly in this environment:
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py`
 
+## Docker Permission Rule (Mandatory)
+- For all Docker-related quality-gate commands in this environment, run with escalated permissions by default.
+- If any Docker command returns npipe access denial (e.g. `permission denied ... dockerDesktopLinuxEngine`), immediately retry the same command with escalated permissions in the same turn.
+- This rule is persistent and must be applied on every restarted session.
+
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。若 current_phase=DONE，则仅执行回归门禁并等待下一阶段蓝图；若不是 DONE，则按 Next TODO 继续并同步 state/project_status/progress。`
+`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=DONE（phase 01..09 已完成）；仅执行回归门禁并等待下一阶段蓝图或 index 更新。`

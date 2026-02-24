@@ -2,7 +2,7 @@
 # 接口清单附录（V2.0）
 
 - 文档版本：V2.0
-- 更新日期：2026-02-21
+- 更新日期：2026-02-24
 - 说明：本附录按模块整理当前系统已实现接口，路径与 `app/main.py` 路由注册一致。
 
 ---
@@ -52,11 +52,24 @@
 | GET | `/api/identity/roles/{role_id}` | 角色详情 |
 | PATCH | `/api/identity/roles/{role_id}` | 更新角色 |
 | DELETE | `/api/identity/roles/{role_id}` | 删除角色 |
+| GET | `/api/identity/role-templates` | 角色模板列表 |
+| POST | `/api/identity/roles:from-template` | 基于模板创建角色 |
 | POST | `/api/identity/permissions` | 创建权限 |
 | GET | `/api/identity/permissions` | 权限列表 |
 | GET | `/api/identity/permissions/{permission_id}` | 权限详情 |
 | PATCH | `/api/identity/permissions/{permission_id}` | 更新权限 |
 | DELETE | `/api/identity/permissions/{permission_id}` | 删除权限 |
+| POST | `/api/identity/org-units` | 创建组织节点 |
+| GET | `/api/identity/org-units` | 组织节点列表 |
+| GET | `/api/identity/org-units/{org_unit_id}` | 组织节点详情 |
+| PATCH | `/api/identity/org-units/{org_unit_id}` | 更新组织节点 |
+| DELETE | `/api/identity/org-units/{org_unit_id}` | 删除组织节点 |
+| POST | `/api/identity/users/{user_id}/org-units/{org_unit_id}` | 用户绑定组织 |
+| DELETE | `/api/identity/users/{user_id}/org-units/{org_unit_id}` | 用户解绑组织 |
+| GET | `/api/identity/users/{user_id}/org-units` | 查询用户组织绑定 |
+| GET | `/api/identity/users/{user_id}/data-policy` | 查询用户数据边界策略 |
+| PUT | `/api/identity/users/{user_id}/data-policy` | 设置用户数据边界策略 |
+| POST | `/api/identity/users/{user_id}/roles:batch-bind` | 批量绑定用户角色（返回逐项结果） |
 | POST | `/api/identity/users/{user_id}/roles/{role_id}` | 用户绑定角色 |
 | DELETE | `/api/identity/users/{user_id}/roles/{role_id}` | 用户解绑角色 |
 | POST | `/api/identity/roles/{role_id}/permissions/{permission_id}` | 角色绑定权限 |
@@ -217,4 +230,24 @@
 | GET | `/ui/defects` | 问题闭环页 |
 | GET | `/ui/emergency` | 应急处置页 |
 | GET | `/ui/command-center` | 指挥中心大屏页 |
+
+---
+
+## 16. 租户导出与清理（`/api/tenants`）
+
+### 16.1 Tenant Export
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/tenants/{tenant_id}/export` | 触发租户导出（支持 `include_zip=true`） |
+| GET | `/api/tenants/{tenant_id}/export/{export_id}` | 查询导出状态与 manifest 摘要 |
+| GET | `/api/tenants/{tenant_id}/export/{export_id}/download` | 下载导出 zip 包 |
+
+### 16.2 Tenant Purge
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/tenants/{tenant_id}/purge:dry_run` | 生成清理计划与计数（不删除） |
+| POST | `/api/tenants/{tenant_id}/purge` | 执行清理（需 `dry_run_id` + 二次确认） |
+| GET | `/api/tenants/{tenant_id}/purge/{purge_id}` | 查询清理结果报告 |
 

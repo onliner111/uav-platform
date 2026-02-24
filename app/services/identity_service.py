@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import hashlib
 import os
+from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
 from app.domain.models import (
     BootstrapAdminRequest,
+    DataAccessPolicy,
+    DataAccessPolicyUpdate,
+    DataScopeMode,
+    OrgUnit,
+    OrgUnitCreate,
+    OrgUnitUpdate,
     Permission,
     PermissionCreate,
     PermissionUpdate,
@@ -20,10 +27,28 @@ from app.domain.models import (
     TenantUpdate,
     User,
     UserCreate,
+    UserOrgMembership,
     UserRole,
     UserUpdate,
+    now_utc,
 )
-from app.domain.permissions import DEFAULT_PERMISSION_NAMES, PERM_WILDCARD
+from app.domain.permissions import (
+    DEFAULT_PERMISSION_NAMES,
+    PERM_ALERT_READ,
+    PERM_COMMAND_READ,
+    PERM_COMMAND_WRITE,
+    PERM_DASHBOARD_READ,
+    PERM_IDENTITY_READ,
+    PERM_INCIDENT_READ,
+    PERM_INCIDENT_WRITE,
+    PERM_INSPECTION_READ,
+    PERM_INSPECTION_WRITE,
+    PERM_MISSION_READ,
+    PERM_MISSION_WRITE,
+    PERM_REGISTRY_READ,
+    PERM_REPORTING_READ,
+    PERM_WILDCARD,
+)
 from app.infra.db import get_engine
 
 
@@ -44,6 +69,61 @@ class AuthError(IdentityError):
 
 
 class IdentityService:
+    ROLE_TEMPLATES: tuple[dict[str, Any], ...] = (
+        {
+            "key": "dispatcher",
+            "name": "dispatcher",
+            "description": "mission and command dispatcher",
+            "permissions": [
+                PERM_MISSION_READ,
+                PERM_MISSION_WRITE,
+                PERM_COMMAND_READ,
+                PERM_COMMAND_WRITE,
+                PERM_ALERT_READ,
+                PERM_DASHBOARD_READ,
+                PERM_REGISTRY_READ,
+            ],
+        },
+        {
+            "key": "inspector",
+            "name": "inspector",
+            "description": "inspection operator",
+            "permissions": [
+                PERM_INSPECTION_READ,
+                PERM_INSPECTION_WRITE,
+                PERM_MISSION_READ,
+                PERM_DASHBOARD_READ,
+            ],
+        },
+        {
+            "key": "incident_operator",
+            "name": "incident-operator",
+            "description": "incident response operator",
+            "permissions": [
+                PERM_INCIDENT_READ,
+                PERM_INCIDENT_WRITE,
+                PERM_MISSION_READ,
+                PERM_COMMAND_READ,
+                PERM_DASHBOARD_READ,
+            ],
+        },
+        {
+            "key": "auditor",
+            "name": "auditor",
+            "description": "read-only governance reviewer",
+            "permissions": [
+                PERM_IDENTITY_READ,
+                PERM_MISSION_READ,
+                PERM_INSPECTION_READ,
+                PERM_INCIDENT_READ,
+                PERM_REPORTING_READ,
+                PERM_DASHBOARD_READ,
+                PERM_COMMAND_READ,
+                PERM_ALERT_READ,
+            ],
+        },
+    )
+
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
@@ -74,6 +154,44 @@ class IdentityService:
     def _get_scoped_role(self, session: Session, tenant_id: str, role_id: str) -> Role | None:
         statement = select(Role).where(Role.tenant_id == tenant_id).where(Role.id == role_id)
         return session.exec(statement).first()
+
+    def _get_scoped_org_unit(self, session: Session, tenant_id: str, org_unit_id: str) -> OrgUnit | None:
+        statement = select(OrgUnit).where(OrgUnit.tenant_id == tenant_id).where(OrgUnit.id == org_unit_id)
+        return session.exec(statement).first()
+
+    def _resolve_org_parent(
+        self,
+        session: Session,
+        tenant_id: str,
+        current_org_id: str,
+        parent_id: str | None,
+    ) -> OrgUnit | None:
+        if parent_id is None:
+            return None
+        if parent_id == current_org_id:
+            raise ConflictError("org unit cannot be parent of itself")
+        parent = self._get_scoped_org_unit(session, tenant_id, parent_id)
+        if parent is None:
+            raise NotFoundError("parent org unit not found")
+        return parent
+
+    def _org_level_path(self, org_unit_id: str, parent: OrgUnit | None) -> tuple[int, str]:
+        if parent is None:
+            return 0, f"/{org_unit_id}"
+        return parent.level + 1, f"{parent.path}/{org_unit_id}"
+
+    def _normalize_scope_values(self, values: list[str]) -> list[str]:
+        return sorted({item.strip() for item in values if isinstance(item, str) and item.strip()})
+
+    def user_exists_any_tenant(self, user_id: str) -> bool:
+        with self._session() as session:
+            statement = select(User.id).where(User.id == user_id)
+            return session.exec(statement).first() is not None
+
+    def role_exists_any_tenant(self, role_id: str) -> bool:
+        with self._session() as session:
+            statement = select(Role.id).where(Role.id == role_id)
+            return session.exec(statement).first() is not None
 
     def create_tenant(self, payload: TenantCreate) -> Tenant:
         with self._session() as session:
@@ -264,6 +382,297 @@ class IdentityService:
             session.delete(role)
             session.commit()
 
+    def list_role_templates(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "key": str(item["key"]),
+                "name": str(item["name"]),
+                "description": str(item["description"]),
+                "permissions": list(item["permissions"]),
+            }
+            for item in self.ROLE_TEMPLATES
+        ]
+
+    def create_role_from_template(
+        self,
+        *,
+        tenant_id: str,
+        template_key: str,
+        name: str | None = None,
+    ) -> Role:
+        template = next((item for item in self.ROLE_TEMPLATES if item["key"] == template_key), None)
+        if template is None:
+            raise NotFoundError("role template not found")
+
+        role_name = name or str(template["name"])
+        role_description = str(template["description"])
+        template_permissions = list(template["permissions"])
+
+        with self._session() as session:
+            _ = self._ensure_default_permissions(session)
+
+            role = Role(
+                tenant_id=tenant_id,
+                name=role_name,
+                description=role_description,
+            )
+            session.add(role)
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise ConflictError("role name already exists in tenant") from exc
+            session.refresh(role)
+
+            permissions = list(
+                session.exec(
+                    select(Permission).where(col(Permission.name).in_(template_permissions))
+                ).all()
+            )
+            permission_by_name = {item.name: item for item in permissions}
+            missing_permissions = [perm for perm in template_permissions if perm not in permission_by_name]
+            if missing_permissions:
+                raise ConflictError(f"missing permissions for template: {missing_permissions}")
+
+            for perm_name in template_permissions:
+                permission = permission_by_name[perm_name]
+                if session.get(RolePermission, (role.id, permission.id)) is None:
+                    session.add(RolePermission(role_id=role.id, permission_id=permission.id))
+            session.commit()
+            session.refresh(role)
+            return role
+
+    def create_org_unit(self, tenant_id: str, payload: OrgUnitCreate) -> OrgUnit:
+        with self._session() as session:
+            if session.get(Tenant, tenant_id) is None:
+                raise NotFoundError("tenant not found")
+
+            org_unit = OrgUnit(
+                tenant_id=tenant_id,
+                name=payload.name,
+                code=payload.code,
+                parent_id=payload.parent_id,
+                is_active=payload.is_active,
+            )
+            parent = self._resolve_org_parent(session, tenant_id, org_unit.id, payload.parent_id)
+            org_unit.level, org_unit.path = self._org_level_path(org_unit.id, parent)
+            session.add(org_unit)
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise ConflictError("org unit code already exists in tenant") from exc
+            session.refresh(org_unit)
+            return org_unit
+
+    def list_org_units(self, tenant_id: str) -> list[OrgUnit]:
+        with self._session() as session:
+            units = list(session.exec(select(OrgUnit).where(OrgUnit.tenant_id == tenant_id)).all())
+            return sorted(units, key=lambda item: item.path)
+
+    def get_org_unit(self, tenant_id: str, org_unit_id: str) -> OrgUnit:
+        with self._session() as session:
+            org_unit = self._get_scoped_org_unit(session, tenant_id, org_unit_id)
+            if org_unit is None:
+                raise NotFoundError("org unit not found")
+            return org_unit
+
+    def update_org_unit(self, tenant_id: str, org_unit_id: str, payload: OrgUnitUpdate) -> OrgUnit:
+        with self._session() as session:
+            org_unit = self._get_scoped_org_unit(session, tenant_id, org_unit_id)
+            if org_unit is None:
+                raise NotFoundError("org unit not found")
+
+            if "name" in payload.model_fields_set and payload.name is not None:
+                org_unit.name = payload.name
+            if "code" in payload.model_fields_set and payload.code is not None:
+                org_unit.code = payload.code
+            if "is_active" in payload.model_fields_set and payload.is_active is not None:
+                org_unit.is_active = payload.is_active
+
+            if "parent_id" in payload.model_fields_set and payload.parent_id != org_unit.parent_id:
+                old_path = org_unit.path
+                old_level = org_unit.level
+                parent = self._resolve_org_parent(session, tenant_id, org_unit.id, payload.parent_id)
+                if parent is not None and parent.path.startswith(f"{old_path}/"):
+                    raise ConflictError("org unit cannot move under its descendant")
+
+                org_unit.parent_id = payload.parent_id
+                org_unit.level, org_unit.path = self._org_level_path(org_unit.id, parent)
+                depth_delta = org_unit.level - old_level
+                descendants = list(
+                    session.exec(
+                        select(OrgUnit)
+                        .where(OrgUnit.tenant_id == tenant_id)
+                        .where(col(OrgUnit.path).like(f"{old_path}/%"))
+                    ).all()
+                )
+                for child in descendants:
+                    suffix = child.path[len(old_path) :]
+                    child.path = f"{org_unit.path}{suffix}"
+                    child.level = child.level + depth_delta
+                    child.updated_at = now_utc()
+                    session.add(child)
+
+            org_unit.updated_at = now_utc()
+            session.add(org_unit)
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise ConflictError("org unit code already exists in tenant") from exc
+            session.refresh(org_unit)
+            return org_unit
+
+    def delete_org_unit(self, tenant_id: str, org_unit_id: str) -> None:
+        with self._session() as session:
+            org_unit = self._get_scoped_org_unit(session, tenant_id, org_unit_id)
+            if org_unit is None:
+                raise NotFoundError("org unit not found")
+
+            child = session.exec(
+                select(OrgUnit.id)
+                .where(OrgUnit.tenant_id == tenant_id)
+                .where(OrgUnit.parent_id == org_unit_id)
+            ).first()
+            if child is not None:
+                raise ConflictError("org unit has child units")
+
+            membership = session.exec(
+                select(UserOrgMembership.user_id)
+                .where(UserOrgMembership.tenant_id == tenant_id)
+                .where(UserOrgMembership.org_unit_id == org_unit_id)
+            ).first()
+            if membership is not None:
+                raise ConflictError("org unit has memberships")
+
+            session.delete(org_unit)
+            session.commit()
+
+    def bind_user_org_unit(
+        self,
+        tenant_id: str,
+        user_id: str,
+        org_unit_id: str,
+        *,
+        is_primary: bool = False,
+    ) -> UserOrgMembership:
+        with self._session() as session:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            org_unit = self._get_scoped_org_unit(session, tenant_id, org_unit_id)
+            if user is None or org_unit is None:
+                raise NotFoundError("user or org unit not found")
+
+            link = session.get(UserOrgMembership, (tenant_id, user_id, org_unit_id))
+            if link is None:
+                link = UserOrgMembership(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    org_unit_id=org_unit_id,
+                    is_primary=is_primary,
+                )
+
+            if is_primary:
+                all_links = list(
+                    session.exec(
+                        select(UserOrgMembership)
+                        .where(UserOrgMembership.tenant_id == tenant_id)
+                        .where(UserOrgMembership.user_id == user_id)
+                    ).all()
+                )
+                for item in all_links:
+                    if item.org_unit_id == org_unit_id:
+                        continue
+                    if item.is_primary:
+                        item.is_primary = False
+                        session.add(item)
+                link.is_primary = True
+
+            session.add(link)
+            session.commit()
+            session.refresh(link)
+            return link
+
+    def unbind_user_org_unit(self, tenant_id: str, user_id: str, org_unit_id: str) -> None:
+        with self._session() as session:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            org_unit = self._get_scoped_org_unit(session, tenant_id, org_unit_id)
+            if user is None or org_unit is None:
+                raise NotFoundError("user or org unit not found")
+            link = session.get(UserOrgMembership, (tenant_id, user_id, org_unit_id))
+            if link is None:
+                return
+            session.delete(link)
+            session.commit()
+
+    def list_user_org_units(self, tenant_id: str, user_id: str) -> list[UserOrgMembership]:
+        with self._session() as session:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
+                raise NotFoundError("user not found")
+            links = list(
+                session.exec(
+                    select(UserOrgMembership)
+                    .where(UserOrgMembership.tenant_id == tenant_id)
+                    .where(UserOrgMembership.user_id == user_id)
+                ).all()
+            )
+            return sorted(links, key=lambda item: (not item.is_primary, item.org_unit_id))
+
+    def get_user_data_policy(self, tenant_id: str, user_id: str) -> DataAccessPolicy:
+        with self._session() as session:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
+                raise NotFoundError("user not found")
+            policy = session.exec(
+                select(DataAccessPolicy)
+                .where(DataAccessPolicy.tenant_id == tenant_id)
+                .where(DataAccessPolicy.user_id == user_id)
+            ).first()
+            if policy is not None:
+                return policy
+            return DataAccessPolicy(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                scope_mode=DataScopeMode.ALL,
+                org_unit_ids=[],
+                project_codes=[],
+                area_codes=[],
+                task_ids=[],
+            )
+
+    def upsert_user_data_policy(
+        self,
+        tenant_id: str,
+        user_id: str,
+        payload: DataAccessPolicyUpdate,
+    ) -> DataAccessPolicy:
+        with self._session() as session:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
+                raise NotFoundError("user not found")
+            policy = session.exec(
+                select(DataAccessPolicy)
+                .where(DataAccessPolicy.tenant_id == tenant_id)
+                .where(DataAccessPolicy.user_id == user_id)
+            ).first()
+            if policy is None:
+                policy = DataAccessPolicy(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                )
+
+            policy.scope_mode = payload.scope_mode
+            policy.org_unit_ids = self._normalize_scope_values(payload.org_unit_ids)
+            policy.project_codes = self._normalize_scope_values(payload.project_codes)
+            policy.area_codes = self._normalize_scope_values(payload.area_codes)
+            policy.task_ids = self._normalize_scope_values(payload.task_ids)
+            policy.updated_at = now_utc()
+            session.add(policy)
+            session.commit()
+            session.refresh(policy)
+            return policy
+
     def create_permission(self, payload: PermissionCreate) -> Permission:
         with self._session() as session:
             permission = Permission(name=payload.name, description=payload.description)
@@ -323,6 +732,76 @@ class IdentityService:
                 return
             session.add(UserRole(tenant_id=tenant_id, user_id=user_id, role_id=role_id))
             session.commit()
+
+    def bind_user_roles_batch(
+        self,
+        tenant_id: str,
+        user_id: str,
+        role_ids: list[str],
+    ) -> dict[str, Any]:
+        with self._session() as session:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
+                raise NotFoundError("user not found")
+
+            normalized_role_ids = [item.strip() for item in role_ids if isinstance(item, str) and item.strip()]
+            if not normalized_role_ids:
+                return {
+                    "user_id": user_id,
+                    "requested_count": 0,
+                    "bound_count": 0,
+                    "already_bound_count": 0,
+                    "denied_count": 0,
+                    "missing_count": 0,
+                    "results": [],
+                }
+
+            scoped_roles = list(
+                session.exec(
+                    select(Role)
+                    .where(Role.tenant_id == tenant_id)
+                    .where(col(Role.id).in_(normalized_role_ids))
+                ).all()
+            )
+            scoped_role_ids = {item.id for item in scoped_roles}
+
+            global_role_ids = set(
+                session.exec(select(Role.id).where(col(Role.id).in_(normalized_role_ids))).all()
+            )
+            existing_role_links = set(
+                session.exec(
+                    select(UserRole.role_id)
+                    .where(UserRole.tenant_id == tenant_id)
+                    .where(UserRole.user_id == user_id)
+                ).all()
+            )
+
+            results: list[dict[str, str]] = []
+            for role_id in normalized_role_ids:
+                if role_id in scoped_role_ids:
+                    if role_id in existing_role_links:
+                        results.append({"role_id": role_id, "status": "already_bound"})
+                        continue
+                    session.add(UserRole(tenant_id=tenant_id, user_id=user_id, role_id=role_id))
+                    existing_role_links.add(role_id)
+                    results.append({"role_id": role_id, "status": "bound"})
+                    continue
+
+                status_name = "cross_tenant_denied" if role_id in global_role_ids else "not_found"
+                results.append({"role_id": role_id, "status": status_name})
+
+            if any(item["status"] == "bound" for item in results):
+                session.commit()
+
+            return {
+                "user_id": user_id,
+                "requested_count": len(normalized_role_ids),
+                "bound_count": sum(1 for item in results if item["status"] == "bound"),
+                "already_bound_count": sum(1 for item in results if item["status"] == "already_bound"),
+                "denied_count": sum(1 for item in results if item["status"] == "cross_tenant_denied"),
+                "missing_count": sum(1 for item in results if item["status"] == "not_found"),
+                "results": results,
+            }
 
     def unbind_user_role(self, tenant_id: str, user_id: str, role_id: str) -> None:
         with self._session() as session:

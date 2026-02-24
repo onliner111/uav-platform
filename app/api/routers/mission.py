@@ -68,7 +68,7 @@ def create_mission(payload: MissionCreate, claims: Claims, service: Service) -> 
     dependencies=[Depends(require_perm(PERM_MISSION_READ))],
 )
 def list_missions(claims: Claims, service: Service) -> list[MissionRead]:
-    missions = service.list_missions(claims["tenant_id"])
+    missions = service.list_missions(claims["tenant_id"], viewer_user_id=claims["sub"])
     return [MissionRead.model_validate(item) for item in missions]
 
 
@@ -79,7 +79,7 @@ def list_missions(claims: Claims, service: Service) -> list[MissionRead]:
 )
 def get_mission(mission_id: str, claims: Claims, service: Service) -> MissionRead:
     try:
-        mission = service.get_mission(claims["tenant_id"], mission_id)
+        mission = service.get_mission(claims["tenant_id"], mission_id, viewer_user_id=claims["sub"])
         return MissionRead.model_validate(mission)
     except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
         _handle_mission_error(exc)
@@ -104,6 +104,7 @@ def update_mission(
             actor_id=claims["sub"],
             permissions=claims.get("permissions", []),
             payload=payload,
+            viewer_user_id=claims["sub"],
         )
         return MissionRead.model_validate(mission)
     except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
@@ -118,7 +119,7 @@ def update_mission(
 )
 def delete_mission(mission_id: str, claims: Claims, service: Service) -> Response:
     try:
-        service.delete_mission(claims["tenant_id"], mission_id)
+        service.delete_mission(claims["tenant_id"], mission_id, viewer_user_id=claims["sub"])
     except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
         _handle_mission_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -141,6 +142,7 @@ def approve_mission(
             mission_id=mission_id,
             actor_id=claims["sub"],
             payload=payload,
+            viewer_user_id=claims["sub"],
         )
         return MissionRead.model_validate(mission)
     except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
@@ -155,7 +157,7 @@ def approve_mission(
 )
 def list_mission_approvals(mission_id: str, claims: Claims, service: Service) -> list[ApprovalRead]:
     try:
-        approvals = service.list_approvals(claims["tenant_id"], mission_id)
+        approvals = service.list_approvals(claims["tenant_id"], mission_id, viewer_user_id=claims["sub"])
         return [ApprovalRead.model_validate(item) for item in approvals]
     except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
         _handle_mission_error(exc)
@@ -180,6 +182,7 @@ def transition_mission(
             actor_id=claims["sub"],
             permissions=claims.get("permissions", []),
             payload=payload,
+            viewer_user_id=claims["sub"],
         )
         return MissionRead.model_validate(mission)
     except (NotFoundError, ConflictError, PermissionDeniedError) as exc:

@@ -2,27 +2,39 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.deps import get_current_claims, require_perm
 from app.domain.models import (
     BootstrapAdminRequest,
+    DataAccessPolicyRead,
+    DataAccessPolicyUpdate,
     DevLoginRequest,
+    OrgUnitCreate,
+    OrgUnitRead,
+    OrgUnitUpdate,
     PermissionCreate,
     PermissionRead,
     PermissionUpdate,
     RoleCreate,
+    RoleFromTemplateCreateRequest,
     RoleRead,
+    RoleTemplateRead,
     RoleUpdate,
     TenantCreate,
     TenantRead,
     TenantUpdate,
     TokenResponse,
     UserCreate,
+    UserOrgMembershipBindRequest,
+    UserOrgMembershipLinkRead,
     UserRead,
+    UserRoleBatchBindRead,
+    UserRoleBatchBindRequest,
     UserUpdate,
 )
 from app.domain.permissions import PERM_IDENTITY_READ, PERM_IDENTITY_WRITE
+from app.infra.audit import set_audit_context
 from app.infra.auth import create_access_token
 from app.services.identity_service import AuthError, ConflictError, IdentityService, NotFoundError
 
@@ -45,6 +57,30 @@ def _handle_identity_error(exc: Exception) -> None:
     if isinstance(exc, AuthError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     raise exc
+
+
+def _policy_snapshot(policy: Any) -> dict[str, Any]:
+    scope_mode = getattr(policy.scope_mode, "value", policy.scope_mode)
+    return {
+        "scope_mode": str(scope_mode),
+        "org_unit_ids": list(policy.org_unit_ids),
+        "project_codes": list(policy.project_codes),
+        "area_codes": list(policy.area_codes),
+        "task_ids": list(policy.task_ids),
+    }
+
+
+def _set_scope_deny_audit(
+    request: Request,
+    *,
+    action: str,
+    reason: str,
+    target: dict[str, Any] | None = None,
+) -> None:
+    detail: dict[str, Any] = {"result": {"outcome": "denied", "reason": reason}}
+    if target is not None:
+        detail["what"] = {"target": target}
+    set_audit_context(request, action=action, detail=detail)
 
 
 @router.post("/tenants", response_model=TenantRead, status_code=status.HTTP_201_CREATED)
@@ -271,6 +307,260 @@ def delete_role(role_id: str, claims: Claims, service: Service) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get(
+    "/role-templates",
+    response_model=list[RoleTemplateRead],
+    dependencies=[Depends(require_perm(PERM_IDENTITY_READ))],
+)
+def list_role_templates(service: Service) -> list[RoleTemplateRead]:
+    rows = service.list_role_templates()
+    return [RoleTemplateRead.model_validate(item) for item in rows]
+
+
+@router.post(
+    "/roles:from-template",
+    response_model=RoleRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def create_role_from_template(
+    payload: RoleFromTemplateCreateRequest,
+    claims: Claims,
+    service: Service,
+) -> RoleRead:
+    try:
+        role = service.create_role_from_template(
+            tenant_id=claims["tenant_id"],
+            template_key=payload.template_key,
+            name=payload.name,
+        )
+        return RoleRead.model_validate(role)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+        raise
+
+
+@router.post(
+    "/org-units",
+    response_model=OrgUnitRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def create_org_unit(payload: OrgUnitCreate, claims: Claims, service: Service) -> OrgUnitRead:
+    try:
+        org_unit = service.create_org_unit(claims["tenant_id"], payload)
+        return OrgUnitRead.model_validate(org_unit)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+        raise
+
+
+@router.get(
+    "/org-units",
+    response_model=list[OrgUnitRead],
+    dependencies=[Depends(require_perm(PERM_IDENTITY_READ))],
+)
+def list_org_units(claims: Claims, service: Service) -> list[OrgUnitRead]:
+    units = service.list_org_units(claims["tenant_id"])
+    return [OrgUnitRead.model_validate(item) for item in units]
+
+
+@router.get(
+    "/org-units/{org_unit_id}",
+    response_model=OrgUnitRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_READ))],
+)
+def get_org_unit(org_unit_id: str, claims: Claims, service: Service) -> OrgUnitRead:
+    try:
+        org_unit = service.get_org_unit(claims["tenant_id"], org_unit_id)
+        return OrgUnitRead.model_validate(org_unit)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+        raise
+
+
+@router.patch(
+    "/org-units/{org_unit_id}",
+    response_model=OrgUnitRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def update_org_unit(
+    org_unit_id: str,
+    payload: OrgUnitUpdate,
+    claims: Claims,
+    service: Service,
+) -> OrgUnitRead:
+    try:
+        org_unit = service.update_org_unit(claims["tenant_id"], org_unit_id, payload)
+        return OrgUnitRead.model_validate(org_unit)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+        raise
+
+
+@router.delete(
+    "/org-units/{org_unit_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def delete_org_unit(org_unit_id: str, claims: Claims, service: Service) -> Response:
+    try:
+        service.delete_org_unit(claims["tenant_id"], org_unit_id)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/users/{user_id}/org-units/{org_unit_id}",
+    response_model=UserOrgMembershipLinkRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def bind_user_org_unit(
+    user_id: str,
+    org_unit_id: str,
+    claims: Claims,
+    service: Service,
+    payload: UserOrgMembershipBindRequest | None = None,
+) -> UserOrgMembershipLinkRead:
+    body = payload or UserOrgMembershipBindRequest()
+    try:
+        link = service.bind_user_org_unit(
+            claims["tenant_id"],
+            user_id,
+            org_unit_id,
+            is_primary=body.is_primary,
+        )
+        return UserOrgMembershipLinkRead.model_validate(link)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+        raise
+
+
+@router.delete(
+    "/users/{user_id}/org-units/{org_unit_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def unbind_user_org_unit(user_id: str, org_unit_id: str, claims: Claims, service: Service) -> Response:
+    try:
+        service.unbind_user_org_unit(claims["tenant_id"], user_id, org_unit_id)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/users/{user_id}/org-units",
+    response_model=list[UserOrgMembershipLinkRead],
+    dependencies=[Depends(require_perm(PERM_IDENTITY_READ))],
+)
+def list_user_org_units(user_id: str, claims: Claims, service: Service) -> list[UserOrgMembershipLinkRead]:
+    try:
+        links = service.list_user_org_units(claims["tenant_id"], user_id)
+        return [UserOrgMembershipLinkRead.model_validate(item) for item in links]
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        _handle_identity_error(exc)
+        raise
+
+
+@router.get(
+    "/users/{user_id}/data-policy",
+    response_model=DataAccessPolicyRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_READ))],
+)
+def get_user_data_policy(
+    user_id: str,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> DataAccessPolicyRead:
+    set_audit_context(
+        request,
+        action="identity.data_policy.get",
+        detail={"what": {"target": {"user_id": user_id}}},
+    )
+    try:
+        policy = service.get_user_data_policy(claims["tenant_id"], user_id)
+        set_audit_context(request, detail={"what": {"policy": _policy_snapshot(policy)}})
+        return DataAccessPolicyRead.model_validate(policy)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.user_exists_any_tenant(user_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.data_policy.get",
+                reason=deny_reason,
+                target={"user_id": user_id},
+            )
+        _handle_identity_error(exc)
+        raise
+
+
+@router.put(
+    "/users/{user_id}/data-policy",
+    response_model=DataAccessPolicyRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def upsert_user_data_policy(
+    user_id: str,
+    payload: DataAccessPolicyUpdate,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> DataAccessPolicyRead:
+    set_audit_context(
+        request,
+        action="identity.data_policy.upsert",
+        detail={
+            "what": {
+                "target": {"user_id": user_id},
+                "requested_policy": _policy_snapshot(payload),
+            }
+        },
+    )
+    try:
+        before_policy = service.get_user_data_policy(claims["tenant_id"], user_id)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.user_exists_any_tenant(user_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.data_policy.upsert",
+                reason=deny_reason,
+                target={"user_id": user_id},
+            )
+        _handle_identity_error(exc)
+        raise
+    try:
+        policy = service.upsert_user_data_policy(claims["tenant_id"], user_id, payload)
+        before = _policy_snapshot(before_policy)
+        after = _policy_snapshot(policy)
+        changed_fields = sorted([key for key, value in after.items() if before.get(key) != value])
+        set_audit_context(
+            request,
+            detail={
+                "what": {
+                    "policy_before": before,
+                    "policy_after": after,
+                    "changed_fields": changed_fields,
+                }
+            },
+        )
+        return DataAccessPolicyRead.model_validate(policy)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.user_exists_any_tenant(user_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.data_policy.upsert",
+                reason=deny_reason,
+                target={"user_id": user_id},
+            )
+        _handle_identity_error(exc)
+        raise
+
+
 @router.post(
     "/permissions",
     response_model=PermissionRead,
@@ -338,14 +628,104 @@ def delete_permission(permission_id: str, service: Service) -> Response:
 
 
 @router.post(
+    "/users/{user_id}/roles:batch-bind",
+    response_model=UserRoleBatchBindRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def bind_user_roles_batch(
+    user_id: str,
+    payload: UserRoleBatchBindRequest,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> UserRoleBatchBindRead:
+    set_audit_context(
+        request,
+        action="identity.user_role.batch_bind",
+        detail={
+            "what": {
+                "target": {"user_id": user_id},
+                "requested_role_ids": payload.role_ids,
+            }
+        },
+    )
+    try:
+        result = service.bind_user_roles_batch(claims["tenant_id"], user_id, payload.role_ids)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.user_exists_any_tenant(user_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.user_role.batch_bind",
+                reason=deny_reason,
+                target={"user_id": user_id},
+            )
+        _handle_identity_error(exc)
+        raise
+
+    denied_role_ids = [item["role_id"] for item in result["results"] if item["status"] == "cross_tenant_denied"]
+    missing_role_ids = [item["role_id"] for item in result["results"] if item["status"] == "not_found"]
+    if denied_role_ids:
+        outcome = "partial_denied"
+        reason = "cross_tenant_boundary"
+    elif missing_role_ids:
+        outcome = "partial_missing"
+        reason = "role_not_found"
+    else:
+        outcome = "success"
+        reason = "ok"
+    set_audit_context(
+        request,
+        detail={
+            "what": {
+                "batch_result": {
+                    "requested_count": result["requested_count"],
+                    "bound_count": result["bound_count"],
+                    "already_bound_count": result["already_bound_count"],
+                    "denied_count": result["denied_count"],
+                    "missing_count": result["missing_count"],
+                },
+                "denied_role_ids": denied_role_ids,
+                "missing_role_ids": missing_role_ids,
+            },
+            "result": {
+                "outcome": outcome,
+                "reason": reason,
+            },
+        },
+    )
+    return UserRoleBatchBindRead.model_validate(result)
+
+
+@router.post(
     "/users/{user_id}/roles/{role_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
 )
-def bind_user_role(user_id: str, role_id: str, claims: Claims, service: Service) -> Response:
+def bind_user_role(
+    user_id: str,
+    role_id: str,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> Response:
+    set_audit_context(
+        request,
+        action="identity.user_role.bind",
+        detail={"what": {"target": {"user_id": user_id, "role_id": role_id}}},
+    )
     try:
         service.bind_user_role(claims["tenant_id"], user_id, role_id)
     except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            is_scope_denied = service.user_exists_any_tenant(user_id) and service.role_exists_any_tenant(role_id)
+            deny_reason = "cross_tenant_boundary" if is_scope_denied else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.user_role.bind",
+                reason=deny_reason,
+                target={"user_id": user_id, "role_id": role_id},
+            )
         _handle_identity_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -355,10 +735,30 @@ def bind_user_role(user_id: str, role_id: str, claims: Claims, service: Service)
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
 )
-def unbind_user_role(user_id: str, role_id: str, claims: Claims, service: Service) -> Response:
+def unbind_user_role(
+    user_id: str,
+    role_id: str,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> Response:
+    set_audit_context(
+        request,
+        action="identity.user_role.unbind",
+        detail={"what": {"target": {"user_id": user_id, "role_id": role_id}}},
+    )
     try:
         service.unbind_user_role(claims["tenant_id"], user_id, role_id)
     except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            is_scope_denied = service.user_exists_any_tenant(user_id) and service.role_exists_any_tenant(role_id)
+            deny_reason = "cross_tenant_boundary" if is_scope_denied else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.user_role.unbind",
+                reason=deny_reason,
+                target={"user_id": user_id, "role_id": role_id},
+            )
         _handle_identity_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

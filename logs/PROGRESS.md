@@ -15,6 +15,12 @@
 - [x] phase-07a-lookup-hardening-execution-plan.md - ✅ success - tenant-scoped lookup hardening landed across inspection/defect/incident/alert/command/identity services
 - [x] phase-07b-db-boundary-master.md - ✅ success - B1/B2/B3 (`202602230014`..`202602230022`), B4 (`202602240023`..`202602240025`), B5 (`202602240026`..`202602240028`) landed with gates green
 - [x] phase-07c-tenant-export-purge.md - ✅ success - phase-07c-tenant-export-purge.md.report.md
+- [x] phase-08-one-net-unified-flight-planning.md - ✅ success - phase-08-one-net-unified-flight-planning.md.report.md
+- [x] phase-08a-org-rbac-foundation.md - ✅ success - phase-08a-org-rbac-foundation.md.report.md
+- [x] phase-08b-data-perimeter-policy.md - ✅ success - phase-08b-data-perimeter-policy.md.report.md
+- [x] phase-08c-audit-hardening.md - ✅ success - phase-08c-audit-hardening.md.report.md
+- [x] phase-08d-integration-acceptance.md - ✅ success - phase-08d-integration-acceptance.md.report.md
+- [x] phase-09-flight-resource-asset-management.md - ✅ success - phase-09-flight-resource-asset-management.md.report.md
 
 ## Notes
 - ✅ success
@@ -24,3 +30,19 @@
 - 2026-02-24T12:07:43Z (UTC): B5 reporting/compliance boundary delivered; gates passed via Docker Compose (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head` to `202602240028`, OpenAPI export, `demo_e2e`, `verify_smoke`).
 - 2026-02-24T12:22:51Z (UTC): 07C-2/07C-3 implementation landed, but gate rerun blocked: `permission denied while trying to connect to npipe:////./pipe/dockerDesktopLinuxEngine`.
 - 2026-02-24T12:46:47Z (UTC): 07C gate chain rerun passed via Docker Compose (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`); phase closed as DONE.
+- 2026-02-24T22:23:14Z (UTC): Phase 08A blueprint refined into executable work packages (WP1-WP4: schema/service/api/tests), with migration and acceptance matrix defined.
+- 2026-02-24T22:34:22Z (UTC): Phase 08A WP1 implemented (`org_units`, `user_org_memberships`, migrations `202602240029/030/031`); `pytest tests/test_identity_org.py -q` passed in Docker.
+- 2026-02-24T14:39:55Z (UTC): Phase 08A WP2 implemented (role template DTO/service/API/tests); targeted checks passed (`pytest tests/test_identity.py tests/test_identity_org.py -q`, targeted `ruff`, targeted `mypy`).
+- 2026-02-24T14:47:12Z (UTC): Phase 08A closed as DONE (WP1-WP4 complete, docs updated, full gate chain passed: `alembic`, `ruff`, `mypy`, `pytest -q`, `demo_e2e`, `verify_smoke`).
+- 2026-02-24T15:27:01Z (UTC): Phase 08B closed as DONE (data perimeter model + migration chain `202602240032/033/034` + mission/inspection/defect/incident/reporting query perimeter integration + identity policy APIs + regressions), with full gates passed.
+- 2026-02-24T15:41:00Z (UTC): Phase 08C moved to RUNNING; landed audit hardening (policy-change audit detail, cross-tenant deny reason, user-role batch-bind API + tests/docs), but Docker gate command failed with `open //./pipe/dockerDesktopLinuxEngine: Access is denied`.
+- 2026-02-24T16:01:53Z (UTC): Phase 08C closed as DONE (audit schema standardization + policy-change/cross-tenant-deny/batch-authorization audit hardening + docs/tests); full gate chain passed (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`).
+- 2026-02-24T16:15:08Z (UTC): Phase 08D moved to RUNNING; landed integration assets (`verify_phase08_integration.py`, `PHASE09_READINESS_CHECKLIST.md`, Phase 09 blueprint), baseline gates passed, but integration command reruns blocked by intermittent Docker npipe deny (`open //./pipe/dockerDesktopLinuxEngine: Access is denied`).
+- 2026-02-24T16:49:45Z (UTC): Re-ran `docker compose ... verify_phase08_integration.py` using immediate retry policy (single retry + 3-loop retry), but all attempts failed with npipe denial (`open //./pipe/dockerDesktopLinuxEngine: Access is denied`); phase-08d remains pending.
+- 2026-02-24T17:11:28Z (UTC): Continued per request; `docker info` still denied on `desktop-linux`, and immediate retry of `verify_phase08_integration.py` still failed (`postgis/postgis:16-3.4` / `redis:7-alpine` image probes blocked by npipe access denied).
+- 2026-02-24T17:29:50Z (UTC): Phase 08D closed as DONE. `verify_phase08_integration.py` passed after fixing approval audit-export path mismatch and audit read-capture chain; report written to `logs/phase-08d-integration-acceptance.md.report.md`, checkpoint moved to `phase-09-flight-resource-asset-management.md` with `READY`.
+- 2026-02-24T17:33:59Z (UTC): Phase 09 switched to RUNNING; WP decomposition (WP1-WP4) landed in phase blueprint, current execution focus is WP1 asset ledger model/migration/API/tests.
+- 2026-02-24T17:42:16Z (UTC): Phase 09 WP1 completed (asset ledger model + `/api/assets` APIs + migration chain `202602240035/036/037` + `tests/test_asset.py`); baseline Docker Compose gates passed (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`), move focus to WP2.
+- 2026-02-24T18:01:57Z (UTC): Phase 09 WP2 completed (availability/health model + `/api/assets/{id}/availability` + `/api/assets/{id}/health` + `/api/assets/pool` + migration chain `202602240038/039/040` + WP2 test coverage in `tests/test_asset.py`); baseline Docker Compose gates passed, move focus to WP3.
+- 2026-02-24T18:11:32Z (UTC): Phase 09 WP3 completed (maintenance workorder/history model + `/api/assets/maintenance/workorders*` APIs + explicit audit actions + migration chain `202602240041/042/043` + `tests/test_asset_maintenance.py`); baseline Docker Compose gates passed (including `verify_phase08_integration.py` regression), move focus to WP4.
+- 2026-02-24T18:25:07Z (UTC): Phase 09 closed as DONE. WP4 delivered (`GET /api/assets/pool/summary` + `demo_phase09_resource_pool_maintenance.py`) and full baseline gate chain passed (`ruff`, `mypy`, `pytest -q`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration.py`, phase09 demo); report written to `logs/phase-09-flight-resource-asset-management.md.report.md`.

@@ -31,7 +31,7 @@ Service = Annotated[ReportingService, Depends(get_reporting_service)]
     dependencies=[Depends(require_perm(PERM_REPORTING_READ))],
 )
 def reporting_overview(claims: Claims, service: Service) -> ReportingOverviewRead:
-    return service.overview(claims["tenant_id"])
+    return service.overview(claims["tenant_id"], viewer_user_id=claims["sub"])
 
 
 @router.get(
@@ -40,7 +40,7 @@ def reporting_overview(claims: Claims, service: Service) -> ReportingOverviewRea
     dependencies=[Depends(require_perm(PERM_REPORTING_READ))],
 )
 def reporting_closure_rate(claims: Claims, service: Service) -> ReportingClosureRateRead:
-    return service.closure_rate(claims["tenant_id"])
+    return service.closure_rate(claims["tenant_id"], viewer_user_id=claims["sub"])
 
 
 @router.get(
@@ -49,7 +49,7 @@ def reporting_closure_rate(claims: Claims, service: Service) -> ReportingClosure
     dependencies=[Depends(require_perm(PERM_REPORTING_READ))],
 )
 def reporting_device_utilization(claims: Claims, service: Service) -> list[DeviceUtilizationRead]:
-    return service.device_utilization(claims["tenant_id"])
+    return service.device_utilization(claims["tenant_id"], viewer_user_id=claims["sub"])
 
 
 @router.post(
@@ -61,4 +61,4 @@ def reporting_export(
     claims: Claims,
     service: Service,
 ) -> dict[str, str]:
-    return {"file_path": service.export_report(claims["tenant_id"], payload)}
+    return {"file_path": service.export_report(claims["tenant_id"], payload, viewer_user_id=claims["sub"])}

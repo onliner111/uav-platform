@@ -16,9 +16,11 @@ from app.domain.models import (
     InspectionTemplateCreate,
     InspectionTemplateItem,
     InspectionTemplateItemCreate,
+    OrgUnit,
 )
 from app.infra.db import get_engine
 from app.infra.events import event_bus
+from app.services.data_perimeter_service import DataPerimeterService
 
 
 class InspectionError(Exception):
@@ -34,6 +36,9 @@ class ConflictError(InspectionError):
 
 
 class InspectionService:
+    def __init__(self) -> None:
+        self._data_perimeter = DataPerimeterService()
+
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
@@ -57,6 +62,19 @@ class InspectionService:
             raise NotFoundError("task not found")
         return task
 
+    def _ensure_task_visible(
+        self,
+        session: Session,
+        tenant_id: str,
+        viewer_user_id: str | None,
+        task: InspectionTask,
+    ) -> None:
+        if viewer_user_id is None:
+            return
+        scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+        if not self._data_perimeter.inspection_task_visible(task, scope):
+            raise NotFoundError("task not found")
+
     def _get_scoped_export(self, session: Session, tenant_id: str, export_id: str) -> InspectionExport:
         export = session.exec(
             select(InspectionExport)
@@ -66,6 +84,13 @@ class InspectionService:
         if export is None:
             raise NotFoundError("export not found")
         return export
+
+    def _ensure_scoped_org_unit(self, session: Session, tenant_id: str, org_unit_id: str) -> None:
+        org_unit = session.exec(
+            select(OrgUnit).where(OrgUnit.tenant_id == tenant_id).where(OrgUnit.id == org_unit_id)
+        ).first()
+        if org_unit is None:
+            raise NotFoundError("org unit not found")
 
     def create_template(self, tenant_id: str, payload: InspectionTemplateCreate) -> InspectionTemplate:
         with self._session() as session:
@@ -131,11 +156,16 @@ class InspectionService:
     def create_task(self, tenant_id: str, payload: InspectionTaskCreate) -> InspectionTask:
         with self._session() as session:
             _ = self._get_scoped_template(session, tenant_id, payload.template_id)
+            if payload.org_unit_id is not None:
+                self._ensure_scoped_org_unit(session, tenant_id, payload.org_unit_id)
             task = InspectionTask(
                 tenant_id=tenant_id,
                 name=payload.name,
                 template_id=payload.template_id,
                 mission_id=payload.mission_id,
+                org_unit_id=payload.org_unit_id,
+                project_code=payload.project_code,
+                area_code=payload.area_code,
                 area_geom=payload.area_geom,
                 priority=payload.priority,
                 status=payload.status,
@@ -150,16 +180,26 @@ class InspectionService:
         )
         return task
 
-    def list_tasks(self, tenant_id: str, status: InspectionTaskStatus | None = None) -> list[InspectionTask]:
+    def list_tasks(
+        self,
+        tenant_id: str,
+        status: InspectionTaskStatus | None = None,
+        viewer_user_id: str | None = None,
+    ) -> list[InspectionTask]:
         with self._session() as session:
             statement = select(InspectionTask).where(InspectionTask.tenant_id == tenant_id)
             if status is not None:
                 statement = statement.where(InspectionTask.status == status)
-            return list(session.exec(statement).all())
+            rows = list(session.exec(statement).all())
+            if viewer_user_id is None:
+                return rows
+            scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+            return [item for item in rows if self._data_perimeter.inspection_task_visible(item, scope)]
 
-    def get_task(self, tenant_id: str, task_id: str) -> InspectionTask:
+    def get_task(self, tenant_id: str, task_id: str, viewer_user_id: str | None = None) -> InspectionTask:
         with self._session() as session:
             task = self._get_scoped_task(session, tenant_id, task_id)
+            self._ensure_task_visible(session, tenant_id, viewer_user_id, task)
             return task
 
     def create_observation(
@@ -167,9 +207,11 @@ class InspectionService:
         tenant_id: str,
         task_id: str,
         payload: InspectionObservationCreate,
+        viewer_user_id: str | None = None,
     ) -> InspectionObservation:
         with self._session() as session:
-            _ = self._get_scoped_task(session, tenant_id, task_id)
+            task = self._get_scoped_task(session, tenant_id, task_id)
+            self._ensure_task_visible(session, tenant_id, viewer_user_id, task)
             observation = InspectionObservation(
                 tenant_id=tenant_id,
                 task_id=task_id,
@@ -194,9 +236,15 @@ class InspectionService:
         )
         return observation
 
-    def list_observations(self, tenant_id: str, task_id: str) -> list[InspectionObservation]:
+    def list_observations(
+        self,
+        tenant_id: str,
+        task_id: str,
+        viewer_user_id: str | None = None,
+    ) -> list[InspectionObservation]:
         with self._session() as session:
-            _ = self._get_scoped_task(session, tenant_id, task_id)
+            task = self._get_scoped_task(session, tenant_id, task_id)
+            self._ensure_task_visible(session, tenant_id, viewer_user_id, task)
             statement = (
                 select(InspectionObservation)
                 .where(InspectionObservation.tenant_id == tenant_id)
@@ -204,11 +252,18 @@ class InspectionService:
             )
             return list(session.exec(statement).all())
 
-    def create_export(self, tenant_id: str, task_id: str, export_format: str) -> InspectionExport:
+    def create_export(
+        self,
+        tenant_id: str,
+        task_id: str,
+        export_format: str,
+        viewer_user_id: str | None = None,
+    ) -> InspectionExport:
         if export_format.lower() != "html":
             raise ConflictError("only html export is supported")
         with self._session() as session:
             task = self._get_scoped_task(session, tenant_id, task_id)
+            self._ensure_task_visible(session, tenant_id, viewer_user_id, task)
             observations = list(
                 session.exec(
                     select(InspectionObservation)
@@ -244,9 +299,16 @@ class InspectionService:
         )
         return export
 
-    def get_export(self, tenant_id: str, export_id: str) -> InspectionExport:
+    def get_export(
+        self,
+        tenant_id: str,
+        export_id: str,
+        viewer_user_id: str | None = None,
+    ) -> InspectionExport:
         with self._session() as session:
             export = self._get_scoped_export(session, tenant_id, export_id)
+            task = self._get_scoped_task(session, tenant_id, export.task_id)
+            self._ensure_task_visible(session, tenant_id, viewer_user_id, task)
             return export
 
     def _render_export_html(

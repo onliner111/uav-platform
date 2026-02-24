@@ -126,6 +126,97 @@ class RolePermission(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
+class OrgUnit(SQLModel, table=True):
+    __tablename__ = "org_units"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_org_units_tenant_id_id"),
+        UniqueConstraint("tenant_id", "code", name="uq_org_units_tenant_code"),
+        ForeignKeyConstraint(
+            ["tenant_id", "parent_id"],
+            ["org_units.tenant_id", "org_units.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_org_units_tenant_id_id", "tenant_id", "id"),
+        Index("ix_org_units_tenant_parent_id", "tenant_id", "parent_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=100, index=True)
+    code: str = Field(max_length=100, index=True)
+    parent_id: str | None = Field(default=None, index=True)
+    level: int = Field(default=0, index=True)
+    path: str = Field(default="", max_length=500)
+    is_active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class UserOrgMembership(SQLModel, table=True):
+    __tablename__ = "user_org_memberships"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["users.tenant_id", "users.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "org_unit_id"],
+            ["org_units.tenant_id", "org_units.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_user_org_memberships_tenant_user", "tenant_id", "user_id"),
+        Index("ix_user_org_memberships_tenant_org", "tenant_id", "org_unit_id"),
+    )
+
+    tenant_id: str = Field(primary_key=True)
+    user_id: str = Field(primary_key=True)
+    org_unit_id: str = Field(primary_key=True)
+    is_primary: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class DataScopeMode(StrEnum):
+    ALL = "ALL"
+    SCOPED = "SCOPED"
+
+
+class DataAccessPolicy(SQLModel, table=True):
+    __tablename__ = "data_access_policies"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "user_id", name="uq_data_access_policies_tenant_user"),
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["users.tenant_id", "users.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_data_access_policies_tenant_user", "tenant_id", "user_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    user_id: str = Field(index=True)
+    scope_mode: DataScopeMode = Field(default=DataScopeMode.ALL, index=True)
+    org_unit_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    project_codes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    area_codes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    task_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
 class DroneVendor(StrEnum):
     DJI = "DJI"
     MAVLINK = "MAVLINK"
@@ -164,6 +255,146 @@ class DroneCredential(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
+class AssetType(StrEnum):
+    UAV = "UAV"
+    PAYLOAD = "PAYLOAD"
+    BATTERY = "BATTERY"
+    CONTROLLER = "CONTROLLER"
+    DOCK = "DOCK"
+
+
+class AssetLifecycleStatus(StrEnum):
+    REGISTERED = "REGISTERED"
+    BOUND = "BOUND"
+    RETIRED = "RETIRED"
+
+
+class AssetAvailabilityStatus(StrEnum):
+    AVAILABLE = "AVAILABLE"
+    RESERVED = "RESERVED"
+    IN_USE = "IN_USE"
+    MAINTENANCE = "MAINTENANCE"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class AssetHealthStatus(StrEnum):
+    UNKNOWN = "UNKNOWN"
+    HEALTHY = "HEALTHY"
+    DEGRADED = "DEGRADED"
+    CRITICAL = "CRITICAL"
+
+
+class MaintenanceWorkOrderStatus(StrEnum):
+    OPEN = "OPEN"
+    IN_PROGRESS = "IN_PROGRESS"
+    CLOSED = "CLOSED"
+    CANCELED = "CANCELED"
+
+
+class Asset(SQLModel, table=True):
+    __tablename__ = "assets"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_assets_tenant_id_id"),
+        UniqueConstraint("tenant_id", "asset_type", "asset_code", name="uq_assets_tenant_type_code"),
+        ForeignKeyConstraint(
+            ["tenant_id", "bound_to_drone_id"],
+            ["drones.tenant_id", "drones.id"],
+            ondelete="SET NULL",
+        ),
+        Index("ix_assets_tenant_id_id", "tenant_id", "id"),
+        Index("ix_assets_tenant_type", "tenant_id", "asset_type"),
+        Index("ix_assets_tenant_lifecycle", "tenant_id", "lifecycle_status"),
+        Index("ix_assets_tenant_bound_drone", "tenant_id", "bound_to_drone_id"),
+        Index("ix_assets_tenant_availability", "tenant_id", "availability_status"),
+        Index("ix_assets_tenant_health", "tenant_id", "health_status"),
+        Index("ix_assets_tenant_region", "tenant_id", "region_code"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    asset_type: AssetType = Field(index=True)
+    asset_code: str = Field(max_length=100, index=True)
+    name: str = Field(max_length=100, index=True)
+    serial_number: str | None = Field(default=None, max_length=100, index=True)
+    lifecycle_status: AssetLifecycleStatus = Field(default=AssetLifecycleStatus.REGISTERED, index=True)
+    availability_status: AssetAvailabilityStatus = Field(
+        default=AssetAvailabilityStatus.AVAILABLE,
+        index=True,
+    )
+    health_status: AssetHealthStatus = Field(default=AssetHealthStatus.UNKNOWN, index=True)
+    health_score: int | None = Field(default=None, ge=0, le=100, index=True)
+    region_code: str | None = Field(default=None, max_length=100, index=True)
+    bound_to_drone_id: str | None = Field(default=None, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    bound_at: datetime | None = Field(default=None, index=True)
+    last_health_at: datetime | None = Field(default=None, index=True)
+    retired_at: datetime | None = Field(default=None, index=True)
+    retired_reason: str | None = Field(default=None, max_length=200)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AssetMaintenanceWorkOrder(SQLModel, table=True):
+    __tablename__ = "asset_maintenance_workorders"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_asset_maintenance_workorders_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "asset_id"],
+            ["assets.tenant_id", "assets.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_asset_maintenance_workorders_tenant_id_id", "tenant_id", "id"),
+        Index("ix_asset_maintenance_workorders_tenant_asset", "tenant_id", "asset_id"),
+        Index("ix_asset_maintenance_workorders_tenant_status", "tenant_id", "status"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    asset_id: str = Field(index=True)
+    title: str = Field(max_length=200)
+    description: str | None = None
+    priority: int = Field(default=5, ge=1, le=10, index=True)
+    status: MaintenanceWorkOrderStatus = Field(default=MaintenanceWorkOrderStatus.OPEN, index=True)
+    created_by: str = Field(index=True)
+    assigned_to: str | None = Field(default=None, index=True)
+    close_note: str | None = None
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+    closed_at: datetime | None = Field(default=None, index=True)
+    closed_by: str | None = Field(default=None, index=True)
+
+
+class AssetMaintenanceHistory(SQLModel, table=True):
+    __tablename__ = "asset_maintenance_histories"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_asset_maintenance_histories_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "workorder_id"],
+            ["asset_maintenance_workorders.tenant_id", "asset_maintenance_workorders.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_asset_maintenance_histories_tenant_id_id", "tenant_id", "id"),
+        Index("ix_asset_maintenance_histories_tenant_workorder", "tenant_id", "workorder_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    workorder_id: str = Field(index=True)
+    action: str = Field(max_length=50, index=True)
+    from_status: MaintenanceWorkOrderStatus | None = Field(default=None, index=True)
+    to_status: MaintenanceWorkOrderStatus | None = Field(default=None, index=True)
+    note: str | None = None
+    actor_id: str | None = Field(default=None, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
 class ApprovalDecision(StrEnum):
     APPROVE = "APPROVE"
     REJECT = "REJECT"
@@ -184,14 +415,23 @@ class Mission(SQLModel, table=True):
             ["drones.tenant_id", "drones.id"],
             ondelete="RESTRICT",
         ),
+        ForeignKeyConstraint(
+            ["tenant_id", "org_unit_id"],
+            ["org_units.tenant_id", "org_units.id"],
+            ondelete="RESTRICT",
+        ),
         Index("ix_missions_tenant_drone_id", "tenant_id", "drone_id"),
         Index("ix_missions_tenant_state", "tenant_id", "state"),
+        Index("ix_missions_tenant_org_unit", "tenant_id", "org_unit_id"),
     )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     name: str = Field(index=True)
     drone_id: str | None = Field(default=None, index=True)
+    org_unit_id: str | None = Field(default=None, index=True)
+    project_code: str | None = Field(default=None, max_length=100, index=True)
+    area_code: str | None = Field(default=None, max_length=100, index=True)
     plan_type: MissionPlanType
     payload: dict[str, Any] = Field(
         default_factory=dict,
@@ -446,6 +686,97 @@ class RoleRead(ORMReadModel):
     created_at: datetime
 
 
+class RoleTemplateRead(BaseModel):
+    key: str
+    name: str
+    description: str
+    permissions: list[str]
+
+
+class RoleFromTemplateCreateRequest(BaseModel):
+    template_key: str
+    name: str | None = None
+
+
+class UserRoleBatchBindRequest(BaseModel):
+    role_ids: list[str] = PydanticField(default_factory=list)
+
+
+class UserRoleBatchBindItemRead(BaseModel):
+    role_id: str
+    status: str
+
+
+class UserRoleBatchBindRead(BaseModel):
+    user_id: str
+    requested_count: int
+    bound_count: int
+    already_bound_count: int
+    denied_count: int
+    missing_count: int
+    results: list[UserRoleBatchBindItemRead]
+
+
+class OrgUnitCreate(BaseModel):
+    name: str
+    code: str
+    parent_id: str | None = None
+    is_active: bool = True
+
+
+class OrgUnitUpdate(BaseModel):
+    name: str | None = None
+    code: str | None = None
+    parent_id: str | None = None
+    is_active: bool | None = None
+
+
+class OrgUnitRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    code: str
+    parent_id: str | None
+    level: int
+    path: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserOrgMembershipBindRequest(BaseModel):
+    is_primary: bool = False
+
+
+class UserOrgMembershipLinkRead(ORMReadModel):
+    tenant_id: str
+    user_id: str
+    org_unit_id: str
+    is_primary: bool
+    created_at: datetime
+
+
+class DataAccessPolicyUpdate(BaseModel):
+    scope_mode: DataScopeMode = DataScopeMode.SCOPED
+    org_unit_ids: list[str] = PydanticField(default_factory=list)
+    project_codes: list[str] = PydanticField(default_factory=list)
+    area_codes: list[str] = PydanticField(default_factory=list)
+    task_ids: list[str] = PydanticField(default_factory=list)
+
+
+class DataAccessPolicyRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    user_id: str
+    scope_mode: DataScopeMode
+    org_unit_ids: list[str]
+    project_codes: list[str]
+    area_codes: list[str]
+    task_ids: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
 class PermissionCreate(BaseModel):
     name: str
     description: str | None = None
@@ -503,9 +834,120 @@ class DroneRead(ORMReadModel):
     updated_at: datetime
 
 
+class AssetCreate(BaseModel):
+    asset_type: AssetType
+    asset_code: str
+    name: str
+    serial_number: str | None = None
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AssetBindRequest(BaseModel):
+    bound_to_drone_id: str
+
+
+class AssetAvailabilityUpdateRequest(BaseModel):
+    availability_status: AssetAvailabilityStatus
+    region_code: str | None = None
+
+
+class AssetHealthUpdateRequest(BaseModel):
+    health_status: AssetHealthStatus
+    health_score: int | None = PydanticField(default=None, ge=0, le=100)
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class MaintenanceWorkOrderCreate(BaseModel):
+    asset_id: str
+    title: str
+    description: str | None = None
+    priority: int = PydanticField(default=5, ge=1, le=10)
+    assigned_to: str | None = None
+    note: str | None = None
+
+
+class MaintenanceWorkOrderTransitionRequest(BaseModel):
+    status: MaintenanceWorkOrderStatus
+    assigned_to: str | None = None
+    note: str | None = None
+
+
+class MaintenanceWorkOrderCloseRequest(BaseModel):
+    note: str | None = None
+
+
+class AssetRetireRequest(BaseModel):
+    reason: str
+
+
+class AssetRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    asset_type: AssetType
+    asset_code: str
+    name: str
+    serial_number: str | None
+    lifecycle_status: AssetLifecycleStatus
+    availability_status: AssetAvailabilityStatus
+    health_status: AssetHealthStatus
+    health_score: int | None
+    region_code: str | None
+    bound_to_drone_id: str | None
+    detail: dict[str, Any]
+    bound_at: datetime | None
+    last_health_at: datetime | None
+    retired_at: datetime | None
+    retired_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AssetPoolRegionSummaryRead(BaseModel):
+    region_code: str
+    total_assets: int
+    available_assets: int
+    by_type: dict[str, int]
+    by_availability: dict[str, int]
+    healthy_assets: int
+    average_health_score: float | None
+
+
+class MaintenanceWorkOrderRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    asset_id: str
+    title: str
+    description: str | None
+    priority: int
+    status: MaintenanceWorkOrderStatus
+    created_by: str
+    assigned_to: str | None
+    close_note: str | None
+    created_at: datetime
+    updated_at: datetime
+    closed_at: datetime | None
+    closed_by: str | None
+
+
+class MaintenanceWorkOrderHistoryRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    workorder_id: str
+    action: str
+    from_status: MaintenanceWorkOrderStatus | None
+    to_status: MaintenanceWorkOrderStatus | None
+    note: str | None
+    actor_id: str | None
+    detail: dict[str, Any]
+    created_at: datetime
+
+
 class MissionCreate(BaseModel):
     name: str
     drone_id: str | None = None
+    org_unit_id: str | None = None
+    project_code: str | None = None
+    area_code: str | None = None
     type: MissionPlanType
     payload: dict[str, Any] = PydanticField(default_factory=dict)
     constraints: dict[str, Any] = PydanticField(default_factory=dict)
@@ -514,6 +956,9 @@ class MissionCreate(BaseModel):
 class MissionUpdate(BaseModel):
     name: str | None = None
     drone_id: str | None = None
+    org_unit_id: str | None = None
+    project_code: str | None = None
+    area_code: str | None = None
     payload: dict[str, Any] | None = None
     constraints: dict[str, Any] | None = None
 
@@ -523,6 +968,9 @@ class MissionRead(ORMReadModel):
     tenant_id: str
     name: str
     drone_id: str | None
+    org_unit_id: str | None
+    project_code: str | None
+    area_code: str | None
     plan_type: MissionPlanType
     payload: dict[str, Any]
     constraints: dict[str, Any]
@@ -672,8 +1120,14 @@ class InspectionTask(SQLModel, table=True):
             ["inspection_templates.tenant_id", "inspection_templates.id"],
             ondelete="RESTRICT",
         ),
+        ForeignKeyConstraint(
+            ["tenant_id", "org_unit_id"],
+            ["org_units.tenant_id", "org_units.id"],
+            ondelete="RESTRICT",
+        ),
         Index("ix_inspection_tasks_tenant_id_id", "tenant_id", "id"),
         Index("ix_inspection_tasks_tenant_template_id", "tenant_id", "template_id"),
+        Index("ix_inspection_tasks_tenant_org_unit", "tenant_id", "org_unit_id"),
     )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
@@ -681,6 +1135,9 @@ class InspectionTask(SQLModel, table=True):
     name: str = Field(max_length=100, index=True)
     template_id: str = Field(index=True)
     mission_id: str | None = Field(default=None, foreign_key="missions.id", index=True)
+    org_unit_id: str | None = Field(default=None, index=True)
+    project_code: str | None = Field(default=None, max_length=100, index=True)
+    area_code: str | None = Field(default=None, max_length=100, index=True)
     area_geom: str = Field(default="")
     priority: int = Field(default=5, index=True)
     status: InspectionTaskStatus = Field(default=InspectionTaskStatus.DRAFT, index=True)
@@ -721,13 +1178,29 @@ class Defect(SQLModel, table=True):
     __tablename__ = "defects"
     __table_args__ = (
         UniqueConstraint("tenant_id", "id", name="uq_defects_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["inspection_tasks.tenant_id", "inspection_tasks.id"],
+            ondelete="SET NULL",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "org_unit_id"],
+            ["org_units.tenant_id", "org_units.id"],
+            ondelete="RESTRICT",
+        ),
         Index("ix_defects_tenant_id_id", "tenant_id", "id"),
         Index("ix_defects_tenant_observation_id", "tenant_id", "observation_id"),
+        Index("ix_defects_tenant_task_id", "tenant_id", "task_id"),
+        Index("ix_defects_tenant_org_unit", "tenant_id", "org_unit_id"),
     )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     observation_id: str = Field(foreign_key="inspection_observations.id", index=True)
+    task_id: str | None = Field(default=None, index=True)
+    org_unit_id: str | None = Field(default=None, index=True)
+    project_code: str | None = Field(default=None, max_length=100, index=True)
+    area_code: str | None = Field(default=None, max_length=100, index=True)
     title: str = Field(max_length=200)
     description: str | None = None
     severity: int = 1
@@ -762,18 +1235,27 @@ class Incident(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("tenant_id", "id", name="uq_incidents_tenant_id_id"),
         ForeignKeyConstraint(
+            ["tenant_id", "org_unit_id"],
+            ["org_units.tenant_id", "org_units.id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
             ["tenant_id", "linked_task_id"],
             ["inspection_tasks.tenant_id", "inspection_tasks.id"],
             ondelete="RESTRICT",
         ),
         Index("ix_incidents_tenant_id_id", "tenant_id", "id"),
         Index("ix_incidents_tenant_linked_task_id", "tenant_id", "linked_task_id"),
+        Index("ix_incidents_tenant_org_unit", "tenant_id", "org_unit_id"),
     )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     title: str = Field(max_length=200)
     level: str = Field(max_length=20, index=True)
+    org_unit_id: str | None = Field(default=None, index=True)
+    project_code: str | None = Field(default=None, max_length=100, index=True)
+    area_code: str | None = Field(default=None, max_length=100, index=True)
     location_geom: str
     status: IncidentStatus = Field(default=IncidentStatus.OPEN, index=True)
     linked_task_id: str | None = Field(default=None, index=True)
@@ -843,6 +1325,9 @@ class InspectionTaskCreate(BaseModel):
     name: str
     template_id: str
     mission_id: str | None = None
+    org_unit_id: str | None = None
+    project_code: str | None = None
+    area_code: str | None = None
     area_geom: str = ""
     priority: int = 5
     status: InspectionTaskStatus = InspectionTaskStatus.SCHEDULED
@@ -854,6 +1339,9 @@ class InspectionTaskRead(ORMReadModel):
     name: str
     template_id: str
     mission_id: str | None
+    org_unit_id: str | None
+    project_code: str | None
+    area_code: str | None
     area_geom: str
     priority: int
     status: InspectionTaskStatus
@@ -903,6 +1391,10 @@ class DefectCreateFromObservationRead(ORMReadModel):
     id: str
     tenant_id: str
     observation_id: str
+    task_id: str | None
+    org_unit_id: str | None
+    project_code: str | None
+    area_code: str | None
     title: str
     description: str | None
     severity: int
@@ -945,6 +1437,9 @@ class DefectStatsRead(BaseModel):
 class IncidentCreate(BaseModel):
     title: str
     level: str
+    org_unit_id: str | None = None
+    project_code: str | None = None
+    area_code: str | None = None
     location_geom: str
 
 
@@ -953,6 +1448,9 @@ class IncidentRead(ORMReadModel):
     tenant_id: str
     title: str
     level: str
+    org_unit_id: str | None
+    project_code: str | None
+    area_code: str | None
     location_geom: str
     status: IncidentStatus
     linked_task_id: str | None

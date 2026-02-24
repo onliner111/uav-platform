@@ -48,7 +48,7 @@ def create_from_observation(
     service: Service,
 ) -> DefectCreateFromObservationRead:
     try:
-        row = service.create_from_observation(claims["tenant_id"], observation_id)
+        row = service.create_from_observation(claims["tenant_id"], observation_id, viewer_user_id=claims["sub"])
         return DefectCreateFromObservationRead.model_validate(row)
     except (NotFoundError, ConflictError) as exc:
         _handle_defect_error(exc)
@@ -66,7 +66,12 @@ def list_defects(
     defect_status: Annotated[DefectStatus | None, Query(alias="status")] = None,
     assigned_to: str | None = None,
 ) -> list[DefectCreateFromObservationRead]:
-    rows = service.list_defects(claims["tenant_id"], status=defect_status, assigned_to=assigned_to)
+    rows = service.list_defects(
+        claims["tenant_id"],
+        status=defect_status,
+        assigned_to=assigned_to,
+        viewer_user_id=claims["sub"],
+    )
     return [DefectCreateFromObservationRead.model_validate(item) for item in rows]
 
 
@@ -76,7 +81,7 @@ def list_defects(
     dependencies=[Depends(require_perm(PERM_DEFECT_READ))],
 )
 def defect_stats(claims: Claims, service: Service) -> DefectStatsRead:
-    return service.stats(claims["tenant_id"])
+    return service.stats(claims["tenant_id"], viewer_user_id=claims["sub"])
 
 
 @router.get(
@@ -86,7 +91,7 @@ def defect_stats(claims: Claims, service: Service) -> DefectStatsRead:
 )
 def get_defect(defect_id: str, claims: Claims, service: Service) -> DefectDetailRead:
     try:
-        defect, actions = service.get_defect(claims["tenant_id"], defect_id)
+        defect, actions = service.get_defect(claims["tenant_id"], defect_id, viewer_user_id=claims["sub"])
         return DefectDetailRead(
             defect=DefectCreateFromObservationRead.model_validate(defect),
             actions=[DefectActionRead.model_validate(action) for action in actions],
@@ -108,7 +113,7 @@ def assign_defect(
     service: Service,
 ) -> DefectCreateFromObservationRead:
     try:
-        row = service.assign_defect(claims["tenant_id"], defect_id, payload)
+        row = service.assign_defect(claims["tenant_id"], defect_id, payload, viewer_user_id=claims["sub"])
         return DefectCreateFromObservationRead.model_validate(row)
     except (NotFoundError, ConflictError) as exc:
         _handle_defect_error(exc)
@@ -127,7 +132,7 @@ def update_status(
     service: Service,
 ) -> DefectCreateFromObservationRead:
     try:
-        row = service.update_status(claims["tenant_id"], defect_id, payload)
+        row = service.update_status(claims["tenant_id"], defect_id, payload, viewer_user_id=claims["sub"])
         return DefectCreateFromObservationRead.model_validate(row)
     except (NotFoundError, ConflictError) as exc:
         _handle_defect_error(exc)

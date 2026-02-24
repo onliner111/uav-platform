@@ -135,7 +135,7 @@ def list_tasks(
     service: Service,
     task_status: Annotated[InspectionTaskStatus | None, Query(alias="status")] = None,
 ) -> list[InspectionTaskRead]:
-    rows = service.list_tasks(claims["tenant_id"], task_status)
+    rows = service.list_tasks(claims["tenant_id"], task_status, viewer_user_id=claims["sub"])
     return [InspectionTaskRead.model_validate(item) for item in rows]
 
 
@@ -146,7 +146,7 @@ def list_tasks(
 )
 def get_task(task_id: str, claims: Claims, service: Service) -> InspectionTaskRead:
     try:
-        row = service.get_task(claims["tenant_id"], task_id)
+        row = service.get_task(claims["tenant_id"], task_id, viewer_user_id=claims["sub"])
         return InspectionTaskRead.model_validate(row)
     except (NotFoundError, ConflictError) as exc:
         _handle_inspection_error(exc)
@@ -166,7 +166,7 @@ def create_observation(
     service: Service,
 ) -> InspectionObservationRead:
     try:
-        row = service.create_observation(claims["tenant_id"], task_id, payload)
+        row = service.create_observation(claims["tenant_id"], task_id, payload, viewer_user_id=claims["sub"])
         return InspectionObservationRead.model_validate(row)
     except (NotFoundError, ConflictError) as exc:
         _handle_inspection_error(exc)
@@ -180,7 +180,7 @@ def create_observation(
 )
 def list_observations(task_id: str, claims: Claims, service: Service) -> list[InspectionObservationRead]:
     try:
-        rows = service.list_observations(claims["tenant_id"], task_id)
+        rows = service.list_observations(claims["tenant_id"], task_id, viewer_user_id=claims["sub"])
         return [InspectionObservationRead.model_validate(item) for item in rows]
     except (NotFoundError, ConflictError) as exc:
         _handle_inspection_error(exc)
@@ -199,7 +199,12 @@ def export_task(
     export_format: Annotated[str, Query(alias="format")] = "html",
 ) -> InspectionExportRead:
     try:
-        row = service.create_export(claims["tenant_id"], task_id, export_format)
+        row = service.create_export(
+            claims["tenant_id"],
+            task_id,
+            export_format,
+            viewer_user_id=claims["sub"],
+        )
         return InspectionExportRead.model_validate(row)
     except (NotFoundError, ConflictError) as exc:
         _handle_inspection_error(exc)
@@ -212,7 +217,7 @@ def export_task(
 )
 def get_export(export_id: str, claims: Claims, service: Service) -> FileResponse:
     try:
-        export = service.get_export(claims["tenant_id"], export_id)
+        export = service.get_export(claims["tenant_id"], export_id, viewer_user_id=claims["sub"])
     except (NotFoundError, ConflictError) as exc:
         _handle_inspection_error(exc)
         raise

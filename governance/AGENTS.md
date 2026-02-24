@@ -42,6 +42,8 @@
 ## Containerization
 - All commands MUST run via docker compose / Makefile.
 - MUST NOT rely on host Python/Node.
+- In this repository environment, Docker-related quality-gate commands MUST be executed with escalated permissions.
+- If a Docker command fails with npipe access denial (for example `dockerDesktopLinuxEngine`), MUST immediately retry the same command with escalated permissions.
 
 ## Quality Gate (Hard Requirement)
 Before declaring success, MUST pass:

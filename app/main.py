@@ -8,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from app.api.routers import (
     alert,
     approval,
+    asset,
+    asset_maintenance,
     command,
     dashboard,
     defect,
@@ -35,6 +37,12 @@ app = FastAPI(
 app.add_middleware(AuditMiddleware)
 
 app.include_router(identity.router, prefix="/api/identity", tags=["identity"])
+app.include_router(asset.router, prefix="/api/assets", tags=["assets"])
+app.include_router(
+    asset_maintenance.router,
+    prefix="/api/assets/maintenance",
+    tags=["assets-maintenance"],
+)
 app.include_router(registry.router, prefix="/api/registry", tags=["registry"])
 app.include_router(mission.router, prefix="/api/mission", tags=["mission"])
 app.include_router(telemetry.router, prefix="/api/telemetry", tags=["telemetry"])
