@@ -43,6 +43,18 @@ class AlertService:
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
+    def _get_scoped_alert(
+        self,
+        session: Session,
+        tenant_id: str,
+        alert_id: str,
+    ) -> AlertRecord | None:
+        return session.exec(
+            select(AlertRecord)
+            .where(AlertRecord.tenant_id == tenant_id)
+            .where(AlertRecord.id == alert_id)
+        ).first()
+
     @staticmethod
     def _as_bool(value: object) -> bool:
         if isinstance(value, bool):
@@ -191,8 +203,8 @@ class AlertService:
 
     def get_alert(self, tenant_id: str, alert_id: str) -> AlertRecord:
         with self._session() as session:
-            record = session.get(AlertRecord, alert_id)
-            if record is None or record.tenant_id != tenant_id:
+            record = self._get_scoped_alert(session, tenant_id, alert_id)
+            if record is None:
                 raise NotFoundError("alert not found")
             return record
 
@@ -206,8 +218,8 @@ class AlertService:
     ) -> AlertRecord:
         published = False
         with self._session() as session:
-            record = session.get(AlertRecord, alert_id)
-            if record is None or record.tenant_id != tenant_id:
+            record = self._get_scoped_alert(session, tenant_id, alert_id)
+            if record is None:
                 raise NotFoundError("alert not found")
             if record.status == AlertStatus.CLOSED:
                 raise ConflictError("alert already closed")
@@ -250,8 +262,8 @@ class AlertService:
     ) -> AlertRecord:
         published = False
         with self._session() as session:
-            record = session.get(AlertRecord, alert_id)
-            if record is None or record.tenant_id != tenant_id:
+            record = self._get_scoped_alert(session, tenant_id, alert_id)
+            if record is None:
                 raise NotFoundError("alert not found")
 
             if record.status != AlertStatus.CLOSED:

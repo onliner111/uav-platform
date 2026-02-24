@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app import main as app_main
@@ -22,6 +23,13 @@ def registry_client(
         f"sqlite:///{db_path}",
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(test_engine, "connect")
+    def _enable_foreign_keys(dbapi_connection: object, _connection_record: object) -> None:
+        cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     SQLModel.metadata.create_all(test_engine)
     monkeypatch.setattr(db, "engine", test_engine)
     monkeypatch.setattr(audit, "engine", test_engine)
@@ -83,6 +91,19 @@ def test_registry_tenant_isolation(registry_client: TestClient) -> None:
         headers=_auth_header(token_b),
     )
     assert cross_get.status_code == 404
+
+    cross_update = registry_client.patch(
+        f"/api/registry/drones/{drone_id}",
+        json={"name": "spoofed"},
+        headers=_auth_header(token_b),
+    )
+    assert cross_update.status_code == 404
+
+    cross_delete = registry_client.delete(
+        f"/api/registry/drones/{drone_id}",
+        headers=_auth_header(token_b),
+    )
+    assert cross_delete.status_code == 404
 
     list_b = registry_client.get("/api/registry/drones", headers=_auth_header(token_b))
     assert list_b.status_code == 200

@@ -6,6 +6,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
+COMPOSE_FILE="infra/docker-compose.yml"
 
 echo "============================================"
 echo "VERIFY ALL — Acceptance Gate"
@@ -46,7 +47,7 @@ docker compose version >/dev/null 2>&1 || fail "docker compose plugin not availa
 pass "Preflight: docker + docker compose available"
 
 # 1) Build + start (containerized)
-run_step "docker compose up (build, detach)" docker compose up --build -d
+run_step "docker compose up (build, detach)" docker compose -f "$COMPOSE_FILE" up --build -d
 
 # 2) Basic health checks (best-effort; don't fail if endpoints not exposed yet)
 echo ""
@@ -81,7 +82,7 @@ if [[ -f "Makefile" ]]; then
 else
   echo "⚠️  WARN: Makefile not found; falling back to docker compose run checks (limited)"
   # Fallback (adjust service name if needed)
-  run_step "pytest (fallback)" docker compose -f infra/docker-compose.yml run --rm app pytest
+  run_step "pytest (fallback)" docker compose -f "$COMPOSE_FILE" run --rm app pytest
 fi
 
 # 4) Show final status
@@ -94,4 +95,4 @@ echo "============================================"
 # Optional: print how to stop services
 echo ""
 echo "To stop services:"
-echo "  docker compose down"
+echo "  docker compose -f $COMPOSE_FILE down"

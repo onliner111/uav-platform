@@ -35,6 +35,18 @@ class IncidentService:
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
+    def _get_scoped_incident(
+        self,
+        session: Session,
+        tenant_id: str,
+        incident_id: str,
+    ) -> Incident | None:
+        return session.exec(
+            select(Incident)
+            .where(Incident.tenant_id == tenant_id)
+            .where(Incident.id == incident_id)
+        ).first()
+
     def create_incident(self, tenant_id: str, payload: IncidentCreate) -> Incident:
         with self._session() as session:
             incident = Incident(
@@ -67,8 +79,8 @@ class IncidentService:
         payload: IncidentCreateTaskRequest,
     ) -> IncidentCreateTaskRead:
         with self._session() as session:
-            incident = session.get(Incident, incident_id)
-            if incident is None or incident.tenant_id != tenant_id:
+            incident = self._get_scoped_incident(session, tenant_id, incident_id)
+            if incident is None:
                 raise NotFoundError("incident not found")
             if incident.status == IncidentStatus.TASK_CREATED and incident.linked_task_id is not None:
                 raise ConflictError("incident task already created")

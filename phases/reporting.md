@@ -1,6 +1,7 @@
 # Reporting Protocol (Required)
 
 Codex MUST generate progress reports in `logs/`.
+Codex MUST keep `docs/PROJECT_STATUS.md` synchronized with `phases/state.md` after each phase result.
 
 ## On phase start (optional)
 You MAY append a short entry to logs/PROGRESS.md:
@@ -25,6 +26,9 @@ Then update logs/PROGRESS.md:
 - Mark phase as ✅
 - Add link-style reference to the report filename (just the filename)
 
+Then synchronize docs/PROJECT_STATUS.md:
+- Reflect current phase/status from phases/state.md
+
 ## On phase failure (REQUIRED)
 Create a per-phase failure report:
 
@@ -40,6 +44,9 @@ Create a per-phase failure report:
 Then update logs/PROGRESS.md:
 - Mark phase as ❌
 - Add report filename
+
+Then synchronize docs/PROJECT_STATUS.md:
+- Reflect FAILED state and last failure context from phases/state.md
 
 ## Constraints
 - Do not write long narratives.

@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 from app.domain.models import (
     Approval,
     ApprovalDecision,
+    Drone,
     Mission,
     MissionApprovalRequest,
     MissionCreate,
@@ -40,6 +41,19 @@ class PermissionDeniedError(MissionError):
 class MissionService:
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
+
+    def _get_scoped_mission(self, session: Session, tenant_id: str, mission_id: str) -> Mission:
+        mission = session.exec(
+            select(Mission).where(Mission.tenant_id == tenant_id).where(Mission.id == mission_id)
+        ).first()
+        if mission is None:
+            raise NotFoundError("mission not found")
+        return mission
+
+    def _ensure_scoped_drone(self, session: Session, tenant_id: str, drone_id: str) -> None:
+        drone = session.exec(select(Drone).where(Drone.tenant_id == tenant_id).where(Drone.id == drone_id)).first()
+        if drone is None:
+            raise NotFoundError("drone not found")
 
     def _has_permission(self, permissions: list[str], required: str) -> bool:
         return required in permissions or PERM_WILDCARD in permissions
@@ -75,6 +89,8 @@ class MissionService:
                 permissions=permissions,
                 actor_id=actor_id,
             )
+            if payload.drone_id is not None:
+                self._ensure_scoped_drone(session, tenant_id, payload.drone_id)
             mission = Mission(
                 tenant_id=tenant_id,
                 name=payload.name,
@@ -107,9 +123,7 @@ class MissionService:
 
     def get_mission(self, tenant_id: str, mission_id: str) -> Mission:
         with self._session() as session:
-            mission = session.get(Mission, mission_id)
-            if mission is None or mission.tenant_id != tenant_id:
-                raise NotFoundError("mission not found")
+            mission = self._get_scoped_mission(session, tenant_id, mission_id)
             return mission
 
     def update_mission(
@@ -121,14 +135,13 @@ class MissionService:
         payload: MissionUpdate,
     ) -> Mission:
         with self._session() as session:
-            mission = session.get(Mission, mission_id)
-            if mission is None or mission.tenant_id != tenant_id:
-                raise NotFoundError("mission not found")
+            mission = self._get_scoped_mission(session, tenant_id, mission_id)
             if mission.state not in {MissionState.DRAFT, MissionState.REJECTED}:
                 raise ConflictError("mission can only be edited in DRAFT/REJECTED state")
             if payload.name is not None:
                 mission.name = payload.name
             if payload.drone_id is not None:
+                self._ensure_scoped_drone(session, tenant_id, payload.drone_id)
                 mission.drone_id = payload.drone_id
             if payload.payload is not None:
                 mission.payload = payload.payload
@@ -152,9 +165,7 @@ class MissionService:
 
     def delete_mission(self, tenant_id: str, mission_id: str) -> None:
         with self._session() as session:
-            mission = session.get(Mission, mission_id)
-            if mission is None or mission.tenant_id != tenant_id:
-                raise NotFoundError("mission not found")
+            mission = self._get_scoped_mission(session, tenant_id, mission_id)
             if mission.state not in {MissionState.DRAFT, MissionState.REJECTED}:
                 raise ConflictError("mission can only be deleted in DRAFT/REJECTED state")
             session.delete(mission)
@@ -168,9 +179,7 @@ class MissionService:
         payload: MissionApprovalRequest,
     ) -> tuple[Mission, Approval]:
         with self._session() as session:
-            mission = session.get(Mission, mission_id)
-            if mission is None or mission.tenant_id != tenant_id:
-                raise NotFoundError("mission not found")
+            mission = self._get_scoped_mission(session, tenant_id, mission_id)
             target_state = (
                 MissionState.APPROVED
                 if payload.decision == ApprovalDecision.APPROVE
@@ -203,9 +212,7 @@ class MissionService:
 
     def list_approvals(self, tenant_id: str, mission_id: str) -> list[Approval]:
         with self._session() as session:
-            mission = session.get(Mission, mission_id)
-            if mission is None or mission.tenant_id != tenant_id:
-                raise NotFoundError("mission not found")
+            _ = self._get_scoped_mission(session, tenant_id, mission_id)
             statement = select(Approval).where(Approval.tenant_id == tenant_id).where(
                 Approval.mission_id == mission_id
             )
@@ -220,9 +227,7 @@ class MissionService:
         payload: MissionTransitionRequest,
     ) -> Mission:
         with self._session() as session:
-            mission = session.get(Mission, mission_id)
-            if mission is None or mission.tenant_id != tenant_id:
-                raise NotFoundError("mission not found")
+            mission = self._get_scoped_mission(session, tenant_id, mission_id)
             if not can_transition(mission.state, payload.target_state):
                 raise ConflictError(f"illegal transition: {mission.state} -> {payload.target_state}")
             if mission.constraints.get("emergency_fastlane", False) and payload.target_state == MissionState.RUNNING:

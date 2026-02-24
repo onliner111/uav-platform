@@ -39,9 +39,7 @@
 ## 3. 目录与关键文件
 
 - 环境变量模板：`.env.example`
-- 编排文件：
-  - `docker-compose.yml`（根目录）
-  - `infra/docker-compose.yml`（Makefile 默认使用）
+- 编排文件：`infra/docker-compose.yml`（统一入口，Makefile 默认使用）
 - 迁移配置：`alembic.ini`、`infra/migrations/*`
 - 运维脚本：`infra/scripts/*`
 - 构建与验证入口：`Makefile`
@@ -220,7 +218,7 @@ cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.ym
 
 步骤：
 
-1. `docker compose ps` 查看 db/redis 是否 healthy
+1. `docker --context default compose -f infra/docker-compose.yml ps` 查看 db/redis 是否 healthy
 2. 检查 `DATABASE_URL`、`REDIS_URL`
 3. 查看 `app` 日志定位错误堆栈
 
@@ -236,7 +234,7 @@ cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.ym
 
 步骤：
 
-1. `docker compose logs app --tail=200`
+1. `docker --context default compose -f infra/docker-compose.yml logs app --tail=200`
 2. 对照最近变更（代码/配置/迁移）
 3. 必要时回滚到上个稳定版本
 
@@ -274,8 +272,9 @@ cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.ym
 
 ---
 
-## 13. �ӿ��嵥��¼
+## 13. �ӿ��嵥��¼
 
-��ϸ�ӿ���μ���doc/API_Appendix_V2.0.md��
+��ϸ�ӿ���μ���doc/API_Appendix_V2.0.md��
 
-���齫����¼��������������������ıز��
+���齫����¼��������������������ıز��
+

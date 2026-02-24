@@ -22,25 +22,25 @@
 2.  进入项目目录
 3.  执行：
 
-docker compose up --build -d
+docker compose -f infra/docker-compose.yml up --build -d
 
 ------------------------------------------------------------------------
 
 # 三、数据库迁移
 
-docker compose exec app alembic upgrade head
+docker compose -f infra/docker-compose.yml exec app alembic upgrade head
 
 ------------------------------------------------------------------------
 
 # 四、停止系统
 
-docker compose down
+docker compose -f infra/docker-compose.yml down
 
 ------------------------------------------------------------------------
 
 # 五、日志查看
 
-docker compose logs -f
+docker compose -f infra/docker-compose.yml logs -f
 
 ------------------------------------------------------------------------
 
@@ -48,11 +48,11 @@ docker compose logs -f
 
 数据库备份：
 
-docker compose exec db pg_dump -U postgres dbname \> backup.sql
+docker compose -f infra/docker-compose.yml exec db pg_dump -U postgres dbname \> backup.sql
 
 数据库恢复：
 
-docker compose exec -T db psql -U postgres dbname \< backup.sql
+docker compose -f infra/docker-compose.yml exec -T db psql -U postgres dbname \< backup.sql
 
 ------------------------------------------------------------------------
 
@@ -61,3 +61,4 @@ docker compose exec -T db psql -U postgres dbname \< backup.sql
 1.  拉取最新代码
 2.  重新构建镜像
 3.  执行数据库迁移
+

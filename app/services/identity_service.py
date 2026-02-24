@@ -4,7 +4,7 @@ import hashlib
 import os
 
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.domain.models import (
     BootstrapAdminRequest,
@@ -66,6 +66,14 @@ class IdentityService:
             for perm in created:
                 session.refresh(perm)
         return list(session.exec(select(Permission)).all())
+
+    def _get_scoped_user(self, session: Session, tenant_id: str, user_id: str) -> User | None:
+        statement = select(User).where(User.tenant_id == tenant_id).where(User.id == user_id)
+        return session.exec(statement).first()
+
+    def _get_scoped_role(self, session: Session, tenant_id: str, role_id: str) -> Role | None:
+        statement = select(Role).where(Role.tenant_id == tenant_id).where(Role.id == role_id)
+        return session.exec(statement).first()
 
     def create_tenant(self, payload: TenantCreate) -> Tenant:
         with self._session() as session:
@@ -170,7 +178,7 @@ class IdentityService:
             session.commit()
             session.refresh(admin_user)
 
-            session.add(UserRole(user_id=admin_user.id, role_id=admin_role.id))
+            session.add(UserRole(tenant_id=payload.tenant_id, user_id=admin_user.id, role_id=admin_role.id))
             session.commit()
             return admin_user
 
@@ -180,15 +188,15 @@ class IdentityService:
 
     def get_user(self, tenant_id: str, user_id: str) -> User:
         with self._session() as session:
-            user = session.get(User, user_id)
-            if user is None or user.tenant_id != tenant_id:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
                 raise NotFoundError("user not found")
             return user
 
     def update_user(self, tenant_id: str, user_id: str, payload: UserUpdate) -> User:
         with self._session() as session:
-            user = session.get(User, user_id)
-            if user is None or user.tenant_id != tenant_id:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
                 raise NotFoundError("user not found")
             if payload.password is not None:
                 user.password_hash = self._hash_password(payload.password)
@@ -201,8 +209,8 @@ class IdentityService:
 
     def delete_user(self, tenant_id: str, user_id: str) -> None:
         with self._session() as session:
-            user = session.get(User, user_id)
-            if user is None or user.tenant_id != tenant_id:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
                 raise NotFoundError("user not found")
             session.delete(user)
             session.commit()
@@ -225,15 +233,15 @@ class IdentityService:
 
     def get_role(self, tenant_id: str, role_id: str) -> Role:
         with self._session() as session:
-            role = session.get(Role, role_id)
-            if role is None or role.tenant_id != tenant_id:
+            role = self._get_scoped_role(session, tenant_id, role_id)
+            if role is None:
                 raise NotFoundError("role not found")
             return role
 
     def update_role(self, tenant_id: str, role_id: str, payload: RoleUpdate) -> Role:
         with self._session() as session:
-            role = session.get(Role, role_id)
-            if role is None or role.tenant_id != tenant_id:
+            role = self._get_scoped_role(session, tenant_id, role_id)
+            if role is None:
                 raise NotFoundError("role not found")
             if payload.name is not None:
                 role.name = payload.name
@@ -250,8 +258,8 @@ class IdentityService:
 
     def delete_role(self, tenant_id: str, role_id: str) -> None:
         with self._session() as session:
-            role = session.get(Role, role_id)
-            if role is None or role.tenant_id != tenant_id:
+            role = self._get_scoped_role(session, tenant_id, role_id)
+            if role is None:
                 raise NotFoundError("role not found")
             session.delete(role)
             session.commit()
@@ -307,22 +315,22 @@ class IdentityService:
 
     def bind_user_role(self, tenant_id: str, user_id: str, role_id: str) -> None:
         with self._session() as session:
-            user = session.get(User, user_id)
-            role = session.get(Role, role_id)
-            if user is None or role is None or user.tenant_id != tenant_id or role.tenant_id != tenant_id:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            role = self._get_scoped_role(session, tenant_id, role_id)
+            if user is None or role is None:
                 raise NotFoundError("user or role not found")
-            if session.get(UserRole, (user_id, role_id)) is not None:
+            if session.get(UserRole, (tenant_id, user_id, role_id)) is not None:
                 return
-            session.add(UserRole(user_id=user_id, role_id=role_id))
+            session.add(UserRole(tenant_id=tenant_id, user_id=user_id, role_id=role_id))
             session.commit()
 
     def unbind_user_role(self, tenant_id: str, user_id: str, role_id: str) -> None:
         with self._session() as session:
-            user = session.get(User, user_id)
-            role = session.get(Role, role_id)
-            if user is None or role is None or user.tenant_id != tenant_id or role.tenant_id != tenant_id:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            role = self._get_scoped_role(session, tenant_id, role_id)
+            if user is None or role is None:
                 raise NotFoundError("user or role not found")
-            user_role = session.get(UserRole, (user_id, role_id))
+            user_role = session.get(UserRole, (tenant_id, user_id, role_id))
             if user_role is None:
                 return
             session.delete(user_role)
@@ -330,9 +338,9 @@ class IdentityService:
 
     def bind_role_permission(self, tenant_id: str, role_id: str, permission_id: str) -> None:
         with self._session() as session:
-            role = session.get(Role, role_id)
+            role = self._get_scoped_role(session, tenant_id, role_id)
             permission = session.get(Permission, permission_id)
-            if role is None or permission is None or role.tenant_id != tenant_id:
+            if role is None or permission is None:
                 raise NotFoundError("role or permission not found")
             if session.get(RolePermission, (role_id, permission_id)) is not None:
                 return
@@ -341,9 +349,9 @@ class IdentityService:
 
     def unbind_role_permission(self, tenant_id: str, role_id: str, permission_id: str) -> None:
         with self._session() as session:
-            role = session.get(Role, role_id)
+            role = self._get_scoped_role(session, tenant_id, role_id)
             permission = session.get(Permission, permission_id)
-            if role is None or permission is None or role.tenant_id != tenant_id:
+            if role is None or permission is None:
                 raise NotFoundError("role or permission not found")
             role_permission = session.get(RolePermission, (role_id, permission_id))
             if role_permission is None:
@@ -353,17 +361,26 @@ class IdentityService:
 
     def collect_user_permissions(self, tenant_id: str, user_id: str) -> list[str]:
         with self._session() as session:
-            user = session.get(User, user_id)
-            if user is None or user.tenant_id != tenant_id:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
                 return []
 
-            user_role_links = list(session.exec(select(UserRole).where(UserRole.user_id == user_id)).all())
+            user_role_links = list(
+                session.exec(
+                    select(UserRole)
+                    .where(UserRole.tenant_id == tenant_id)
+                    .where(UserRole.user_id == user_id)
+                ).all()
+            )
             role_ids = [item.role_id for item in user_role_links]
             if not role_ids:
                 return []
 
-            all_roles = list(session.exec(select(Role)).all())
-            scoped_roles = [role for role in all_roles if role.id in role_ids and role.tenant_id == tenant_id]
+            scoped_roles = list(
+                session.exec(
+                    select(Role).where(Role.tenant_id == tenant_id).where(col(Role.id).in_(role_ids))
+                ).all()
+            )
             scoped_role_ids = [role.id for role in scoped_roles]
             if not scoped_role_ids:
                 return []

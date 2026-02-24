@@ -5,11 +5,13 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app import main as app_main
 from app.api.routers import command as command_router
-from app.domain.models import EventRecord
+from app.domain.models import CommandRequestRecord, CommandStatus, CommandType, EventRecord
 from app.infra import audit, db, events
 from app.services.command_service import CommandService
 
@@ -24,6 +26,13 @@ def command_client(
         f"sqlite:///{db_path}",
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(test_engine, "connect")
+    def _enable_foreign_keys(dbapi_connection: object, _connection_record: object) -> None:
+        cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     SQLModel.metadata.create_all(test_engine)
     monkeypatch.setattr(db, "engine", test_engine)
     monkeypatch.setattr(audit, "engine", test_engine)
@@ -170,3 +179,71 @@ def test_command_timeout_marked_timeout(command_client: TestClient) -> None:
     assert body["status"] == "TIMEOUT"
     assert body["ack_ok"] is False
     assert body["attempts"] == 1
+
+
+def test_command_cross_tenant_drone_access_returns_404(command_client: TestClient) -> None:
+    tenant_a = _create_tenant(command_client, "command-cross-tenant-a")
+    tenant_b = _create_tenant(command_client, "command-cross-tenant-b")
+    _bootstrap_admin(command_client, tenant_a, "admin_a", "pass-a")
+    _bootstrap_admin(command_client, tenant_b, "admin_b", "pass-b")
+    token_a = _login(command_client, tenant_a, "admin_a", "pass-a")
+    token_b = _login(command_client, tenant_b, "admin_b", "pass-b")
+    drone_a = _create_drone(command_client, token_a, "drone-cross-a")
+
+    response = command_client.post(
+        "/api/command/commands",
+        json={
+            "drone_id": drone_a,
+            "type": "RTH",
+            "params": {},
+            "idempotency_key": "cross-tenant-drone",
+            "expect_ack": True,
+        },
+        headers=_auth_header(token_b),
+    )
+    assert response.status_code == 404
+
+
+def test_command_requests_composite_fk_enforced_in_db(command_client: TestClient) -> None:
+    tenant_a = _create_tenant(command_client, "command-fk-a")
+    tenant_b = _create_tenant(command_client, "command-fk-b")
+    _bootstrap_admin(command_client, tenant_a, "admin_a", "pass-a")
+    _bootstrap_admin(command_client, tenant_b, "admin_b", "pass-b")
+
+    token_a = _login(command_client, tenant_a, "admin_a", "pass-a")
+    token_b = _login(command_client, tenant_b, "admin_b", "pass-b")
+    drone_a = _create_drone(command_client, token_a, "drone-fk-a")
+    drone_b = _create_drone(command_client, token_b, "drone-fk-b")
+
+    with Session(db.engine, expire_on_commit=False) as session:
+        session.add(
+            CommandRequestRecord(
+                tenant_id=tenant_a,
+                drone_id=drone_b,
+                command_type=CommandType.RTH,
+                params={},
+                idempotency_key="cross-tenant-fk",
+                expect_ack=True,
+                status=CommandStatus.PENDING,
+                attempts=0,
+                issued_by="tester",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+        session.add(
+            CommandRequestRecord(
+                tenant_id=tenant_a,
+                drone_id=drone_a,
+                command_type=CommandType.LAND,
+                params={},
+                idempotency_key="same-tenant-fk",
+                expect_ack=True,
+                status=CommandStatus.PENDING,
+                attempts=0,
+                issued_by="tester",
+            )
+        )
+        session.commit()

@@ -44,6 +44,46 @@ class DefectService:
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
+    def _get_scoped_observation(
+        self,
+        session: Session,
+        tenant_id: str,
+        observation_id: str,
+    ) -> InspectionObservation:
+        observation = self._find_scoped_observation(session, tenant_id, observation_id)
+        if observation is None:
+            raise NotFoundError("observation not found")
+        return observation
+
+    def _find_scoped_observation(
+        self,
+        session: Session,
+        tenant_id: str,
+        observation_id: str,
+    ) -> InspectionObservation | None:
+        return session.exec(
+            select(InspectionObservation)
+            .where(InspectionObservation.tenant_id == tenant_id)
+            .where(InspectionObservation.id == observation_id)
+        ).first()
+
+    def _get_scoped_defect(self, session: Session, tenant_id: str, defect_id: str) -> Defect:
+        defect = session.exec(
+            select(Defect)
+            .where(Defect.tenant_id == tenant_id)
+            .where(Defect.id == defect_id)
+        ).first()
+        if defect is None:
+            raise NotFoundError("defect not found")
+        return defect
+
+    def _find_scoped_task(self, session: Session, tenant_id: str, task_id: str) -> InspectionTask | None:
+        return session.exec(
+            select(InspectionTask)
+            .where(InspectionTask.tenant_id == tenant_id)
+            .where(InspectionTask.id == task_id)
+        ).first()
+
     def _create_action(self, session: Session, tenant_id: str, defect_id: str, action_type: str, note: str) -> None:
         action = DefectAction(
             tenant_id=tenant_id,
@@ -55,9 +95,7 @@ class DefectService:
 
     def create_from_observation(self, tenant_id: str, observation_id: str) -> Defect:
         with self._session() as session:
-            observation = session.get(InspectionObservation, observation_id)
-            if observation is None or observation.tenant_id != tenant_id:
-                raise NotFoundError("observation not found")
+            observation = self._get_scoped_observation(session, tenant_id, observation_id)
 
             existing = session.exec(
                 select(Defect)
@@ -110,9 +148,7 @@ class DefectService:
 
     def get_defect(self, tenant_id: str, defect_id: str) -> tuple[Defect, list[DefectAction]]:
         with self._session() as session:
-            defect = session.get(Defect, defect_id)
-            if defect is None or defect.tenant_id != tenant_id:
-                raise NotFoundError("defect not found")
+            defect = self._get_scoped_defect(session, tenant_id, defect_id)
             actions = list(
                 session.exec(
                     select(DefectAction)
@@ -124,9 +160,7 @@ class DefectService:
 
     def assign_defect(self, tenant_id: str, defect_id: str, payload: DefectAssignRequest) -> Defect:
         with self._session() as session:
-            defect = session.get(Defect, defect_id)
-            if defect is None or defect.tenant_id != tenant_id:
-                raise NotFoundError("defect not found")
+            defect = self._get_scoped_defect(session, tenant_id, defect_id)
             if defect.status == DefectStatus.CLOSED:
                 raise ConflictError("closed defect cannot be assigned")
             defect.assigned_to = payload.assigned_to
@@ -146,9 +180,7 @@ class DefectService:
 
     def update_status(self, tenant_id: str, defect_id: str, payload: DefectStatusRequest) -> Defect:
         with self._session() as session:
-            defect = session.get(Defect, defect_id)
-            if defect is None or defect.tenant_id != tenant_id:
-                raise NotFoundError("defect not found")
+            defect = self._get_scoped_defect(session, tenant_id, defect_id)
             if defect.status == payload.status:
                 return defect
             allowed = self._allowed_transitions.get(defect.status, set())
@@ -161,8 +193,8 @@ class DefectService:
             self._create_action(session, tenant_id, defect.id, f"STATUS_{payload.status}", note)
 
             if payload.status == DefectStatus.FIXED:
-                observation = session.get(InspectionObservation, defect.observation_id)
-                if observation is not None and observation.tenant_id == tenant_id:
+                observation = self._find_scoped_observation(session, tenant_id, defect.observation_id)
+                if observation is not None:
                     review_task = InspectionTask(
                         tenant_id=tenant_id,
                         name=f"Review-{defect.id[:8]}",
@@ -192,8 +224,8 @@ class DefectService:
         return defect
 
     def _resolve_template_id_for_review(self, session: Session, tenant_id: str, task_id: str) -> str:
-        source_task = session.get(InspectionTask, task_id)
-        if source_task is not None and source_task.tenant_id == tenant_id:
+        source_task = self._find_scoped_task(session, tenant_id, task_id)
+        if source_task is not None:
             return source_task.template_id
         fallback = session.exec(select(InspectionTask).where(InspectionTask.tenant_id == tenant_id)).first()
         if fallback is None:

@@ -14,6 +14,14 @@ Codex MUST execute phases sequentially.
 4. phase-04-command-center.md
 5. phase-05-compliance.md
 6. phase-06-reporting.md
+7. phase-07-master-blueprint.md
+8. phase-07-tenant-boundary.md
+9. phase-07a-identity-preview.md
+10. phase-07a-core-batch-a.md
+11. phase-07a-lookup-hardening-analysis.md
+12. phase-07a-lookup-hardening-execution-plan.md
+13. phase-07b-db-boundary-master.md
+14. phase-07c-tenant-export-purge.md
 
 ---
 
@@ -28,6 +36,7 @@ Codex MUST execute phases sequentially.
 - MUST stop if a phase fails after 3 fix cycles.
 - MUST NOT skip phases.
 - MUST NOT reorder phases.
+- MUST start from `phases/state.md -> current_phase`.
 
 ---
 
@@ -48,10 +57,11 @@ Codex should:
 
 1. Read governance/AGENTS.md
 2. Read phases/index.md
-3. Execute phase 1
-4. Verify
-5. If success → automatically continue to next phase
-6. Repeat until all phases complete
+3. Read phases/state.md
+4. Execute from current_phase
+5. Verify
+6. If success → automatically continue to next phase
+7. Repeat until all phases complete
 
 ---
 

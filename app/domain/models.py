@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
 from pydantic import Field as PydanticField
-from sqlalchemy import JSON, Column, UniqueConstraint
+from sqlalchemy import JSON, Column, ForeignKeyConstraint, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from app.domain.state_machine import MissionState
@@ -59,7 +59,10 @@ class Tenant(SQLModel, table=True):
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
-    __table_args__ = (UniqueConstraint("tenant_id", "username", name="uq_users_tenant_username"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "username", name="uq_users_tenant_username"),
+        UniqueConstraint("tenant_id", "id", name="uq_users_tenant_id_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
@@ -71,7 +74,10 @@ class User(SQLModel, table=True):
 
 class Role(SQLModel, table=True):
     __tablename__ = "roles"
-    __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_roles_tenant_name"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_roles_tenant_name"),
+        UniqueConstraint("tenant_id", "id", name="uq_roles_tenant_id_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
@@ -91,9 +97,24 @@ class Permission(SQLModel, table=True):
 
 class UserRole(SQLModel, table=True):
     __tablename__ = "user_roles"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["users.tenant_id", "users.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "role_id"],
+            ["roles.tenant_id", "roles.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_user_roles_tenant_user", "tenant_id", "user_id"),
+        Index("ix_user_roles_tenant_role", "tenant_id", "role_id"),
+    )
 
-    user_id: str = Field(foreign_key="users.id", primary_key=True)
-    role_id: str = Field(foreign_key="roles.id", primary_key=True)
+    tenant_id: str = Field(primary_key=True)
+    user_id: str = Field(primary_key=True)
+    role_id: str = Field(primary_key=True)
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
@@ -113,7 +134,10 @@ class DroneVendor(StrEnum):
 
 class Drone(SQLModel, table=True):
     __tablename__ = "drones"
-    __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_drones_tenant_name"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_drones_tenant_name"),
+        UniqueConstraint("tenant_id", "id", name="uq_drones_tenant_id_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
@@ -153,11 +177,21 @@ class MissionPlanType(StrEnum):
 
 class Mission(SQLModel, table=True):
     __tablename__ = "missions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_missions_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "drone_id"],
+            ["drones.tenant_id", "drones.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_missions_tenant_drone_id", "tenant_id", "drone_id"),
+        Index("ix_missions_tenant_state", "tenant_id", "state"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     name: str = Field(index=True)
-    drone_id: str | None = Field(default=None, foreign_key="drones.id", index=True)
+    drone_id: str | None = Field(default=None, index=True)
     plan_type: MissionPlanType
     payload: dict[str, Any] = Field(
         default_factory=dict,
@@ -187,10 +221,18 @@ class Approval(SQLModel, table=True):
 
 class MissionRun(SQLModel, table=True):
     __tablename__ = "mission_runs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "mission_id"],
+            ["missions.tenant_id", "missions.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_mission_runs_tenant_mission_id", "tenant_id", "mission_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
-    mission_id: str = Field(foreign_key="missions.id", index=True)
+    mission_id: str = Field(index=True)
     state: MissionState = Field(index=True)
     started_at: datetime = Field(default_factory=now_utc, index=True)
     ended_at: datetime | None = Field(default=None, index=True)
@@ -257,14 +299,26 @@ class CommandRequestRecord(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint(
             "tenant_id",
+            "id",
+            name="uq_command_requests_tenant_id_id",
+        ),
+        UniqueConstraint(
+            "tenant_id",
             "idempotency_key",
             name="uq_command_requests_tenant_idempotency",
         ),
+        ForeignKeyConstraint(
+            ["tenant_id", "drone_id"],
+            ["drones.tenant_id", "drones.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_command_requests_tenant_id_id", "tenant_id", "id"),
+        Index("ix_command_requests_tenant_drone_id", "tenant_id", "drone_id"),
     )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
-    drone_id: str = Field(foreign_key="drones.id", index=True)
+    drone_id: str = Field(index=True)
     command_type: CommandType = Field(index=True)
     params: dict[str, Any] = Field(
         default_factory=dict,
@@ -567,6 +621,10 @@ class IncidentStatus(StrEnum):
 
 class InspectionTemplate(SQLModel, table=True):
     __tablename__ = "inspection_templates"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_inspection_templates_tenant_id_id"),
+        Index("ix_inspection_templates_tenant_id_id", "tenant_id", "id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
@@ -579,10 +637,24 @@ class InspectionTemplate(SQLModel, table=True):
 
 class InspectionTemplateItem(SQLModel, table=True):
     __tablename__ = "inspection_template_items"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_inspection_template_items_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "template_id"],
+            ["inspection_templates.tenant_id", "inspection_templates.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_inspection_template_items_tenant_id_id", "tenant_id", "id"),
+        Index(
+            "ix_inspection_template_items_tenant_template_id",
+            "tenant_id",
+            "template_id",
+        ),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
-    template_id: str = Field(foreign_key="inspection_templates.id", index=True)
+    template_id: str = Field(index=True)
     code: str = Field(max_length=50, index=True)
     title: str = Field(max_length=100)
     severity_default: int = 1
@@ -593,11 +665,21 @@ class InspectionTemplateItem(SQLModel, table=True):
 
 class InspectionTask(SQLModel, table=True):
     __tablename__ = "inspection_tasks"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_inspection_tasks_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "template_id"],
+            ["inspection_templates.tenant_id", "inspection_templates.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_inspection_tasks_tenant_id_id", "tenant_id", "id"),
+        Index("ix_inspection_tasks_tenant_template_id", "tenant_id", "template_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     name: str = Field(max_length=100, index=True)
-    template_id: str = Field(foreign_key="inspection_templates.id", index=True)
+    template_id: str = Field(index=True)
     mission_id: str | None = Field(default=None, foreign_key="missions.id", index=True)
     area_geom: str = Field(default="")
     priority: int = Field(default=5, index=True)
@@ -637,6 +719,11 @@ class InspectionExport(SQLModel, table=True):
 
 class Defect(SQLModel, table=True):
     __tablename__ = "defects"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_defects_tenant_id_id"),
+        Index("ix_defects_tenant_id_id", "tenant_id", "id"),
+        Index("ix_defects_tenant_observation_id", "tenant_id", "observation_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
@@ -651,10 +738,20 @@ class Defect(SQLModel, table=True):
 
 class DefectAction(SQLModel, table=True):
     __tablename__ = "defect_actions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_defect_actions_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "defect_id"],
+            ["defects.tenant_id", "defects.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_defect_actions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_defect_actions_tenant_defect_id", "tenant_id", "defect_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
-    defect_id: str = Field(foreign_key="defects.id", index=True)
+    defect_id: str = Field(index=True)
     action_type: str = Field(max_length=50, index=True)
     note: str = ""
     created_at: datetime = Field(default_factory=now_utc, index=True)
@@ -662,6 +759,16 @@ class DefectAction(SQLModel, table=True):
 
 class Incident(SQLModel, table=True):
     __tablename__ = "incidents"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_incidents_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "linked_task_id"],
+            ["inspection_tasks.tenant_id", "inspection_tasks.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_incidents_tenant_id_id", "tenant_id", "id"),
+        Index("ix_incidents_tenant_linked_task_id", "tenant_id", "linked_task_id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
@@ -669,12 +776,22 @@ class Incident(SQLModel, table=True):
     level: str = Field(max_length=20, index=True)
     location_geom: str
     status: IncidentStatus = Field(default=IncidentStatus.OPEN, index=True)
-    linked_task_id: str | None = Field(default=None, foreign_key="inspection_tasks.id", index=True)
+    linked_task_id: str | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class ApprovalRecord(SQLModel, table=True):
     __tablename__ = "approval_records"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_approval_records_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "approved_by"],
+            ["users.tenant_id", "users.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_approval_records_tenant_id_id", "tenant_id", "id"),
+        Index("ix_approval_records_tenant_approved_by", "tenant_id", "approved_by"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)

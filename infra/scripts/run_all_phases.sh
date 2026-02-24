@@ -116,9 +116,9 @@ fi
 if [[ "$status" != "DONE" ]]; then
   echo "[INFO] Starting / Resuming autonomous execution..."
   codex --full-auto \
-"Read governance/AGENTS.md, phases/index.md, phases/state.md, phases/resume.md, phases/reporting.md, logs/PROGRESS.md.
+"Read governance/AGENTS.md, phases/index.md, phases/state.md, docs/PROJECT_STATUS.md, phases/resume.md, phases/reporting.md, logs/PROGRESS.md.
 Resume execution from phases/state.md current_phase and execute remaining phases sequentially in autonomous mode
-with checkpoint updates, reporting generation, and strict Quality Gate enforcement."
+with checkpoint updates, docs/PROJECT_STATUS.md synchronization, reporting generation, and strict Quality Gate enforcement."
 else
   echo "[INFO] Status is DONE. Will not run Codex. Will commit/tag if needed."
 fi

@@ -1,64 +1,93 @@
-# 00_INDEX.md - Documentation Index
+# 00_INDEX.md
+Documentation Index
+文档索引与体系结构说明
 
-## 1. Document Hierarchy
+---
 
-1. Governance Layer
-- `governance/00_INDEX.md`: documentation navigation and ownership boundaries.
-- `governance/01_GOVERNANCE.md`: SSOT and change-control rules.
+# 1. Governance Layer 治理层
 
-2. Repository SSOT Layer
-- `governance/AGENTS.md`: engineering constitution and hard constraints.
-- `governance/ROADMAP.md`: product milestones and capability progression.
-- `governance/EXECUTION_PLAYBOOK.md`: execution playbook and delivery workflow.
+- governance/00_INDEX.md
+- governance/01_GOVERNANCE.md
+- governance/02_REPO_LAYOUT.md
+- governance/03_PHASE_LIFECYCLE.md
+- governance/04_CHAT_INTERACTION_PROTOCOL.md
+- governance/05_GOVERNANCE_CONSISTENCY_CHECKLIST.md
+- governance/tenant_boundary_matrix.md
 
-3. Phase Execution Layer
-- `phases/index.md`: canonical phase order.
-- `phases/phase-*.md`: per-phase scope and acceptance definitions.
-- `phases/state.md`: checkpoint/resume runtime state.
-- `phases/reporting.md`: phase reporting contract.
+Governance layer defines architectural invariants and structural constraints.
+治理层定义架构不变量与结构性约束。
 
-4. Reference and Manual Layer
-- `docs/Architecture_Overview_*.md`
-- `docs/Deployment_Guide_*.md`
-- `docs/Admin_Manual_*.md`
-- `docs/User_Manual_*.md`
-- `docs/API_Appendix_*.md`
+---
 
-5. Generated Report Layer
-- Auto-generated system snapshots and risk reports (see section 4).
+# 2. Repository SSOT Layer 单一事实来源层
 
-## 2. SSOT Mapping
+- governance/AGENTS.md
+- governance/ROADMAP.md
+- governance/EXECUTION_PLAYBOOK.md
 
-| Domain | Single Source of Truth | Notes |
-| --- | --- | --- |
-| Engineering rules | `governance/AGENTS.md` | Global engineering constraints only. |
-| Product milestones | `governance/ROADMAP.md` | Outcome and milestone planning only. |
-| Execution workflow | `governance/EXECUTION_PLAYBOOK.md` | How to execute, validate, and deliver. |
-| Phase sequence | `phases/index.md` | Canonical execution order. |
-| Phase definition | `phases/phase-*.md` | Scope and acceptance per phase. |
-| Resume state | `phases/state.md` | Current phase pointer and execution status. |
-| Governance policy | `governance/01_GOVERNANCE.md` | Change-control and SSOT boundaries. |
+This layer defines:
+- Engineering constraints
+- Product milestones
+- Execution workflow
 
-Conflict handling rule: if two documents disagree, follow the domain owner above instead of duplicating rules.
+本层定义：
+- 工程约束
+- 产品里程碑
+- 执行流程
 
-## 3. Phase Grouping Model
+---
 
-- Group A (Feature Delivery): phases 01-06.
-- Group B (Structure Hardening): phases 07-09.
-- Group C (Production Readiness): phases 10-12.
+# 3. Phase Execution Layer 阶段执行层
 
-Current repository contains phase files for 01-06. Group B and Group C are reserved for future phase documents and should keep this numbering model.
+- phases/index.md
+- phases/phase-*.md
+- phases/state.md
+- phases/reporting.md
 
-## 4. Auto-Generated Reports Reference
+Phases define WHAT to implement.
+阶段定义“做什么”。
 
-- `docs/gpt_SYSTEM_SNAPSHOT.md`
-  - Source script: `tooling/gpt/gen_report1.sh`
-  - Purpose: full repository/system snapshot.
-- `docs/gpt_ARCHITECTURE_RISK_REPORT.md`
-  - Source script: `tooling/gpt/gen_report2.sh`
-  - Purpose: architecture and engineering risk scan.
-- `docs/SYSTEM_SNAPSHOT.md`
-  - Legacy/baseline snapshot reference.
+---
 
-Generated reports are evidence artifacts, not rule-defining SSOT documents.
+# 4. Application & Infrastructure Layer 应用与基础设施层
 
+- app/
+- infra/
+- tests/
+- openapi/
+
+This layer implements phase definitions.
+本层实现阶段蓝图。
+
+---
+
+# 5. Reference & Manual Layer 文档说明层
+
+- docs/Architecture_Overview_*.md
+- docs/Deployment_Guide_*.md
+- docs/Admin_Manual_*.md
+- docs/User_Manual_*.md
+- docs/API_Appendix_*.md
+
+Human-readable documentation only.
+仅供阅读说明。
+
+---
+
+# 6. Generated Reports 自动生成报告层
+
+- logs/gpt_*.md
+
+Generated reports are evidence artifacts, not SSOT.
+生成报告属于证据文件，不是规则源。
+
+---
+
+# Phase Grouping Model 阶段分组模型
+
+- Group A (Feature Delivery 功能交付): 01–06 (Completed)
+- Group B (Structure Hardening 结构强化): 07–09 (In Progress)
+- Group C (Production Readiness 生产就绪): 10–12 (Planned)
+
+Execution checkpoint SSOT is phases/state.md; current active phase must be reflected in docs/PROJECT_STATUS.md.
+执行检查点 SSOT 为 phases/state.md；当前执行阶段必须同步记录在 docs/PROJECT_STATUS.md。

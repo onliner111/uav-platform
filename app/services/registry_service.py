@@ -26,6 +26,14 @@ class RegistryService:
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
+    def _get_scoped_drone(self, session: Session, tenant_id: str, drone_id: str) -> Drone:
+        drone = session.exec(
+            select(Drone).where(Drone.tenant_id == tenant_id).where(Drone.id == drone_id)
+        ).first()
+        if drone is None:
+            raise NotFoundError("drone not found")
+        return drone
+
     def create_drone(self, tenant_id: str, payload: DroneCreate) -> Drone:
         with self._session() as session:
             if session.get(Tenant, tenant_id) is None:
@@ -63,16 +71,12 @@ class RegistryService:
 
     def get_drone(self, tenant_id: str, drone_id: str) -> Drone:
         with self._session() as session:
-            drone = session.get(Drone, drone_id)
-            if drone is None or drone.tenant_id != tenant_id:
-                raise NotFoundError("drone not found")
+            drone = self._get_scoped_drone(session, tenant_id, drone_id)
             return drone
 
     def update_drone(self, tenant_id: str, drone_id: str, payload: DroneUpdate) -> Drone:
         with self._session() as session:
-            drone = session.get(Drone, drone_id)
-            if drone is None or drone.tenant_id != tenant_id:
-                raise NotFoundError("drone not found")
+            drone = self._get_scoped_drone(session, tenant_id, drone_id)
             if payload.name is not None:
                 drone.name = payload.name
             if payload.vendor is not None:
@@ -102,9 +106,7 @@ class RegistryService:
 
     def delete_drone(self, tenant_id: str, drone_id: str) -> None:
         with self._session() as session:
-            drone = session.get(Drone, drone_id)
-            if drone is None or drone.tenant_id != tenant_id:
-                raise NotFoundError("drone not found")
+            drone = self._get_scoped_drone(session, tenant_id, drone_id)
             session.delete(drone)
             session.commit()
 

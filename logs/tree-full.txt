@@ -1,0 +1,520 @@
+Folder PATH listing for volume OS
+Volume serial number is F8FD-E9EC
+C:.
+|   .env.example
+|   .gitignore
+|   alembic.ini
+|   Dockerfile
+|   Makefile
+|   pyproject.toml
+|   README.md
+|   requirements-dev.txt
+|   requirements.txt
+|   
++---.github
+|   \---workflows
+|           ci.yml
+|           
++---app
+|   |   main.py
+|   |   __init__.py
+|   |   
+|   +---adapters
+|   |       base.py
+|   |       dji_adapter.py
+|   |       fake_adapter.py
+|   |       mavlink_adapter.py
+|   |       __init__.py
+|   |       
+|   +---api
+|   |   |   deps.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---routers
+|   |           alert.py
+|   |           approval.py
+|   |           command.py
+|   |           dashboard.py
+|   |           defect.py
+|   |           identity.py
+|   |           incident.py
+|   |           inspection.py
+|   |           mission.py
+|   |           registry.py
+|   |           reporting.py
+|   |           telemetry.py
+|   |           ui.py
+|   |           __init__.py
+|   |           
+|   +---domain
+|   |       models.py
+|   |       permissions.py
+|   |       state_machine.py
+|   |       __init__.py
+|   |       
+|   +---infra
+|   |       audit.py
+|   |       auth.py
+|   |       db.py
+|   |       events.py
+|   |       migrate.py
+|   |       openapi_export.py
+|   |       redis_state.py
+|   |       tenant.py
+|   |       __init__.py
+|   |       
+|   +---services
+|   |       alert_service.py
+|   |       command_service.py
+|   |       compliance_service.py
+|   |       dashboard_service.py
+|   |       defect_service.py
+|   |       identity_service.py
+|   |       incident_service.py
+|   |       inspection_service.py
+|   |       mission_service.py
+|   |       registry_service.py
+|   |       reporting_service.py
+|   |       telemetry_service.py
+|   |       __init__.py
+|   |       
+|   \---web
+|       +---static
+|       |       command_center.js
+|       |       defects.js
+|       |       emergency.js
+|       |       inspection_task.js
+|       |       ui.css
+|       |       
+|       \---templates
+|               command_center.html
+|               defects.html
+|               emergency.html
+|               inspection_list.html
+|               inspection_task_detail.html
+|               
++---docs
+|       Admin_Manual_V1.0.md
+|       Admin_Manual_V2.0.md
+|       API_Appendix_V2.0.md
+|       Architecture_Overview_V1.0.md
+|       Architecture_Overview_V2.0.md
+|       Deployment_Guide_V1.0.md
+|       Deployment_Guide_V2.0.md
+|       gpt_ARCHITECTURE_RISK_REPORT.md
+|       gpt_SYSTEM_SNAPSHOT.md
+|       PHASE_07A_CORE_IMPACT_ANALYSIS.md
+|       PHASE_07A_IMPACT_ANALYSIS.md
+|       SYSTEM_SNAPSHOT.md
+|       User_Manual_V1.0.md
+|       User_Manual_V2.0.md
+|       
++---governance
+|       00_INDEX.md
+|       01_GOVERNANCE.md
+|       AGENTS.md
+|       EXECUTION_PLAYBOOK.md
+|       ROADMAP.md
+|       
++---infra
+|   |   docker-compose.yml
+|   |   
+|   +---migrations
+|   |   |   env.py
+|   |   |   script.py.mako
+|   |   |   
+|   |   \---versions
+|   |           202602190001_init_phase0.py
+|   |           202602190002_identity_phase1.py
+|   |           202602190003_registry_phase2.py
+|   |           202602190004_mission_phase3.py
+|   |           202602190005_command_phase5.py
+|   |           202602190006_alert_phase7.py
+|   |           202602210007_phase1_to_phase6.py
+|   |           202602220008_phase07a_identity_expand.py
+|   |           202602220009_phase07a_identity_backfill_validate.py
+|   |           202602220010_phase07a_identity_enforce.py
+|   |           202602220011_phase07a_core_batch_a_expand.py
+|   |           202602220012_phase07a_core_batch_a_backfill_validate.py
+|   |           202602220013_phase07a_core_batch_a_enforce.py
+|   |           
+|   \---scripts
+|           demo_command_center_phase4.py
+|           demo_common.py
+|           demo_compliance_phase5.py
+|           demo_defect_phase2.py
+|           demo_e2e.py
+|           demo_emergency_phase3.py
+|           demo_inspection_phase1.py
+|           demo_reporting_phase6.py
+|           run_all_phases.sh
+|           verify_all.sh
+|           verify_openapi_client.py
+|           verify_smoke.py
+|           
++---logs
+|       phase-01-inspection.md.report.md
+|       phase-02-defect-closure.md.report.md
+|       phase-03-emergency.md.report.md
+|       phase-04-command-center.md.report.md
+|       phase-05-compliance.md.report.md
+|       phase-06-reporting.md.report.md
+|       PROGRESS.md
+|       README.md
+|       tree-full.txt
+|       
++---openapi
+|   |   openapi.json
+|   |   
+|   +---clients
+|   |   |   .gitkeep
+|   |   |   
+|   |   \---python
+|   |       |   .gitignore
+|   |       |   .gitlab-ci.yml
+|   |       |   .openapi-generator-ignore
+|   |       |   .travis.yml
+|   |       |   git_push.sh
+|   |       |   pyproject.toml
+|   |       |   README.md
+|   |       |   requirements.txt
+|   |       |   setup.cfg
+|   |       |   setup.py
+|   |       |   test-requirements.txt
+|   |       |   tox.ini
+|   |       |   
+|   |       +---.github
+|   |       |   \---workflows
+|   |       |           python.yml
+|   |       |           
+|   |       +---.openapi-generator
+|   |       |       FILES
+|   |       |       VERSION
+|   |       |       
+|   |       +---docs
+|   |       |       AlertActionRequest.md
+|   |       |       AlertApi.md
+|   |       |       AlertRead.md
+|   |       |       AlertSeverity.md
+|   |       |       AlertStatus.md
+|   |       |       AlertType.md
+|   |       |       ApprovalDecision.md
+|   |       |       ApprovalRead.md
+|   |       |       ApprovalRecordCreate.md
+|   |       |       ApprovalRecordRead.md
+|   |       |       ApprovalsApi.md
+|   |       |       BootstrapAdminRequest.md
+|   |       |       CommandApi.md
+|   |       |       CommandDispatchRequest.md
+|   |       |       CommandRead.md
+|   |       |       CommandStatus.md
+|   |       |       CommandType.md
+|   |       |       DashboardApi.md
+|   |       |       DashboardStatsRead.md
+|   |       |       DefaultApi.md
+|   |       |       DefectActionRead.md
+|   |       |       DefectAssignRequest.md
+|   |       |       DefectCreateFromObservationRead.md
+|   |       |       DefectDetailRead.md
+|   |       |       DefectsApi.md
+|   |       |       DefectStatsRead.md
+|   |       |       DefectStatus.md
+|   |       |       DefectStatusRequest.md
+|   |       |       DeviceUtilizationRead.md
+|   |       |       DevLoginRequest.md
+|   |       |       DroneCreate.md
+|   |       |       DroneRead.md
+|   |       |       DroneUpdate.md
+|   |       |       DroneVendor.md
+|   |       |       HTTPValidationError.md
+|   |       |       IdentityApi.md
+|   |       |       IncidentCreate.md
+|   |       |       IncidentCreateTaskRead.md
+|   |       |       IncidentCreateTaskRequest.md
+|   |       |       IncidentRead.md
+|   |       |       IncidentsApi.md
+|   |       |       IncidentStatus.md
+|   |       |       InspectionApi.md
+|   |       |       InspectionExportRead.md
+|   |       |       InspectionObservationCreate.md
+|   |       |       InspectionObservationRead.md
+|   |       |       InspectionTaskCreate.md
+|   |       |       InspectionTaskRead.md
+|   |       |       InspectionTaskStatus.md
+|   |       |       InspectionTemplateCreate.md
+|   |       |       InspectionTemplateItemCreate.md
+|   |       |       InspectionTemplateItemRead.md
+|   |       |       InspectionTemplateRead.md
+|   |       |       MissionApi.md
+|   |       |       MissionApprovalRequest.md
+|   |       |       MissionCreate.md
+|   |       |       MissionPlanType.md
+|   |       |       MissionRead.md
+|   |       |       MissionState.md
+|   |       |       MissionTransitionRequest.md
+|   |       |       MissionUpdate.md
+|   |       |       PermissionCreate.md
+|   |       |       PermissionRead.md
+|   |       |       PermissionUpdate.md
+|   |       |       RegistryApi.md
+|   |       |       ReportingApi.md
+|   |       |       ReportingClosureRateRead.md
+|   |       |       ReportingExportRequest.md
+|   |       |       ReportingOverviewRead.md
+|   |       |       RoleCreate.md
+|   |       |       RoleRead.md
+|   |       |       RoleUpdate.md
+|   |       |       TelemetryApi.md
+|   |       |       TelemetryBattery.md
+|   |       |       TelemetryLink.md
+|   |       |       TelemetryNormalized.md
+|   |       |       TelemetryPosition.md
+|   |       |       TenantCreate.md
+|   |       |       TenantRead.md
+|   |       |       TenantUpdate.md
+|   |       |       TokenResponse.md
+|   |       |       UiApi.md
+|   |       |       UserCreate.md
+|   |       |       UserRead.md
+|   |       |       UserUpdate.md
+|   |       |       ValidationError.md
+|   |       |       ValidationErrorLocInner.md
+|   |       |       
+|   |       +---openapi_client
+|   |       |   |   api_client.py
+|   |       |   |   api_response.py
+|   |       |   |   configuration.py
+|   |       |   |   exceptions.py
+|   |       |   |   py.typed
+|   |       |   |   rest.py
+|   |       |   |   __init__.py
+|   |       |   |   
+|   |       |   +---api
+|   |       |   |       alert_api.py
+|   |       |   |       approvals_api.py
+|   |       |   |       command_api.py
+|   |       |   |       dashboard_api.py
+|   |       |   |       default_api.py
+|   |       |   |       defects_api.py
+|   |       |   |       identity_api.py
+|   |       |   |       incidents_api.py
+|   |       |   |       inspection_api.py
+|   |       |   |       mission_api.py
+|   |       |   |       registry_api.py
+|   |       |   |       reporting_api.py
+|   |       |   |       telemetry_api.py
+|   |       |   |       ui_api.py
+|   |       |   |       __init__.py
+|   |       |   |       
+|   |       |   \---models
+|   |       |           alert_action_request.py
+|   |       |           alert_read.py
+|   |       |           alert_severity.py
+|   |       |           alert_status.py
+|   |       |           alert_type.py
+|   |       |           approval_decision.py
+|   |       |           approval_read.py
+|   |       |           approval_record_create.py
+|   |       |           approval_record_read.py
+|   |       |           bootstrap_admin_request.py
+|   |       |           command_dispatch_request.py
+|   |       |           command_read.py
+|   |       |           command_status.py
+|   |       |           command_type.py
+|   |       |           dashboard_stats_read.py
+|   |       |           defect_action_read.py
+|   |       |           defect_assign_request.py
+|   |       |           defect_create_from_observation_read.py
+|   |       |           defect_detail_read.py
+|   |       |           defect_stats_read.py
+|   |       |           defect_status.py
+|   |       |           defect_status_request.py
+|   |       |           device_utilization_read.py
+|   |       |           dev_login_request.py
+|   |       |           drone_create.py
+|   |       |           drone_read.py
+|   |       |           drone_update.py
+|   |       |           drone_vendor.py
+|   |       |           http_validation_error.py
+|   |       |           incident_create.py
+|   |       |           incident_create_task_read.py
+|   |       |           incident_create_task_request.py
+|   |       |           incident_read.py
+|   |       |           incident_status.py
+|   |       |           inspection_export_read.py
+|   |       |           inspection_observation_create.py
+|   |       |           inspection_observation_read.py
+|   |       |           inspection_task_create.py
+|   |       |           inspection_task_read.py
+|   |       |           inspection_task_status.py
+|   |       |           inspection_template_create.py
+|   |       |           inspection_template_item_create.py
+|   |       |           inspection_template_item_read.py
+|   |       |           inspection_template_read.py
+|   |       |           mission_approval_request.py
+|   |       |           mission_create.py
+|   |       |           mission_plan_type.py
+|   |       |           mission_read.py
+|   |       |           mission_state.py
+|   |       |           mission_transition_request.py
+|   |       |           mission_update.py
+|   |       |           permission_create.py
+|   |       |           permission_read.py
+|   |       |           permission_update.py
+|   |       |           reporting_closure_rate_read.py
+|   |       |           reporting_export_request.py
+|   |       |           reporting_overview_read.py
+|   |       |           role_create.py
+|   |       |           role_read.py
+|   |       |           role_update.py
+|   |       |           telemetry_battery.py
+|   |       |           telemetry_link.py
+|   |       |           telemetry_normalized.py
+|   |       |           telemetry_position.py
+|   |       |           tenant_create.py
+|   |       |           tenant_read.py
+|   |       |           tenant_update.py
+|   |       |           token_response.py
+|   |       |           user_create.py
+|   |       |           user_read.py
+|   |       |           user_update.py
+|   |       |           validation_error.py
+|   |       |           validation_error_loc_inner.py
+|   |       |           __init__.py
+|   |       |           
+|   |       \---test
+|   |               test_alert_action_request.py
+|   |               test_alert_api.py
+|   |               test_alert_read.py
+|   |               test_alert_severity.py
+|   |               test_alert_status.py
+|   |               test_alert_type.py
+|   |               test_approvals_api.py
+|   |               test_approval_decision.py
+|   |               test_approval_read.py
+|   |               test_approval_record_create.py
+|   |               test_approval_record_read.py
+|   |               test_bootstrap_admin_request.py
+|   |               test_command_api.py
+|   |               test_command_dispatch_request.py
+|   |               test_command_read.py
+|   |               test_command_status.py
+|   |               test_command_type.py
+|   |               test_dashboard_api.py
+|   |               test_dashboard_stats_read.py
+|   |               test_default_api.py
+|   |               test_defects_api.py
+|   |               test_defect_action_read.py
+|   |               test_defect_assign_request.py
+|   |               test_defect_create_from_observation_read.py
+|   |               test_defect_detail_read.py
+|   |               test_defect_stats_read.py
+|   |               test_defect_status.py
+|   |               test_defect_status_request.py
+|   |               test_device_utilization_read.py
+|   |               test_dev_login_request.py
+|   |               test_drone_create.py
+|   |               test_drone_read.py
+|   |               test_drone_update.py
+|   |               test_drone_vendor.py
+|   |               test_http_validation_error.py
+|   |               test_identity_api.py
+|   |               test_incidents_api.py
+|   |               test_incident_create.py
+|   |               test_incident_create_task_read.py
+|   |               test_incident_create_task_request.py
+|   |               test_incident_read.py
+|   |               test_incident_status.py
+|   |               test_inspection_api.py
+|   |               test_inspection_export_read.py
+|   |               test_inspection_observation_create.py
+|   |               test_inspection_observation_read.py
+|   |               test_inspection_task_create.py
+|   |               test_inspection_task_read.py
+|   |               test_inspection_task_status.py
+|   |               test_inspection_template_create.py
+|   |               test_inspection_template_item_create.py
+|   |               test_inspection_template_item_read.py
+|   |               test_inspection_template_read.py
+|   |               test_mission_api.py
+|   |               test_mission_approval_request.py
+|   |               test_mission_create.py
+|   |               test_mission_plan_type.py
+|   |               test_mission_read.py
+|   |               test_mission_state.py
+|   |               test_mission_transition_request.py
+|   |               test_mission_update.py
+|   |               test_permission_create.py
+|   |               test_permission_read.py
+|   |               test_permission_update.py
+|   |               test_registry_api.py
+|   |               test_reporting_api.py
+|   |               test_reporting_closure_rate_read.py
+|   |               test_reporting_export_request.py
+|   |               test_reporting_overview_read.py
+|   |               test_role_create.py
+|   |               test_role_read.py
+|   |               test_role_update.py
+|   |               test_telemetry_api.py
+|   |               test_telemetry_battery.py
+|   |               test_telemetry_link.py
+|   |               test_telemetry_normalized.py
+|   |               test_telemetry_position.py
+|   |               test_tenant_create.py
+|   |               test_tenant_read.py
+|   |               test_tenant_update.py
+|   |               test_token_response.py
+|   |               test_ui_api.py
+|   |               test_user_create.py
+|   |               test_user_read.py
+|   |               test_user_update.py
+|   |               test_validation_error.py
+|   |               test_validation_error_loc_inner.py
+|   |               __init__.py
+|   |               
+|   \---postman
+|       |   .openapi-generator-ignore
+|       |   postman.json
+|       |   
+|       \---.openapi-generator
+|               FILES
+|               VERSION
+|               
++---phase
+|       PHASE_07A_LOOKUP_HARDENING_EXECUTION_PLAN.md
+|       
++---phases
+|       index.md
+|       phase-01-inspection.md
+|       phase-02-defect-closure.md
+|       phase-03-emergency.md
+|       phase-04-command-center.md
+|       phase-05-compliance.md
+|       phase-06-reporting.md
+|       phase-07-master-blueprint.md
+|       phase-07-tenant-boundary.md
+|       phase-07a-core-batch-a.md
+|       phase-07a-core-boundary.md
+|       phase-07a-identity-preview.md
+|       phase-07a-lookup-hardening-analysis.md
+|       phase-07a-lookup-hardening-execution-plan.md
+|       reporting.md
+|       resume.md
+|       state.md
+|       
++---tests
+|       test_adapters.py
+|       test_alert.py
+|       test_command.py
+|       test_events.py
+|       test_health.py
+|       test_identity.py
+|       test_mission.py
+|       test_registry.py
+|       test_telemetry.py
+|       
+\---tooling
+    \---gpt
+            gen_report1.sh
+            gen_report2.sh
+            

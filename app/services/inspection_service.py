@@ -37,6 +37,36 @@ class InspectionService:
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
+    def _get_scoped_template(self, session: Session, tenant_id: str, template_id: str) -> InspectionTemplate:
+        template = session.exec(
+            select(InspectionTemplate)
+            .where(InspectionTemplate.tenant_id == tenant_id)
+            .where(InspectionTemplate.id == template_id)
+        ).first()
+        if template is None:
+            raise NotFoundError("template not found")
+        return template
+
+    def _get_scoped_task(self, session: Session, tenant_id: str, task_id: str) -> InspectionTask:
+        task = session.exec(
+            select(InspectionTask)
+            .where(InspectionTask.tenant_id == tenant_id)
+            .where(InspectionTask.id == task_id)
+        ).first()
+        if task is None:
+            raise NotFoundError("task not found")
+        return task
+
+    def _get_scoped_export(self, session: Session, tenant_id: str, export_id: str) -> InspectionExport:
+        export = session.exec(
+            select(InspectionExport)
+            .where(InspectionExport.tenant_id == tenant_id)
+            .where(InspectionExport.id == export_id)
+        ).first()
+        if export is None:
+            raise NotFoundError("export not found")
+        return export
+
     def create_template(self, tenant_id: str, payload: InspectionTemplateCreate) -> InspectionTemplate:
         with self._session() as session:
             template = InspectionTemplate(
@@ -63,9 +93,7 @@ class InspectionService:
 
     def get_template(self, tenant_id: str, template_id: str) -> InspectionTemplate:
         with self._session() as session:
-            template = session.get(InspectionTemplate, template_id)
-            if template is None or template.tenant_id != tenant_id:
-                raise NotFoundError("template not found")
+            template = self._get_scoped_template(session, tenant_id, template_id)
             return template
 
     def create_template_item(
@@ -75,9 +103,7 @@ class InspectionService:
         payload: InspectionTemplateItemCreate,
     ) -> InspectionTemplateItem:
         with self._session() as session:
-            template = session.get(InspectionTemplate, template_id)
-            if template is None or template.tenant_id != tenant_id:
-                raise NotFoundError("template not found")
+            _ = self._get_scoped_template(session, tenant_id, template_id)
             item = InspectionTemplateItem(
                 tenant_id=tenant_id,
                 template_id=template_id,
@@ -94,9 +120,7 @@ class InspectionService:
 
     def list_template_items(self, tenant_id: str, template_id: str) -> list[InspectionTemplateItem]:
         with self._session() as session:
-            template = session.get(InspectionTemplate, template_id)
-            if template is None or template.tenant_id != tenant_id:
-                raise NotFoundError("template not found")
+            _ = self._get_scoped_template(session, tenant_id, template_id)
             statement = (
                 select(InspectionTemplateItem)
                 .where(InspectionTemplateItem.tenant_id == tenant_id)
@@ -106,9 +130,7 @@ class InspectionService:
 
     def create_task(self, tenant_id: str, payload: InspectionTaskCreate) -> InspectionTask:
         with self._session() as session:
-            template = session.get(InspectionTemplate, payload.template_id)
-            if template is None or template.tenant_id != tenant_id:
-                raise NotFoundError("template not found")
+            _ = self._get_scoped_template(session, tenant_id, payload.template_id)
             task = InspectionTask(
                 tenant_id=tenant_id,
                 name=payload.name,
@@ -137,9 +159,7 @@ class InspectionService:
 
     def get_task(self, tenant_id: str, task_id: str) -> InspectionTask:
         with self._session() as session:
-            task = session.get(InspectionTask, task_id)
-            if task is None or task.tenant_id != tenant_id:
-                raise NotFoundError("task not found")
+            task = self._get_scoped_task(session, tenant_id, task_id)
             return task
 
     def create_observation(
@@ -149,9 +169,7 @@ class InspectionService:
         payload: InspectionObservationCreate,
     ) -> InspectionObservation:
         with self._session() as session:
-            task = session.get(InspectionTask, task_id)
-            if task is None or task.tenant_id != tenant_id:
-                raise NotFoundError("task not found")
+            _ = self._get_scoped_task(session, tenant_id, task_id)
             observation = InspectionObservation(
                 tenant_id=tenant_id,
                 task_id=task_id,
@@ -178,9 +196,7 @@ class InspectionService:
 
     def list_observations(self, tenant_id: str, task_id: str) -> list[InspectionObservation]:
         with self._session() as session:
-            task = session.get(InspectionTask, task_id)
-            if task is None or task.tenant_id != tenant_id:
-                raise NotFoundError("task not found")
+            _ = self._get_scoped_task(session, tenant_id, task_id)
             statement = (
                 select(InspectionObservation)
                 .where(InspectionObservation.tenant_id == tenant_id)
@@ -192,9 +208,7 @@ class InspectionService:
         if export_format.lower() != "html":
             raise ConflictError("only html export is supported")
         with self._session() as session:
-            task = session.get(InspectionTask, task_id)
-            if task is None or task.tenant_id != tenant_id:
-                raise NotFoundError("task not found")
+            task = self._get_scoped_task(session, tenant_id, task_id)
             observations = list(
                 session.exec(
                     select(InspectionObservation)
@@ -232,9 +246,7 @@ class InspectionService:
 
     def get_export(self, tenant_id: str, export_id: str) -> InspectionExport:
         with self._session() as session:
-            export = session.get(InspectionExport, export_id)
-            if export is None or export.tenant_id != tenant_id:
-                raise NotFoundError("export not found")
+            export = self._get_scoped_export(session, tenant_id, export_id)
             return export
 
     def _render_export_html(

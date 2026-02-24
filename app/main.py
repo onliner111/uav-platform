@@ -18,6 +18,8 @@ from app.api.routers import (
     registry,
     reporting,
     telemetry,
+    tenant_export,
+    tenant_purge,
     ui,
 )
 from app.infra.audit import AuditMiddleware
@@ -46,6 +48,8 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(dashboard.ws_router, tags=["dashboard-ws"])
 app.include_router(approval.router, prefix="/api/approvals", tags=["approvals"])
 app.include_router(reporting.router, prefix="/api/reporting", tags=["reporting"])
+app.include_router(tenant_export.router, prefix="/api", tags=["tenant-export"])
+app.include_router(tenant_purge.router, prefix="/api", tags=["tenant-purge"])
 app.include_router(ui.router, tags=["ui"])
 
 static_dir = Path("app") / "web" / "static"

@@ -1,5 +1,7 @@
+mkdir -p logs
+
 codex --full-auto "
-Generate docs/gpt_ARCHITECTURE_RISK_REPORT.md.
+Generate logs/gpt_ARCHITECTURE_RISK_REPORT.md.
 
 Analyze:
 - Tight coupling areas
@@ -11,5 +13,5 @@ Analyze:
 - Dangerous technical debt
 
 Do not change code.
-Only generate the report.
+Only generate the report in logs/.
 "

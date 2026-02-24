@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app import main as app_main
-from app.domain.models import EventRecord
+from app.domain.models import EventRecord, Mission, MissionPlanType, MissionRun, MissionState
 from app.infra import audit, db, events
 
 
@@ -22,6 +25,13 @@ def mission_client(
         f"sqlite:///{db_path}",
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(test_engine, "connect")
+    def _enable_foreign_keys(dbapi_connection: object, _connection_record: object) -> None:
+        cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     SQLModel.metadata.create_all(test_engine)
     monkeypatch.setattr(db, "engine", test_engine)
     monkeypatch.setattr(audit, "engine", test_engine)
@@ -210,4 +220,151 @@ def test_mission_emits_events_on_create_and_approve(mission_client: TestClient) 
     event_types = {row.event_type for row in filtered_rows}
     assert "mission.created" in event_types
     assert "mission.approved" in event_types
+
+
+def test_mission_tenant_isolation_by_id_endpoints(mission_client: TestClient) -> None:
+    tenant_a = _create_tenant(mission_client, "mission-tenant-a")
+    tenant_b = _create_tenant(mission_client, "mission-tenant-b")
+    _bootstrap_admin(mission_client, tenant_a, "admin_a", "pass-a")
+    _bootstrap_admin(mission_client, tenant_b, "admin_b", "pass-b")
+
+    token_a = _login(mission_client, tenant_a, "admin_a", "pass-a")
+    token_b = _login(mission_client, tenant_b, "admin_b", "pass-b")
+
+    mission_id = _create_basic_mission(mission_client, token_a)
+
+    cross_get = mission_client.get(
+        f"/api/mission/missions/{mission_id}",
+        headers=_auth_header(token_b),
+    )
+    assert cross_get.status_code == 404
+
+    cross_update = mission_client.patch(
+        f"/api/mission/missions/{mission_id}",
+        json={"name": "spoofed"},
+        headers=_auth_header(token_b),
+    )
+    assert cross_update.status_code == 404
+
+    cross_approve = mission_client.post(
+        f"/api/mission/missions/{mission_id}/approve",
+        json={"decision": "APPROVE"},
+        headers=_auth_header(token_b),
+    )
+    assert cross_approve.status_code == 404
+
+    cross_approvals = mission_client.get(
+        f"/api/mission/missions/{mission_id}/approvals",
+        headers=_auth_header(token_b),
+    )
+    assert cross_approvals.status_code == 404
+
+    cross_transition = mission_client.post(
+        f"/api/mission/missions/{mission_id}/transition",
+        json={"target_state": "RUNNING"},
+        headers=_auth_header(token_b),
+    )
+    assert cross_transition.status_code == 404
+
+    cross_delete = mission_client.delete(
+        f"/api/mission/missions/{mission_id}",
+        headers=_auth_header(token_b),
+    )
+    assert cross_delete.status_code == 404
+
+
+def test_mission_create_and_update_reject_cross_tenant_drone(mission_client: TestClient) -> None:
+    tenant_a = _create_tenant(mission_client, "mission-drone-a")
+    tenant_b = _create_tenant(mission_client, "mission-drone-b")
+    _bootstrap_admin(mission_client, tenant_a, "admin_a", "pass-a")
+    _bootstrap_admin(mission_client, tenant_b, "admin_b", "pass-b")
+
+    token_a = _login(mission_client, tenant_a, "admin_a", "pass-a")
+    token_b = _login(mission_client, tenant_b, "admin_b", "pass-b")
+
+    create_drone_resp = mission_client.post(
+        "/api/registry/drones",
+        json={"name": "cross-tenant-drone", "vendor": "FAKE", "capabilities": {"camera": True}},
+        headers=_auth_header(token_b),
+    )
+    assert create_drone_resp.status_code == 201
+    cross_tenant_drone_id = create_drone_resp.json()["id"]
+
+    create_mission_resp = mission_client.post(
+        "/api/mission/missions",
+        json={
+            "name": "cross-tenant-drone-mission",
+            "drone_id": cross_tenant_drone_id,
+            "type": "POINT_TASK",
+            "payload": {"point": {"lat": 30.1, "lon": 114.2}},
+            "constraints": {},
+        },
+        headers=_auth_header(token_a),
+    )
+    assert create_mission_resp.status_code == 404
+
+    mission_id = _create_basic_mission(mission_client, token_a)
+    update_mission_resp = mission_client.patch(
+        f"/api/mission/missions/{mission_id}",
+        json={"drone_id": cross_tenant_drone_id},
+        headers=_auth_header(token_a),
+    )
+    assert update_mission_resp.status_code == 404
+
+
+def test_mission_composite_fk_enforced_in_db(mission_client: TestClient) -> None:
+    tenant_a = _create_tenant(mission_client, "mission-fk-a")
+    tenant_b = _create_tenant(mission_client, "mission-fk-b")
+    _bootstrap_admin(mission_client, tenant_a, "admin_a", "pass-a")
+    _bootstrap_admin(mission_client, tenant_b, "admin_b", "pass-b")
+
+    token_a = _login(mission_client, tenant_a, "admin_a", "pass-a")
+    token_b = _login(mission_client, tenant_b, "admin_b", "pass-b")
+
+    drone_b_resp = mission_client.post(
+        "/api/registry/drones",
+        json={"name": "drone-b", "vendor": "FAKE", "capabilities": {}},
+        headers=_auth_header(token_b),
+    )
+    assert drone_b_resp.status_code == 201
+    drone_b_id = drone_b_resp.json()["id"]
+
+    mission_b_id = _create_basic_mission(mission_client, token_b)
+    mission_a_id = _create_basic_mission(mission_client, token_a)
+
+    with Session(db.engine, expire_on_commit=False) as session:
+        cross_mission = Mission(
+            tenant_id=tenant_a,
+            name="db-cross-drone",
+            drone_id=drone_b_id,
+            plan_type=MissionPlanType.POINT_TASK,
+            payload={"point": {"lat": 30.2, "lon": 114.3}},
+            constraints={},
+            state=MissionState.DRAFT,
+            created_by="db-test",
+        )
+        session.add(cross_mission)
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+        cross_run = MissionRun(
+            tenant_id=tenant_a,
+            mission_id=mission_b_id,
+            state=MissionState.RUNNING,
+            started_at=datetime.now(UTC),
+        )
+        session.add(cross_run)
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+        valid_run = MissionRun(
+            tenant_id=tenant_a,
+            mission_id=mission_a_id,
+            state=MissionState.RUNNING,
+            started_at=datetime.now(UTC),
+        )
+        session.add(valid_run)
+        session.commit()
 

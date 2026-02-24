@@ -67,6 +67,36 @@ class CommandService:
             raise ConflictError(f"adapter not available for vendor: {vendor}")
         return factory()
 
+    def _get_scoped_command(
+        self,
+        session: Session,
+        tenant_id: str,
+        command_id: str,
+    ) -> CommandRequestRecord:
+        record = session.exec(
+            select(CommandRequestRecord)
+            .where(CommandRequestRecord.tenant_id == tenant_id)
+            .where(CommandRequestRecord.id == command_id)
+        ).first()
+        if record is None:
+            raise NotFoundError("command not found")
+        return record
+
+    def _get_scoped_drone(
+        self,
+        session: Session,
+        tenant_id: str,
+        drone_id: str,
+    ) -> Drone:
+        drone = session.exec(
+            select(Drone)
+            .where(Drone.tenant_id == tenant_id)
+            .where(Drone.id == drone_id)
+        ).first()
+        if drone is None:
+            raise NotFoundError("drone not found")
+        return drone
+
     def _persist_outcome(
         self,
         *,
@@ -77,9 +107,7 @@ class CommandService:
         ack_message: str,
     ) -> CommandRequestRecord:
         with self._session() as session:
-            record = session.get(CommandRequestRecord, command_id)
-            if record is None or record.tenant_id != tenant_id:
-                raise NotFoundError("command not found")
+            record = self._get_scoped_command(session, tenant_id, command_id)
             record.status = status
             record.ack_ok = ack_ok
             record.ack_message = ack_message
@@ -106,9 +134,7 @@ class CommandService:
             if existing is not None:
                 return existing, False
 
-            drone = session.get(Drone, payload.drone_id)
-            if drone is None or drone.tenant_id != tenant_id:
-                raise NotFoundError("drone not found")
+            drone = self._get_scoped_drone(session, tenant_id, payload.drone_id)
 
             record = CommandRequestRecord(
                 tenant_id=tenant_id,
@@ -225,10 +251,7 @@ class CommandService:
 
     def get_command(self, tenant_id: str, command_id: str) -> CommandRequestRecord:
         with self._session() as session:
-            record = session.get(CommandRequestRecord, command_id)
-            if record is None or record.tenant_id != tenant_id:
-                raise NotFoundError("command not found")
-            return record
+            return self._get_scoped_command(session, tenant_id, command_id)
 
     def list_commands(self, tenant_id: str) -> list[CommandRequestRecord]:
         with self._session() as session:

@@ -1,5 +1,7 @@
+mkdir -p logs
+
 codex --full-auto "
-Generate a full system snapshot document as docs/gpt_SYSTEM_SNAPSHOT.md.
+Generate a full system snapshot document as logs/gpt_SYSTEM_SNAPSHOT.md.
 
 The document must include:
 
@@ -15,5 +17,5 @@ The document must include:
 10. Git branch + last 10 commits summary
 
 Do not modify any code.
-Only generate the documentation file.
+Only generate the documentation file in logs/.
 "
