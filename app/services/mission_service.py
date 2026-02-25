@@ -21,6 +21,7 @@ from app.domain.permissions import PERM_MISSION_FASTLANE, PERM_WILDCARD
 from app.domain.state_machine import MissionState, can_transition
 from app.infra.db import get_engine
 from app.infra.events import event_bus
+from app.services.compliance_service import ComplianceService
 from app.services.data_perimeter_service import DataPerimeterService
 
 
@@ -43,6 +44,7 @@ class PermissionDeniedError(MissionError):
 class MissionService:
     def __init__(self) -> None:
         self._data_perimeter = DataPerimeterService()
+        self._compliance = ComplianceService()
 
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
@@ -114,6 +116,14 @@ class MissionService:
                 permissions=permissions,
                 actor_id=actor_id,
             )
+            self._compliance.validate_mission_plan(
+                session=session,
+                tenant_id=tenant_id,
+                plan_type=payload.type,
+                payload=payload.payload,
+                constraints=constraints,
+                area_code=payload.area_code,
+            )
             if payload.drone_id is not None:
                 self._ensure_scoped_drone(session, tenant_id, payload.drone_id)
             if payload.org_unit_id is not None:
@@ -174,26 +184,48 @@ class MissionService:
             self._ensure_mission_visible(session, tenant_id, viewer_user_id, mission)
             if mission.state not in {MissionState.DRAFT, MissionState.REJECTED}:
                 raise ConflictError("mission can only be edited in DRAFT/REJECTED state")
+            next_name = mission.name
+            next_drone_id = mission.drone_id
+            next_org_unit_id = mission.org_unit_id
+            next_project_code = mission.project_code
+            next_area_code = mission.area_code
+            next_payload = mission.payload
+            next_constraints = mission.constraints
             if payload.name is not None:
-                mission.name = payload.name
+                next_name = payload.name
             if payload.drone_id is not None:
                 self._ensure_scoped_drone(session, tenant_id, payload.drone_id)
-                mission.drone_id = payload.drone_id
+                next_drone_id = payload.drone_id
             if payload.org_unit_id is not None:
                 self._ensure_scoped_org_unit(session, tenant_id, payload.org_unit_id)
-                mission.org_unit_id = payload.org_unit_id
+                next_org_unit_id = payload.org_unit_id
             if payload.project_code is not None:
-                mission.project_code = payload.project_code
+                next_project_code = payload.project_code
             if payload.area_code is not None:
-                mission.area_code = payload.area_code
+                next_area_code = payload.area_code
             if payload.payload is not None:
-                mission.payload = payload.payload
+                next_payload = payload.payload
             if payload.constraints is not None:
-                mission.constraints = self._enforce_fastlane(
+                next_constraints = self._enforce_fastlane(
                     constraints=payload.constraints,
                     permissions=permissions,
                     actor_id=actor_id,
                 )
+            self._compliance.validate_mission_plan(
+                session=session,
+                tenant_id=tenant_id,
+                plan_type=mission.plan_type,
+                payload=next_payload,
+                constraints=next_constraints,
+                area_code=next_area_code,
+            )
+            mission.name = next_name
+            mission.drone_id = next_drone_id
+            mission.org_unit_id = next_org_unit_id
+            mission.project_code = next_project_code
+            mission.area_code = next_area_code
+            mission.payload = next_payload
+            mission.constraints = next_constraints
             mission.updated_at = datetime.now(UTC)
             session.add(mission)
             session.commit()
@@ -289,6 +321,12 @@ class MissionService:
                     constraints=mission.constraints,
                     permissions=permissions,
                     actor_id=actor_id,
+                )
+            if payload.target_state == MissionState.RUNNING:
+                self._compliance.enforce_before_mission_run(
+                    session=session,
+                    tenant_id=tenant_id,
+                    mission=mission,
                 )
 
             mission.state = payload.target_state

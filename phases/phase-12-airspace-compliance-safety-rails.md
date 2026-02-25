@@ -49,16 +49,16 @@
 
 ## 8. Execution Progress
 
-- [ ] 12-WP1 空域区划模型与基础校验
+- [x] 12-WP1 空域区划模型与基础校验
   - 区域实体（禁飞/限高/敏感）与查询
   - 任务计划时空冲突校验
-- [ ] 12-WP2 飞前检查清单与审批联动
+- [x] 12-WP2 飞前检查清单与审批联动
   - Checklist 模型、模板、执行记录
   - 与任务审批策略打通
-- [ ] 12-WP3 围栏策略与执行期护栏
+- [x] 12-WP3 围栏策略与执行期护栏
   - 指令前置校验与拦截
   - 原因码与审计字段规范化
-- [ ] 12-WP4 验收关账
+- [x] 12-WP4 验收关账
   - 演示脚本：`infra/scripts/demo_phase12_airspace_compliance.py`
   - 报告：`logs/phase-12-airspace-compliance-safety-rails.md.report.md`
   - 全门禁复验通过

@@ -32,16 +32,16 @@ Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-25T04:15:26Z`
-- current_phase: `phase-12-airspace-compliance-safety-rails.md`
+- updated_at_utc: `2026-02-25T04:46:32Z`
+- current_phase: `phase-13-data-outcomes-alert-closure.md`
 - phase_status: `READY`
-- last_success_phase: `phase-11-unified-task-center-workflow.md`
-- current_focus: `Phase 11 closed as DONE; next focus is phase-12 P0 airspace baseline guardrails`
+- last_success_phase: `phase-12-airspace-compliance-safety-rails.md`
+- current_focus: `Phase 12 closed as DONE; next focus is phase-13 P0 outcomes+alert baseline`
 
 ## Next TODO (Execution Target)
-1. Start phase-12 P0: `12-WP1` + `12-WP3(最小指令前置拦截护栏)`.
+1. Start phase-13 P0: `13-WP1` + `13-WP2(站内闭环最小集)`.
 2. Keep Docker Compose baseline gate commands below as phase-entry regression checklist.
-3. Follow `P0 -> P1 -> P2 -> WP4` sequencing in phase-11..15 documents.
+3. Follow `P0 -> P1 -> P2 -> WP4` sequencing in phase-13..15 documents.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -66,4 +66,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=phase-12-airspace-compliance-safety-rails.md（status=READY）；从 phase-12 P0 开始执行，并按 P0->P1->P2->WP4 顺序推进。`
+`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=phase-13-data-outcomes-alert-closure.md（status=READY）；从 phase-13 P0 开始执行，并按 P0->P1->P2->WP4 顺序推进。`

@@ -644,6 +644,123 @@ class TaskCenterTaskHistory(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
+class AirspaceZoneType(StrEnum):
+    NO_FLY = "NO_FLY"
+    ALT_LIMIT = "ALT_LIMIT"
+    SENSITIVE = "SENSITIVE"
+
+
+class ComplianceReasonCode(StrEnum):
+    AIRSPACE_NO_FLY = "AIRSPACE_NO_FLY"
+    AIRSPACE_ALT_LIMIT_EXCEEDED = "AIRSPACE_ALT_LIMIT_EXCEEDED"
+    AIRSPACE_SENSITIVE_RESTRICTED = "AIRSPACE_SENSITIVE_RESTRICTED"
+    PREFLIGHT_CHECKLIST_REQUIRED = "PREFLIGHT_CHECKLIST_REQUIRED"
+    PREFLIGHT_CHECKLIST_INCOMPLETE = "PREFLIGHT_CHECKLIST_INCOMPLETE"
+    COMMAND_GEOFENCE_BLOCKED = "COMMAND_GEOFENCE_BLOCKED"
+    COMMAND_ALTITUDE_BLOCKED = "COMMAND_ALTITUDE_BLOCKED"
+    COMMAND_SENSITIVE_RESTRICTED = "COMMAND_SENSITIVE_RESTRICTED"
+
+
+class PreflightChecklistStatus(StrEnum):
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    WAIVED = "WAIVED"
+
+
+class AirspaceZone(SQLModel, table=True):
+    __tablename__ = "airspace_zones"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_airspace_zones_tenant_id_id"),
+        Index("ix_airspace_zones_tenant_id_id", "tenant_id", "id"),
+        Index("ix_airspace_zones_tenant_type", "tenant_id", "zone_type"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=100, index=True)
+    zone_type: AirspaceZoneType = Field(index=True)
+    area_code: str | None = Field(default=None, max_length=100, index=True)
+    geom_wkt: str
+    max_alt_m: float | None = Field(default=None, ge=0)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class PreflightChecklistTemplate(SQLModel, table=True):
+    __tablename__ = "preflight_checklist_templates"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_preflight_templates_tenant_id_id"),
+        Index("ix_preflight_templates_tenant_id_id", "tenant_id", "id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=100, index=True)
+    description: str | None = None
+    items: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    require_approval_before_run: bool = Field(default=True, index=True)
+    is_active: bool = Field(default=True, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class MissionPreflightChecklist(SQLModel, table=True):
+    __tablename__ = "mission_preflight_checklists"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_mission_preflight_checklists_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "mission_id",
+            name="uq_mission_preflight_checklists_tenant_mission",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "mission_id"],
+            ["missions.tenant_id", "missions.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "template_id"],
+            ["preflight_checklist_templates.tenant_id", "preflight_checklist_templates.id"],
+            ondelete="SET NULL",
+        ),
+        Index("ix_mission_preflight_checklists_tenant_id_id", "tenant_id", "id"),
+        Index("ix_mission_preflight_checklists_tenant_mission", "tenant_id", "mission_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    mission_id: str = Field(index=True)
+    template_id: str | None = Field(default=None, index=True)
+    status: PreflightChecklistStatus = Field(default=PreflightChecklistStatus.PENDING, index=True)
+    required_items: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    completed_items: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    evidence: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    updated_by: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+    completed_at: datetime | None = Field(default=None, index=True)
+
+
 class EventEnvelope(BaseModel):
     event_id: str = PydanticField(default_factory=lambda: str(uuid4()))
     event_type: str
@@ -720,6 +837,8 @@ class CommandRequestRecord(SQLModel, table=True):
         ),
         Index("ix_command_requests_tenant_id_id", "tenant_id", "id"),
         Index("ix_command_requests_tenant_drone_id", "tenant_id", "drone_id"),
+        Index("ix_command_requests_tenant_compliance", "tenant_id", "compliance_passed"),
+        Index("ix_command_requests_tenant_reason", "tenant_id", "compliance_reason_code"),
     )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
@@ -735,6 +854,12 @@ class CommandRequestRecord(SQLModel, table=True):
     status: CommandStatus = Field(default=CommandStatus.PENDING, index=True)
     ack_ok: bool | None = Field(default=None)
     ack_message: str | None = None
+    compliance_passed: bool | None = Field(default=None, index=True)
+    compliance_reason_code: ComplianceReasonCode | None = Field(default=None, index=True)
+    compliance_detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
     attempts: int = Field(default=0)
     issued_by: str | None = Field(default=None, index=True)
     issued_at: datetime = Field(default_factory=now_utc, index=True)
@@ -1165,6 +1290,78 @@ class MissionTransitionRequest(BaseModel):
     target_state: MissionState
 
 
+class AirspaceZoneCreate(BaseModel):
+    name: str
+    zone_type: AirspaceZoneType
+    area_code: str | None = None
+    geom_wkt: str
+    max_alt_m: float | None = PydanticField(default=None, ge=0)
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AirspaceZoneRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    zone_type: AirspaceZoneType
+    area_code: str | None
+    geom_wkt: str
+    max_alt_m: float | None
+    is_active: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class PreflightChecklistTemplateCreate(BaseModel):
+    name: str
+    description: str | None = None
+    items: list[dict[str, Any]] = PydanticField(default_factory=list)
+    require_approval_before_run: bool = True
+    is_active: bool = True
+
+
+class PreflightChecklistTemplateRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    description: str | None
+    items: list[dict[str, Any]]
+    require_approval_before_run: bool
+    is_active: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MissionPreflightChecklistInitRequest(BaseModel):
+    template_id: str | None = None
+    required_items: list[dict[str, Any]] = PydanticField(default_factory=list)
+
+
+class MissionPreflightChecklistItemCheckRequest(BaseModel):
+    item_code: str
+    checked: bool = True
+    note: str | None = None
+
+
+class MissionPreflightChecklistRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    mission_id: str
+    template_id: str | None
+    status: PreflightChecklistStatus
+    required_items: list[dict[str, Any]]
+    completed_items: list[dict[str, Any]]
+    evidence: dict[str, Any]
+    updated_by: str | None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+
+
 class TaskTypeCatalogCreate(BaseModel):
     code: str
     name: str
@@ -1361,6 +1558,9 @@ class CommandRead(ORMReadModel):
     status: CommandStatus
     ack_ok: bool | None
     ack_message: str | None
+    compliance_passed: bool | None
+    compliance_reason_code: ComplianceReasonCode | None
+    compliance_detail: dict[str, Any]
     attempts: int
     issued_by: str | None
     issued_at: datetime

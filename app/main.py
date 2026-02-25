@@ -11,6 +11,7 @@ from app.api.routers import (
     asset,
     asset_maintenance,
     command,
+    compliance,
     dashboard,
     defect,
     identity,
@@ -50,6 +51,7 @@ app.include_router(mission.router, prefix="/api/mission", tags=["mission"])
 app.include_router(telemetry.router, prefix="/api/telemetry", tags=["telemetry"])
 app.include_router(telemetry.ws_router, tags=["telemetry-ws"])
 app.include_router(command.router, prefix="/api/command", tags=["command"])
+app.include_router(compliance.router, prefix="/api/compliance", tags=["compliance"])
 app.include_router(alert.router, prefix="/api/alert", tags=["alert"])
 app.include_router(map_router.router, prefix="/api/map", tags=["map"])
 app.include_router(task_center.router, prefix="/api/task-center", tags=["task-center"])

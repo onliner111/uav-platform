@@ -14,6 +14,7 @@ from app.domain.models import (
     MissionUpdate,
 )
 from app.domain.permissions import PERM_MISSION_APPROVE, PERM_MISSION_READ, PERM_MISSION_WRITE
+from app.services.compliance_service import ComplianceViolationError
 from app.services.mission_service import (
     ConflictError,
     MissionService,
@@ -35,6 +36,15 @@ Service = Annotated[MissionService, Depends(get_mission_service)]
 def _handle_mission_error(exc: Exception) -> None:
     if isinstance(exc, NotFoundError):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if isinstance(exc, ComplianceViolationError):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason_code": exc.reason_code.value,
+                "message": str(exc),
+                "detail": exc.detail,
+            },
+        ) from exc
     if isinstance(exc, ConflictError):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if isinstance(exc, PermissionDeniedError):
@@ -57,7 +67,7 @@ def create_mission(payload: MissionCreate, claims: Claims, service: Service) -> 
             payload=payload,
         )
         return MissionRead.model_validate(mission)
-    except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
+    except (NotFoundError, ConflictError, PermissionDeniedError, ComplianceViolationError) as exc:
         _handle_mission_error(exc)
         raise
 
@@ -81,7 +91,7 @@ def get_mission(mission_id: str, claims: Claims, service: Service) -> MissionRea
     try:
         mission = service.get_mission(claims["tenant_id"], mission_id, viewer_user_id=claims["sub"])
         return MissionRead.model_validate(mission)
-    except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
+    except (NotFoundError, ConflictError, PermissionDeniedError, ComplianceViolationError) as exc:
         _handle_mission_error(exc)
         raise
 
@@ -107,7 +117,7 @@ def update_mission(
             viewer_user_id=claims["sub"],
         )
         return MissionRead.model_validate(mission)
-    except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
+    except (NotFoundError, ConflictError, PermissionDeniedError, ComplianceViolationError) as exc:
         _handle_mission_error(exc)
         raise
 
@@ -145,7 +155,7 @@ def approve_mission(
             viewer_user_id=claims["sub"],
         )
         return MissionRead.model_validate(mission)
-    except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
+    except (NotFoundError, ConflictError, PermissionDeniedError, ComplianceViolationError) as exc:
         _handle_mission_error(exc)
         raise
 
@@ -159,7 +169,7 @@ def list_mission_approvals(mission_id: str, claims: Claims, service: Service) ->
     try:
         approvals = service.list_approvals(claims["tenant_id"], mission_id, viewer_user_id=claims["sub"])
         return [ApprovalRead.model_validate(item) for item in approvals]
-    except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
+    except (NotFoundError, ConflictError, PermissionDeniedError, ComplianceViolationError) as exc:
         _handle_mission_error(exc)
         raise
 
@@ -185,7 +195,7 @@ def transition_mission(
             viewer_user_id=claims["sub"],
         )
         return MissionRead.model_validate(mission)
-    except (NotFoundError, ConflictError, PermissionDeniedError) as exc:
+    except (NotFoundError, ConflictError, PermissionDeniedError, ComplianceViolationError) as exc:
         _handle_mission_error(exc)
         raise
 

@@ -23,7 +23,7 @@
 - [x] phase-09-flight-resource-asset-management.md - ✅ success - phase-09-flight-resource-asset-management.md.report.md
 - [x] phase-10-unified-map-situation-v1.md - ✅ success - phase-10-unified-map-situation-v1.md.report.md
 - [x] phase-11-unified-task-center-workflow.md - ✅ success - phase-11-unified-task-center-workflow.md.report.md
-- [ ] phase-12-airspace-compliance-safety-rails.md - ⏳ pending
+- [x] phase-12-airspace-compliance-safety-rails.md - ✅ success - phase-12-airspace-compliance-safety-rails.md.report.md
 - [ ] phase-13-data-outcomes-alert-closure.md - ⏳ pending
 - [ ] phase-14-ai-assistant-evidence-chain.md - ⏳ pending
 - [ ] phase-15-kpi-open-platform.md - ⏳ pending
@@ -59,3 +59,4 @@
 - 2026-02-25T03:40:43Z (UTC): Phase 10 closed as DONE (WP1-WP4 complete). Added `infra/scripts/demo_phase10_one_map.py`, generated `logs/phase-10-unified-map-situation-v1.md.report.md`, and passed full closeout gates (`ruff`, `mypy`, `pytest -q`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase10_one_map`); checkpoint moved to `phase-11-unified-task-center-workflow.md` (`READY`).
 - 2026-02-25T03:56:32Z (UTC): Phase 11 switched to `RUNNING` and completed P0 baseline (`11-WP1` task type/template center, `11-WP2` manual dispatch minimal chain, `11-WP3` core lifecycle state machine). Added `app/services/task_center_service.py`, `app/api/routers/task_center.py`, migration chain `202602240044/045/046`, and `tests/test_task_center.py`; Docker Compose checks passed (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`).
 - 2026-02-25T04:15:26Z (UTC): Phase 11 closed as DONE. Completed P1/P2 enhancement set (`auto-dispatch` scoring explainability, risk/checklist updates, attachment/comment collaboration), delivered `infra/scripts/demo_phase11_task_center.py`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase11_task_center`); checkpoint moved to `phase-12-airspace-compliance-safety-rails.md` (`READY`).
+- 2026-02-25T04:46:32Z (UTC): Phase 12 closed as DONE. Delivered airspace zoning + mission plan validation, preflight checklist lifecycle with mission run gate, and command pre-dispatch compliance interception; landed migration chain `202602250047/048/049`, tests `tests/test_compliance.py`, demo `infra/scripts/demo_phase12_airspace_compliance.py`, report `logs/phase-12-airspace-compliance-safety-rails.md.report.md`; full closeout chain passed (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase12_airspace_compliance`); checkpoint moved to `phase-13-data-outcomes-alert-closure.md` (`READY`).
