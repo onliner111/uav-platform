@@ -2,8 +2,8 @@
 # 用户使用手册（V2.0）
 
 - 文档版本：V2.0
-- 适用系统版本：阶段 `phase-01` 至 `phase-07c` 已完成版本
-- 更新日期：2026-02-24
+- 适用系统版本：阶段 `phase-01` 至 `phase-15` 已完成版本
+- 更新日期：2026-02-25
 
 ---
 
@@ -16,8 +16,11 @@
 3. 问题单（缺陷）闭环流转
 4. 应急事件一键创建任务
 5. 指挥中心大屏实时监看
-6. 合规审批与审计导出
-7. 报表统计与季度报告导出
+6. 空域合规与飞前检查
+7. 成果目录与告警处置闭环
+8. AI 助手分析与证据链复核
+9. KPI 统计与治理报表
+10. 开放平台 Webhook 与外部适配器接入
 
 ---
 
@@ -180,12 +183,25 @@ docker --context default compose -f infra/docker-compose.yml run --rm app alembi
 
 ## 8. 合规与审计（Compliance）
 
-### 8.1 审批记录
+### 8.1 空域与飞前检查
+
+- 空域规则区：
+  - `POST /api/compliance/zones`
+  - `GET /api/compliance/zones`
+- 飞前模板：
+  - `POST /api/compliance/preflight/templates`
+  - `GET /api/compliance/preflight/templates`
+- 任务飞前检查：
+  - `POST /api/compliance/missions/{mission_id}/preflight/init`
+  - `GET /api/compliance/missions/{mission_id}/preflight`
+  - `POST /api/compliance/missions/{mission_id}/preflight/check-item`
+
+### 8.2 审批记录
 
 - 新增审批：`POST /api/approvals`
 - 查询审批：`GET /api/approvals`
 
-### 8.2 审计导出
+### 8.3 审计导出
 
 `GET /api/approvals/audit-export`
 
@@ -205,7 +221,20 @@ docker --context default compose -f infra/docker-compose.yml run --rm app alembi
 
 `POST /api/reporting/export`
 
+支持参数：
+- `task_id`：按任务导出
+- `from_ts` / `to_ts`：按时间范围导出
+- `topic`：按专题导出
+
 导出文件位于：`logs/exports/`（PDF）。
+
+### 9.3 KPI 统计与治理报表
+
+- 重算 KPI 快照：`POST /api/kpi/snapshots/recompute`
+- 查询快照：`GET /api/kpi/snapshots`
+- 查询最新快照：`GET /api/kpi/snapshots/latest`
+- 热力图数据：`GET /api/kpi/heatmap`
+- 导出治理报表：`POST /api/kpi/governance/export`
 
 ---
 
@@ -261,31 +290,103 @@ docker --context default compose -f infra/docker-compose.yml run --rm app alembi
 
 ---
 
-## 11. 常见问题（FAQ）
+## 11. 成果与告警闭环（Outcomes + Alert）
 
-### 11.1 页面返回 401
+### 11.1 成果目录
+
+- 原始数据目录：
+  - `POST /api/outcomes/raw`
+  - `GET /api/outcomes/raw`
+- 成果记录：
+  - `POST /api/outcomes/records`
+  - `GET /api/outcomes/records`
+  - `POST /api/outcomes/records/from-observation/{observation_id}`
+  - `PATCH /api/outcomes/records/{outcome_id}/status`
+
+### 11.2 告警处置闭环
+
+- 路由规则管理：
+  - `POST /api/alert/routing-rules`
+  - `GET /api/alert/routing-rules`
+- 告警处置：
+  - `POST /api/alert/alerts/{alert_id}/actions`
+  - `GET /api/alert/alerts/{alert_id}/actions`
+- 复盘聚合：
+  - `GET /api/alert/alerts/{alert_id}/review`
+
+---
+
+## 12. AI 助手与证据链（AI Assistant）
+
+### 12.1 分析任务与运行
+
+- 创建任务：`POST /api/ai/jobs`
+- 查询任务：`GET /api/ai/jobs`
+- 触发运行：`POST /api/ai/jobs/{job_id}/runs`
+- 查询运行：`GET /api/ai/jobs/{job_id}/runs`
+- 运行重试：`POST /api/ai/runs/{run_id}/retry`
+
+### 12.2 输出与人审
+
+- 输出列表：`GET /api/ai/outputs`
+- 输出详情：`GET /api/ai/outputs/{output_id}`
+- 审核动作：`POST /api/ai/outputs/{output_id}/review`
+- 审核视图：`GET /api/ai/outputs/{output_id}/review`
+
+说明：
+- AI 输出字段 `control_allowed=false`，仅用于辅助分析与建议，不直接控制设备。
+
+---
+
+## 13. KPI 与开放平台（KPI + Open Platform）
+
+### 13.1 KPI 数据
+
+- KPI 快照与热力图：见第 9.3 节。
+
+### 13.2 开放平台管理
+
+- 凭据管理：
+  - `POST /api/open-platform/credentials`
+  - `GET /api/open-platform/credentials`
+- Webhook 管理：
+  - `POST /api/open-platform/webhooks`
+  - `GET /api/open-platform/webhooks`
+  - `POST /api/open-platform/webhooks/{endpoint_id}/dispatch-test`
+- 外部适配器入站：
+  - `POST /api/open-platform/adapters/events/ingest`
+  - `GET /api/open-platform/adapters/events`
+
+说明：
+- `ingest` 接口使用签名头鉴权：`X-Open-Key-Id`、`X-Open-Api-Key`、`X-Open-Signature`。
+
+---
+
+## 14. 常见问题（FAQ）
+
+### 14.1 页面返回 401
 
 原因：未传 token 或 token 无效。  
 处理：重新登录获取 `access_token`，并在 UI URL 追加 `?token=<token>`。
 
-### 11.2 页面返回 403
+### 14.2 页面返回 403
 
 原因：当前账号缺少模块权限。  
 处理：管理员在身份模块为角色绑定对应权限，再重新登录。
 
-### 11.3 看不到数据
+### 14.3 看不到数据
 
 原因：租户隔离导致只能看到当前租户数据。  
 处理：确认登录账号与业务数据处于同一 `tenant_id`。
 
-### 11.4 导出文件找不到
+### 14.4 导出文件找不到
 
 原因：导出成功但文件被清理或路径变化。  
 处理：检查 `logs/exports/`，必要时重新触发导出接口。
 
 ---
 
-## 12. 验收建议命令
+## 15. 验收建议命令
 
 ```powershell
 docker --context default compose -f infra/docker-compose.yml run --rm --build app-tools ruff check app tests infra/scripts
@@ -296,7 +397,7 @@ docker --context default compose -f infra/docker-compose.yml run --rm --build -e
 
 ---
 
-## 13. 附录：关键页面与接口索引
+## 16. 附录：关键页面与接口索引
 
 ### 页面
 
@@ -313,7 +414,12 @@ docker --context default compose -f infra/docker-compose.yml run --rm --build -e
 - 问题闭环：`/api/defects/*`
 - 应急：`/api/incidents/*`
 - 指挥大屏：`/api/dashboard/*` + `/ws/dashboard`
-- 合规审批：`/api/approvals/*`
+- 合规：`/api/compliance/*` + `/api/approvals/*`
+- 告警：`/api/alert/*`
+- 成果目录：`/api/outcomes/*`
+- AI 助手：`/api/ai/*`
+- KPI：`/api/kpi/*`
+- 开放平台：`/api/open-platform/*`
 - 报表：`/api/reporting/*`
 - 租户导出与清理：`/api/tenants/*`
 

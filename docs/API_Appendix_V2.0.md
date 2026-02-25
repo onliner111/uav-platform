@@ -2,8 +2,8 @@
 # 接口清单附录（V2.0）
 
 - 文档版本：V2.0
-- 更新日期：2026-02-24
-- 说明：本附录按模块整理当前系统已实现接口，路径与 `app/main.py` 路由注册一致。
+- 更新日期：2026-02-25
+- 说明：本附录按模块整理当前系统已实现接口，路径与 `app/main.py` 路由注册一致（覆盖至 `phase-15`）。
 
 ---
 
@@ -12,6 +12,7 @@
 1. 受保护接口需携带请求头：`Authorization: Bearer <access_token>`
 2. UI 页面使用查询参数：`?token=<access_token>`
 3. 健康检查接口无需鉴权：`/healthz`、`/readyz`
+4. 开放平台适配器入口使用签名头鉴权：`X-Open-Key-Id`、`X-Open-Api-Key`、`X-Open-Signature`
 
 ---
 
@@ -132,6 +133,12 @@
 | GET | `/api/alert/alerts/{alert_id}` | 告警详情 |
 | POST | `/api/alert/alerts/{alert_id}/ack` | 告警确认 |
 | POST | `/api/alert/alerts/{alert_id}/close` | 告警关闭 |
+| POST | `/api/alert/routing-rules` | 创建告警路由规则 |
+| GET | `/api/alert/routing-rules` | 路由规则列表（支持优先级/类型/启用过滤） |
+| GET | `/api/alert/alerts/{alert_id}/routes` | 告警路由日志 |
+| POST | `/api/alert/alerts/{alert_id}/actions` | 新增处置动作 |
+| GET | `/api/alert/alerts/{alert_id}/actions` | 处置动作列表 |
+| GET | `/api/alert/alerts/{alert_id}/review` | 告警复盘聚合（告警+路由+动作） |
 
 ---
 
@@ -216,7 +223,7 @@
 | GET | `/api/reporting/overview` | 总览统计 |
 | GET | `/api/reporting/closure-rate` | 闭环率统计 |
 | GET | `/api/reporting/device-utilization` | 设备利用率统计 |
-| POST | `/api/reporting/export` | 导出报表文件 |
+| POST | `/api/reporting/export` | 导出报表文件（支持 `task_id/from_ts/to_ts/topic`） |
 
 ---
 
@@ -250,4 +257,127 @@
 | POST | `/api/tenants/{tenant_id}/purge:dry_run` | 生成清理计划与计数（不删除） |
 | POST | `/api/tenants/{tenant_id}/purge` | 执行清理（需 `dry_run_id` + 二次确认） |
 | GET | `/api/tenants/{tenant_id}/purge/{purge_id}` | 查询清理结果报告 |
+
+---
+
+## 17. 资源台账与资源池（`/api/assets`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/assets` | 创建设备/资源台账 |
+| GET | `/api/assets` | 资源列表（类型/生命周期/可用性/健康过滤） |
+| GET | `/api/assets/{asset_id}` | 资源详情 |
+| POST | `/api/assets/{asset_id}/bind` | 绑定任务/主体 |
+| POST | `/api/assets/{asset_id}/availability` | 更新可用状态 |
+| POST | `/api/assets/{asset_id}/health` | 更新健康状态 |
+| POST | `/api/assets/{asset_id}/retire` | 资源退役 |
+| GET | `/api/assets/pool` | 资源池查询 |
+| GET | `/api/assets/pool/summary` | 区域资源池汇总 |
+
+---
+
+## 18. 空域合规与飞前检查（`/api/compliance`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/compliance/zones` | 新增空域规则区 |
+| GET | `/api/compliance/zones` | 空域规则区列表 |
+| GET | `/api/compliance/zones/{zone_id}` | 空域规则区详情 |
+| POST | `/api/compliance/preflight/templates` | 新增飞前检查模板 |
+| GET | `/api/compliance/preflight/templates` | 飞前检查模板列表 |
+| POST | `/api/compliance/missions/{mission_id}/preflight/init` | 初始化任务飞前检查 |
+| GET | `/api/compliance/missions/{mission_id}/preflight` | 查询任务飞前检查 |
+| POST | `/api/compliance/missions/{mission_id}/preflight/check-item` | 勾选飞前检查项 |
+
+---
+
+## 19. 一张图态势（`/api/map`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/map/overview` | 一张图聚合视图 |
+| GET | `/api/map/layers/resources` | 资源图层 |
+| GET | `/api/map/layers/tasks` | 任务图层 |
+| GET | `/api/map/layers/alerts` | 告警图层 |
+| GET | `/api/map/layers/events` | 事件图层 |
+| GET | `/api/map/tracks/replay` | 航迹回放 |
+
+---
+
+## 20. 统一任务中心（`/api/task-center`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/task-center/types` | 创建任务类型 |
+| GET | `/api/task-center/types` | 任务类型列表 |
+| POST | `/api/task-center/templates` | 创建任务模板 |
+| GET | `/api/task-center/templates` | 模板列表 |
+| POST | `/api/task-center/tasks` | 创建任务中心任务 |
+| GET | `/api/task-center/tasks` | 任务列表 |
+| GET | `/api/task-center/tasks/{task_id}` | 任务详情 |
+| POST | `/api/task-center/tasks/{task_id}/submit-approval` | 提交审批 |
+| POST | `/api/task-center/tasks/{task_id}/approve` | 审批决策 |
+| POST | `/api/task-center/tasks/{task_id}/dispatch` | 手工派发 |
+| POST | `/api/task-center/tasks/{task_id}/auto-dispatch` | 自动派发（含候选评分） |
+| POST | `/api/task-center/tasks/{task_id}/transition` | 任务状态流转 |
+| PATCH | `/api/task-center/tasks/{task_id}/risk-checklist` | 更新风险清单 |
+| POST | `/api/task-center/tasks/{task_id}/attachments` | 新增附件 |
+| POST | `/api/task-center/tasks/{task_id}/comments` | 新增评论 |
+| GET | `/api/task-center/tasks/{task_id}/comments` | 评论列表 |
+| GET | `/api/task-center/tasks/{task_id}/history` | 历史流水 |
+
+---
+
+## 21. 成果目录（`/api/outcomes`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/outcomes/raw` | 新增原始数据目录记录 |
+| GET | `/api/outcomes/raw` | 原始数据目录列表 |
+| POST | `/api/outcomes/records` | 新增成果记录 |
+| POST | `/api/outcomes/records/from-observation/{observation_id}` | 由观测点生成成果记录 |
+| GET | `/api/outcomes/records` | 成果记录列表 |
+| PATCH | `/api/outcomes/records/{outcome_id}/status` | 更新成果状态 |
+
+---
+
+## 22. AI 助手与证据链（`/api/ai`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/ai/jobs` | 创建 AI 分析任务 |
+| GET | `/api/ai/jobs` | AI 任务列表 |
+| POST | `/api/ai/jobs/{job_id}/runs` | 触发分析运行 |
+| GET | `/api/ai/jobs/{job_id}/runs` | 运行列表 |
+| POST | `/api/ai/runs/{run_id}/retry` | 运行重试 |
+| GET | `/api/ai/outputs` | 输出列表（支持按任务/运行/审核状态筛选） |
+| GET | `/api/ai/outputs/{output_id}` | 输出详情 |
+| POST | `/api/ai/outputs/{output_id}/review` | 人审动作（通过/驳回/覆写） |
+| GET | `/api/ai/outputs/{output_id}/review` | 输出复核视图（输出+动作+证据） |
+
+---
+
+## 23. KPI 与治理报表（`/api/kpi`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/kpi/snapshots/recompute` | 重算 KPI 快照 |
+| GET | `/api/kpi/snapshots` | KPI 快照列表 |
+| GET | `/api/kpi/snapshots/latest` | 最新 KPI 快照 |
+| GET | `/api/kpi/heatmap` | KPI 热力图网格数据 |
+| POST | `/api/kpi/governance/export` | 导出治理月报/季报 |
+
+---
+
+## 24. 开放平台（`/api/open-platform`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/open-platform/credentials` | 创建开放平台凭据（key/api_key/secret） |
+| GET | `/api/open-platform/credentials` | 凭据列表 |
+| POST | `/api/open-platform/webhooks` | 创建 Webhook 端点 |
+| GET | `/api/open-platform/webhooks` | Webhook 列表 |
+| POST | `/api/open-platform/webhooks/{endpoint_id}/dispatch-test` | Webhook 发送测试 |
+| POST | `/api/open-platform/adapters/events/ingest` | 外部适配器事件入口（签名鉴权） |
+| GET | `/api/open-platform/adapters/events` | 外部事件入站记录列表 |
 

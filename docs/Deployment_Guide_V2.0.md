@@ -3,7 +3,8 @@
 
 - 文档版本：V2.0
 - 适用对象：运维工程师、实施工程师
-- 更新日期：2026-02-21
+- 适用范围：`phase-01` 至 `phase-15` 已实现能力
+- 更新日期：2026-02-25
 
 ---
 
@@ -14,7 +15,7 @@
 1. PostgreSQL（PostGIS 镜像）
 2. Redis
 3. 应用服务 `app`
-4. 工具服务 `app-tools`（测试、导出、脚本执行）
+4. 工具服务 `app-tools`（OpenAPI 导出、演示脚本、冒烟脚本）
 5. OpenAPI 生成服务 `openapi-generator`
 
 ---
@@ -39,7 +40,7 @@
 ## 3. 目录与关键文件
 
 - 环境变量模板：`.env.example`
-- 编排文件：`infra/docker-compose.yml`（统一入口，Makefile 默认使用）
+- 编排文件：`infra/docker-compose.yml`
 - 迁移配置：`alembic.ini`、`infra/migrations/*`
 - 运维脚本：`infra/scripts/*`
 - 构建与验证入口：`Makefile`
@@ -80,13 +81,13 @@ cp .env.example .env
 ### 5.1 启动服务
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml up -d --build app app-tools db redis
+docker compose -f infra/docker-compose.yml up -d --build app app-tools db redis
 ```
 
 ### 5.2 执行数据库迁移
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml run --rm app alembic upgrade head
+docker compose -f infra/docker-compose.yml run --rm --build app alembic upgrade head
 ```
 
 ### 5.3 健康检查
@@ -105,40 +106,43 @@ curl http://localhost:8000/readyz
 启动：
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d
 ```
 
 停止：
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml down
+docker compose -f infra/docker-compose.yml down
 ```
 
 查看状态：
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml ps
+docker compose -f infra/docker-compose.yml ps
 ```
 
 查看日志：
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml logs -f app db redis
+docker compose -f infra/docker-compose.yml logs -f app db redis
 ```
 
 ### 6.2 质量门禁命令
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml run --rm --build app-tools ruff check app tests infra/scripts
-docker --context default compose -f infra/docker-compose.yml run --rm --build app-tools mypy app
-docker --context default compose -f infra/docker-compose.yml run --rm --build app-tools pytest
+docker compose -f infra/docker-compose.yml run --rm --build app ruff check app tests infra/scripts
+docker compose -f infra/docker-compose.yml run --rm --build app mypy app
+docker compose -f infra/docker-compose.yml run --rm --build app pytest -q
+docker compose -f infra/docker-compose.yml run --rm --build app alembic upgrade head
+docker compose -f infra/docker-compose.yml run --rm --build app-tools python -m app.infra.openapi_export
 ```
 
-### 6.3 E2E 验证
+### 6.3 E2E 与验收验证
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py
-docker --context default compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py
+docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py
+docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py
+docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase15_kpi_open_platform.py
 ```
 
 ---
@@ -149,22 +153,22 @@ docker --context default compose -f infra/docker-compose.yml run --rm --build -e
 
 1. 备份数据库
 2. 记录当前镜像版本和 Git 提交号
-3. 预演迁移脚本（测试环境）
+3. 在测试环境预演迁移脚本与冒烟脚本
 
 ### 7.2 执行升级
 
 1. 拉取新代码
 2. 重建镜像并启动服务
 3. 执行迁移
-4. 执行 lint/typecheck/test/smoke
+4. 执行质量门禁与冒烟验证
 
 示例：
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml up -d --build app app-tools db redis
-docker --context default compose -f infra/docker-compose.yml run --rm app alembic upgrade head
-docker --context default compose -f infra/docker-compose.yml run --rm --build app-tools pytest
-docker --context default compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py
+docker compose -f infra/docker-compose.yml up -d --build app app-tools db redis
+docker compose -f infra/docker-compose.yml run --rm --build app alembic upgrade head
+docker compose -f infra/docker-compose.yml run --rm --build app pytest -q
+docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py
 ```
 
 ---
@@ -174,14 +178,14 @@ docker --context default compose -f infra/docker-compose.yml run --rm --build -e
 ### 8.1 PostgreSQL 备份
 
 ```bash
-docker --context default compose -f infra/docker-compose.yml exec -T db \
+docker compose -f infra/docker-compose.yml exec -T db \
   pg_dump -U ${POSTGRES_USER:-uav} ${POSTGRES_DB:-uav_platform} > backup_$(date +%F_%H%M%S).sql
 ```
 
 ### 8.2 PostgreSQL 恢复
 
 ```bash
-cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.yml exec -T db \
+cat backup_xxx.sql | docker compose -f infra/docker-compose.yml exec -T db \
   psql -U ${POSTGRES_USER:-uav} ${POSTGRES_DB:-uav_platform}
 ```
 
@@ -218,7 +222,7 @@ cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.ym
 
 步骤：
 
-1. `docker --context default compose -f infra/docker-compose.yml ps` 查看 db/redis 是否 healthy
+1. `docker compose -f infra/docker-compose.yml ps` 查看 db/redis 是否 healthy
 2. 检查 `DATABASE_URL`、`REDIS_URL`
 3. 查看 `app` 日志定位错误堆栈
 
@@ -234,7 +238,7 @@ cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.ym
 
 步骤：
 
-1. `docker --context default compose -f infra/docker-compose.yml logs app --tail=200`
+1. `docker compose -f infra/docker-compose.yml logs app --tail=200`
 2. 对照最近变更（代码/配置/迁移）
 3. 必要时回滚到上个稳定版本
 
@@ -254,7 +258,7 @@ cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.ym
 2. 强制 HTTPS 与网关鉴权
 3. 收敛数据库和 Redis 对外暴露范围
 4. 定期轮换 `JWT_SECRET`
-5. 审计导出文件加密归档
+5. 审计与导出文件应纳入加密归档策略
 
 ---
 
@@ -267,14 +271,14 @@ cat backup_xxx.sql | docker --context default compose -f infra/docker-compose.ym
 3. 质量门禁通过（lint/typecheck/test）
 4. `verify_smoke.py` 通过
 5. 管理员账号可登录，核心 UI 可访问
-6. 审计与报表导出可用
-
+6. 关键模块可访问：`assets`、`compliance`、`outcomes`、`map`、`task-center`、`ai`、`kpi`、`open-platform`
+7. 审计与报表导出可用
 
 ---
 
-## 13. �ӿ��嵥��¼
+## 13. 接口清单附录
 
-��ϸ�ӿ���μ���doc/API_Appendix_V2.0.md��
+详细接口请参见 `docs/API_Appendix_V2.0.md`。
 
-���齫����¼��������������������ıز��
+建议将该附录作为联调验收与上线回归的核对清单。
 

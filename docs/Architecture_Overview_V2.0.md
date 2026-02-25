@@ -2,8 +2,8 @@
 # 系统架构说明书（V2.0）
 
 - 文档版本：V2.0
-- 架构范围：Phase 01-06 已实现能力
-- 更新日期：2026-02-21
+- 架构范围：`phase-01` 至 `phase-15` 已实现能力
+- 更新日期：2026-02-25
 
 ---
 
@@ -11,16 +11,16 @@
 
 ### 1.1 目标
 
-1. 支撑城管巡查高频业务
-2. 支撑应急指挥场景展示与落地
-3. 保证数据可追溯、流程可审计
+1. 支撑巡查、应急、指挥、合规、评估的一体化低空治理闭环
+2. 保证多租户隔离、数据可追溯、关键动作可审计
+3. 支撑 AI 辅助分析与开放平台对接，同时保持控制决策可解释
 
 ### 1.2 约束
 
 1. 单体架构（Monolith），禁止提前微服务拆分
-2. 无前端构建流水线，采用 Jinja2 + 静态 JS
+2. 前端采用 Jinja2 + 静态 JS，无独立前端构建流水线
 3. 容器化运行，统一通过 Docker Compose
-4. 业务逻辑保持确定性，不将控制决策交给 LLM
+4. AI 能力只提供分析建议，不直接执行控制动作
 
 ---
 
@@ -53,63 +53,70 @@
 代码目录按职责分层：
 
 1. `app/api`：HTTP/WS 入口、鉴权、路由编排
-2. `app/services`：业务用例与流程编排
-3. `app/domain`：领域模型、状态机、权限常量
+2. `app/services`：业务用例、流程与规则编排
+3. `app/domain`：领域模型、状态机、权限与策略常量
 4. `app/infra`：数据库、审计中间件、事件总线、OpenAPI 导出
-5. `app/adapters`：无人机适配器插件（`FAKE`/`DJI`/`MAVLINK`）
+5. `app/adapters`：外部系统适配器（无人机厂商、开放平台）
 6. `app/web`：Jinja2 页面与静态资源
 
 ---
 
 ## 4. 核心模块
 
-### 4.1 身份与权限模块（Identity/RBAC）
+### 4.1 身份、组织与数据边界（Identity/RBAC）
 
-- 租户、用户、角色、权限、角色绑定、权限绑定
-- JWT 鉴权
-- 权限守卫 `require_perm(...)`
+- 租户、用户、角色、权限、组织节点、模板角色
+- 用户角色批量绑定、数据边界策略、租户级访问控制
+- JWT 鉴权、权限守卫 `require_perm(...)`
 
-### 4.2 巡查模块（Inspection）
+### 4.2 飞行执行主链路（Registry/Mission/Telemetry/Command）
 
-- 模板与检查项管理
-- 巡查任务管理
-- 观测点采集
-- 报告导出（HTML）
-- UI：`/ui/inspection`、`/ui/inspection/tasks/{task_id}`
+- 设备注册与状态管理（`/api/registry`）
+- 任务编排与执行（`/api/mission`）
+- 遥测采集与实时推送（`/api/telemetry` + WS）
+- 指令下发与审计（`/api/command`）
 
-### 4.3 问题闭环模块（Defect）
+### 4.3 资产与维护（Assets）
 
-- 由观测点生成问题单
-- 指派与状态流转
-- 操作历史追踪
-- 统计闭环率
-- UI：`/ui/defects`
+- 资产台账、区域资源池、可用性健康评分
+- 维护工单、维护历史、维护统计（`/api/assets/maintenance`）
+- 支撑任务派发前资源充足性判断
 
-### 4.4 应急模块（Incident/Emergency）
+### 4.4 空域合规与任务中心（Compliance/Map/Task-Center）
 
-- 事件创建
-- 一键生成应急任务（自动关联 `mission_id`）
-- UI：`/ui/emergency`
+- 空域规则校验与飞前合规清单（`/api/compliance`）
+- 一张图态势聚合、图层、轨迹回放（`/api/map`）
+- 统一任务中心：分派、风险评分、协同批注、生命周期（`/api/task-center`）
 
-### 4.5 指挥中心模块（Dashboard）
+### 4.5 巡查与问题闭环（Inspection/Defect/Incident）
 
-- 聚合统计 API
-- 实时 WebSocket 推送
-- 地图观测点实时展示
-- UI：`/ui/command-center`
+- 巡查模板、任务、观测点（`/api/inspection`）
+- 问题单生成、流转、复核、关闭（`/api/defects`）
+- 事件创建与应急链路（`/api/incidents`）
 
-### 4.6 合规模块（Approval/Audit）
+### 4.6 成果、告警与报表（Outcomes/Alert/Reporting）
 
-- 审批记录
-- 审计导出
-- 关键写操作审计日志落库（`audit_logs`）
+- 成果目录、成果状态机、处理链路（`/api/outcomes`）
+- 告警优先级、路由与处置联动（`/api/alert`）
+- 报表导出与统计（`/api/reporting`）
 
-### 4.7 报表模块（Reporting）
+### 4.7 AI 助手与证据链（AI）
 
-- 总览统计
-- 闭环率统计
-- 设备利用率统计
-- 报表导出（PDF）
+- 分析作业、运行、输出、证据、复核动作全链路
+- 建议可解释、可追溯，不允许直接控制执行（`control_allowed=false`）
+- 接口前缀：`/api/ai`
+
+### 4.8 KPI 与开放平台（KPI/Open-Platform）
+
+- KPI 快照、趋势与热力聚合（`/api/kpi`）
+- 开放平台凭据、签名、Webhook、适配器治理（`/api/open-platform`）
+- 对外集成在租户边界内可审计运行
+
+### 4.9 治理与运维扩展接口
+
+- 审批与审计：`/api/approvals`
+- Dashboard 聚合与 WS：`/api/dashboard`、`/ws/dashboard`
+- 租户导出与租户清理：`/api/tenant-export`、`/api/tenant-purge`
 
 ---
 
@@ -117,42 +124,45 @@
 
 ### 5.1 多租户隔离
 
-所有核心业务表包含 `tenant_id`，查询侧按 `tenant_id` 过滤实现逻辑隔离。
+所有核心业务表包含 `tenant_id`，查询默认按租户隔离；跨租户访问通过显式权限与审计约束。
 
 ### 5.2 核心实体（节选）
 
-1. 身份与权限：`tenants/users/roles/permissions`
-2. 巡查：`inspection_templates`、`inspection_tasks`、`inspection_observations`
-3. 问题：`defects`、`defect_actions`
-4. 应急：`incidents`
-5. 合规：`approval_records`
-6. 审计：`audit_logs`
-7. 事件：`events`
+1. 身份与组织：`tenants/users/roles/permissions/org_units`
+2. 任务执行：`missions/telemetry_points/command_logs`
+3. 资产维护：`assets/asset_maintenance_orders/asset_maintenance_records`
+4. 合规与任务中心：`compliance_rules/task_center_*`
+5. 成果与告警：`outcomes/outcome_actions/alerts/alert_actions`
+6. AI 与证据：`ai_jobs/ai_runs/ai_outputs/ai_evidences/ai_review_actions`
+7. KPI 与开放平台：`kpi_snapshots/open_platform_credentials/open_platform_webhooks`
+8. 审批与审计：`approval_records/audit_logs/events`
 
 ---
 
 ## 6. 关键流程时序
 
-### 6.1 巡查主流程
+### 6.1 巡查与闭环流程
 
 ```text
-模板创建 -> 任务创建 -> 观测点写入 -> 地图展示 -> 导出报告
+模板创建 -> 巡查任务 -> 观测点 -> 问题单 -> 处理/复核 -> 关闭 -> 报表
 ```
 
-### 6.2 问题闭环流程
+### 6.2 合规与执行流程
 
 ```text
-观测点 -> 生成问题单 -> 指派 -> 处理 -> 复核 -> 关闭
+任务创建 -> 空域/清单校验 -> 资源匹配 -> 指令下发 -> 遥测回传 -> 态势展示
 ```
 
-状态机：
-
-`OPEN -> ASSIGNED -> IN_PROGRESS -> FIXED -> VERIFIED -> CLOSED`
-
-### 6.3 应急流程
+### 6.3 AI 证据链流程
 
 ```text
-事件创建 -> 选择区域 -> 一键创建应急任务 -> 进入调度与监看
+分析请求 -> 任务运行 -> 证据聚合 -> 生成建议 -> 人工复核 -> 结果归档
+```
+
+### 6.4 KPI 与开放平台流程
+
+```text
+业务数据汇总 -> KPI 聚合 -> 对外签名推送/拉取 -> 适配器记录审计
 ```
 
 ---
@@ -161,13 +171,13 @@
 
 ### 7.1 事件机制
 
-- 业务状态变更通过 `event_bus` 发布到 `events` 表
-- 用于追踪关键生命周期，如任务创建、状态变化、审批等
+- 关键状态变更通过 `event_bus` 发布到 `events` 表
+- 用于追踪任务、审批、告警、AI 复核、开放平台交互等生命周期
 
 ### 7.2 审计机制
 
-- `AuditMiddleware` 对写请求记录审计日志
-- 审计字段包括：租户、操作人、动作、资源、HTTP 方法、状态码、时间
+- `AuditMiddleware` 对关键请求记录审计日志
+- 审计字段包括：租户、操作人、动作、资源、方法、状态码、时间、上下文
 
 ---
 
@@ -175,13 +185,13 @@
 
 ### 8.1 遥测通道
 
-- 遥测写入 Redis 最新状态
-- 支持 WebSocket 推送无人机实时数据
+- 遥测状态写入 Redis 最新值
+- 提供 WebSocket 推送实时数据
 
-### 8.2 指挥中心实时通道
+### 8.2 指挥中心通道
 
-- `WS /ws/dashboard` 周期推送统计与地图点
-- 前端按流式数据增量刷新
+- `WS /ws/dashboard` 周期推送统计与地图态势
+- 前端按增量数据刷新图层与关键指标
 
 ---
 
@@ -197,7 +207,7 @@
 编排方式：
 
 - `infra/docker-compose.yml`
-- `Makefile` 封装 lint/typecheck/test/e2e
+- `Makefile` 封装 lint/typecheck/test/e2e 常用命令
 
 ---
 
@@ -205,9 +215,9 @@
 
 1. JWT 身份认证
 2. 细粒度权限控制（接口级）
-3. 租户数据隔离
+3. 多租户数据隔离与跨租户防护
 4. 关键行为审计
-5. 导出动作可追踪
+5. 对外接口签名校验与凭据治理
 
 ---
 
@@ -215,16 +225,16 @@
 
 ### 11.1 适配器扩展
 
-新增无人机厂商时，只需在 `app/adapters` 增加实现并在服务中注册。
+新增外部系统接入时，在 `app/adapters` 增加实现并在服务层注册，无需拆分服务。
 
 ### 11.2 业务扩展
 
-新增业务优先通过：
+新增业务优先遵循：
 
-1. 新增领域模型 + 迁移
-2. 新增服务层用例
-3. 新增 API 路由与权限
-4. 新增审计与事件
+1. 增加领域模型与迁移
+2. 增加服务层用例
+3. 增加 API 路由与权限
+4. 增加审计、事件与测试覆盖
 
 ---
 
@@ -232,21 +242,20 @@
 
 已知限制：
 
-1. 几何字段当前使用文本表达，未启用复杂空间计算
-2. Dashboard 推送采用轮询式推送，不是事件驱动聚合总线
-3. 导出文件存储在本地文件系统，需外部归档策略
+1. 几何字段仍以简化结构为主，复杂空间计算能力有限
+2. Dashboard 推送以周期刷新为主，事件驱动聚合仍可增强
+3. 导出文件默认落地本地文件系统，依赖外部归档策略
 
 演进建议：
 
-1. 接入对象存储管理导出文件生命周期
-2. 增加监控告警指标（延迟、吞吐、错误率）
-3. 在规模增长后评估分层拆分与异步任务队列
-
+1. 引入对象存储与生命周期治理
+2. 增加系统级 SLA 与告警指标（延迟、吞吐、错误率）
+3. 在业务规模增长后评估异步任务队列与分层拆分
 
 ---
 
-## 13. �ӿ��嵥��¼
+## 13. 接口清单附录
 
-��ϸ�ӿ���μ���doc/API_Appendix_V2.0.md��
+详细接口请参见 `docs/API_Appendix_V2.0.md`。
 
-�ܹ�������ӿ�����Ӧ�Ըø�¼��Ϊ��ǰʵ�ֻ��ߡ�
+架构模块与接口边界以附录为准，作为联调和验收基线。

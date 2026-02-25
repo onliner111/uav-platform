@@ -3,7 +3,7 @@
 
 - 文档版本：V2.0
 - 适用范围：平台管理员、业务管理员、安全审计管理员
-- 更新日期：2026-02-24
+- 更新日期：2026-02-25
 
 ---
 
@@ -16,6 +16,9 @@
 3. 应急与巡查业务过程监督
 4. 审批与审计留痕管理
 5. 报表统计与导出管理
+6. 成果目录与告警处置治理
+7. AI 产出人审与责任追踪
+8. 开放平台凭据与 Webhook 治理
 
 ---
 
@@ -298,6 +301,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 1. 月度汇总：巡查量、问题量、闭环率
 2. 季度汇总：设备利用率、应急响应情况
+3. 使用 `POST /api/kpi/governance/export` 固化月报/季报归档。
 
 ---
 
@@ -343,7 +347,100 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 4. 跨租户访问按系统规则返回 404 语义。
 
 ---
-## 11. 管理员日常巡检清单
+## 11. 成果与告警闭环治理（13）
+
+### 11.1 成果目录治理
+
+- 原始数据目录：
+  - `POST /api/outcomes/raw`
+  - `GET /api/outcomes/raw`
+- 成果记录：
+  - `POST /api/outcomes/records`
+  - `GET /api/outcomes/records`
+  - `PATCH /api/outcomes/records/{outcome_id}/status`
+
+治理建议：
+1. 对高风险成果建立复核责任人。
+2. 按任务/专题定期抽查成果状态（`NEW/IN_REVIEW/RESOLVED`）。
+
+### 11.2 告警路由与处置治理
+
+- 路由规则：
+  - `POST /api/alert/routing-rules`
+  - `GET /api/alert/routing-rules`
+- 路由日志：`GET /api/alert/alerts/{alert_id}/routes`
+- 处置动作：
+  - `POST /api/alert/alerts/{alert_id}/actions`
+  - `GET /api/alert/alerts/{alert_id}/actions`
+- 复盘视图：`GET /api/alert/alerts/{alert_id}/review`
+
+治理建议：
+1. 将 P1/P2 告警与值守班组目标绑定，规则变更纳入审批。
+2. 每周复盘 `review` 聚合，检查处置链完整性与时效性。
+
+---
+
+## 12. AI 助手治理（14）
+
+### 12.1 任务与运行治理
+
+- `POST /api/ai/jobs`
+- `GET /api/ai/jobs`
+- `POST /api/ai/jobs/{job_id}/runs`
+- `GET /api/ai/jobs/{job_id}/runs`
+- `POST /api/ai/runs/{run_id}/retry`
+
+### 12.2 人审与责任追踪
+
+- 输出：
+  - `GET /api/ai/outputs`
+  - `GET /api/ai/outputs/{output_id}`
+- 人审动作：
+  - `POST /api/ai/outputs/{output_id}/review`
+  - `GET /api/ai/outputs/{output_id}/review`
+
+治理要求：
+1. AI 输出仅作辅助决策，保持 `control_allowed=false` 非控制约束。
+2. 关键输出必须完成人审动作并保留审计记录。
+3. 覆写（override）需记录原因与责任人。
+
+---
+
+## 13. KPI 与开放平台治理（15）
+
+### 13.1 KPI 与治理报表
+
+- `POST /api/kpi/snapshots/recompute`
+- `GET /api/kpi/snapshots`
+- `GET /api/kpi/snapshots/latest`
+- `GET /api/kpi/heatmap`
+- `POST /api/kpi/governance/export`
+
+治理建议：
+1. 固定窗口（月/季）生成快照，避免跨周期口径漂移。
+2. 报表导出后在 `logs/exports/` 做归档与版本留存。
+
+### 13.2 开放平台安全治理
+
+- 凭据：
+  - `POST /api/open-platform/credentials`
+  - `GET /api/open-platform/credentials`
+- Webhook：
+  - `POST /api/open-platform/webhooks`
+  - `GET /api/open-platform/webhooks`
+  - `POST /api/open-platform/webhooks/{endpoint_id}/dispatch-test`
+- 适配器入站：
+  - `POST /api/open-platform/adapters/events/ingest`
+  - `GET /api/open-platform/adapters/events`
+
+治理要求：
+1. 入站事件统一启用签名头：`X-Open-Key-Id`、`X-Open-Api-Key`、`X-Open-Signature`。
+2. Webhook 建议使用专用凭据并定期轮换。
+3. 生产环境禁用无审计来源的临时 key。
+
+---
+
+## 14. 管理员日常巡检清单
 
 每日：
 
@@ -356,29 +453,31 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 1. 导出审计日志并归档
 2. 复核角色权限最小化原则
 3. 抽查巡查导出报告
+4. 抽查 AI 人审动作链与开放平台入站签名有效率
 
 每月：
 
 1. 导出报表并形成管理简报
 2. 清理无效账户和历史临时角色
+3. 复盘 KPI 热力图趋势并更新治理策略
 
 ---
 
-## 12. 常见管理问题
+## 15. 常见管理问题
 
-### 12.1 403 无权限
+### 15.1 403 无权限
 
 处理：检查用户角色、角色权限绑定，重新登录刷新 token。
 
-### 12.2 看不到数据
+### 15.2 看不到数据
 
 处理：确认当前账号所属租户与目标数据租户一致。
 
-### 12.3 导出失败
+### 15.3 导出失败
 
 处理：检查服务写盘权限与 `logs/exports/` 目录状态；租户导出接口可先查询状态接口确认任务结果。
 
-### 12.4 清理执行失败
+### 15.4 清理执行失败
 
 处理：
 1. 确认已先执行 dry-run 并使用正确 `dry_run_id`。
@@ -387,7 +486,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 13. 接口清单附录
+## 16. 接口清单附录
 
 详细接口请参见：`docs/API_Appendix_V2.0.md`。
 建议在系统升级后同步复核该附录中的路径与权限要求。
