@@ -27,11 +27,22 @@
 - [x] phase-13-data-outcomes-alert-closure.md - ✅ success - phase-13-data-outcomes-alert-closure.md.report.md
 - [x] phase-14-ai-assistant-evidence-chain.md - ✅ success - phase-14-ai-assistant-evidence-chain.md.report.md
 - [x] phase-15-kpi-open-platform.md - ✅ success - phase-15-kpi-open-platform.md.report.md
+- [ ] phase-16-saas-console-ui.md - ⏳ pending
+- [ ] phase-17-multi-org-data-perimeter-v2.md - ⏳ pending
+- [ ] phase-18-outcomes-repository-object-storage.md - ⏳ pending
+- [ ] phase-19-real-device-video-integration.md - ⏳ pending
+- [ ] phase-20-task-center-v2-optimization.md - ⏳ pending
+- [ ] phase-21-airspace-compliance-hub-v2.md - ⏳ pending
+- [ ] phase-22-alert-oncall-notification-v2.md - ⏳ pending
+- [ ] phase-23-ai-model-governance-v2.md - ⏳ pending
+- [ ] phase-24-billing-quota-system.md - ⏳ pending
+- [ ] phase-25-observability-reliability.md - ⏳ pending
 
 ## Notes
 - ✅ success
 - ❌ failed
 - ⏳ pending
+- 2026-02-25T16:54:45Z (UTC): roadmap extended with phase-16..phase-25 blueprints; checkpoint moved to `phase-16-saas-console-ui.md` (`READY`).
 - 2026-02-24T11:23:20Z (UTC): gates passed via Docker Compose (`ruff`, `mypy`, `pytest -q`, `e2e` chain with `demo_e2e` + `verify_smoke`).
 - 2026-02-24T12:07:43Z (UTC): B5 reporting/compliance boundary delivered; gates passed via Docker Compose (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head` to `202602240028`, OpenAPI export, `demo_e2e`, `verify_smoke`).
 - 2026-02-24T12:22:51Z (UTC): 07C-2/07C-3 implementation landed, but gate rerun blocked: `permission denied while trying to connect to npipe:////./pipe/dockerDesktopLinuxEngine`.

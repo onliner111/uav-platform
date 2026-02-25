@@ -27,21 +27,31 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 23. `phases/phase-13-data-outcomes-alert-closure.md`
 24. `phases/phase-14-ai-assistant-evidence-chain.md`
 25. `phases/phase-15-kpi-open-platform.md`
+26. `phases/phase-16-saas-console-ui.md`
+27. `phases/phase-17-multi-org-data-perimeter-v2.md`
+28. `phases/phase-18-outcomes-repository-object-storage.md`
+29. `phases/phase-19-real-device-video-integration.md`
+30. `phases/phase-20-task-center-v2-optimization.md`
+31. `phases/phase-21-airspace-compliance-hub-v2.md`
+32. `phases/phase-22-alert-oncall-notification-v2.md`
+33. `phases/phase-23-ai-model-governance-v2.md`
+34. `phases/phase-24-billing-quota-system.md`
+35. `phases/phase-25-observability-reliability.md`
 
 Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-25T06:03:33Z`
-- current_phase: `phase-15-kpi-open-platform.md`
-- phase_status: `DONE`
+- updated_at_utc: `2026-02-25T16:54:45Z`
+- current_phase: `phase-16-saas-console-ui.md`
+- phase_status: `READY`
 - last_success_phase: `phase-15-kpi-open-platform.md`
-- current_focus: `All indexed phases (01..15) are closed as DONE; repository is at full-roadmap completion checkpoint`
+- current_focus: `Roadmap extended to phase-16..phase-25; execution is queued from phase-16 (READY)`
 
 ## Next TODO (Execution Target)
-1. Keep Docker Compose baseline gate commands below as regression checklist for new roadmap items.
-2. If new phases are added, update `phases/index.md` and restart from `phases/state.md`.
-3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> WP4`) for any future phases.
+1. Start Phase 16 from `P0 -> P1 -> P2 -> 16-WP4` and keep full gate pass as closeout condition.
+2. Keep Docker Compose baseline gate commands below as regression checklist for each new phase.
+3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> WP4`) for all future phases.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -66,4 +76,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 status=DONE（phase-15 已完成）；如有新增阶段，请先更新 phases/index.md 与 phases/state.md 后继续执行。`
+`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-16-saas-console-ui.md；按 P0 -> P1 -> P2 -> WP4 执行并通过全量门禁后再推进下一阶段。`

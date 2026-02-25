@@ -6,9 +6,9 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-15-kpi-open-platform.md (DONE; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 15 closed as DONE (`15-WP1`..`15-WP4`)
-- Next Target: all indexed phases completed; waiting for next roadmap extension
+- Current Phase: phase-16-saas-console-ui.md (READY; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 16 queued (`16-WP1`..`16-WP4`)
+- Next Target: execute phase-16..phase-25 extension sequentially with full gate closeout per phase
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
@@ -92,6 +92,7 @@
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-25T16:54:45Z (UTC): Roadmap extended with planning blueprints `phase-16`..`phase-25` (UI-first SaaS console, multi-org/data perimeter v2, outcomes/object storage, real device/video integration, task/compliance/alert/AI v2 enhancements, billing/quota, observability/reliability). Execution checkpoint moved to `phase-16-saas-console-ui.md` with `READY`; index and resume entrypoint updated accordingly.
 - 2026-02-25T04:15:26Z (UTC): Phase 11 closed as DONE. Completed P1/P2 capabilities (auto-dispatch scoring explainability, risk/checklist update, attachment/comment collaboration), delivered demo script `infra/scripts/demo_phase11_task_center.py`, generated report `logs/phase-11-unified-task-center-workflow.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase11_task_center`).
 - 2026-02-25T04:46:32Z (UTC): Phase 12 closed as DONE. Completed airspace zoning + mission plan guardrails, preflight checklist lifecycle and run-gate enforcement, and command pre-dispatch interception with standardized reason codes; delivered demo script `infra/scripts/demo_phase12_airspace_compliance.py`, generated report `logs/phase-12-airspace-compliance-safety-rails.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase12_airspace_compliance`).
 - 2026-02-25T05:20:21Z (UTC): Phase 13 closed as DONE. Completed outcomes/raw catalog and structured outcome state machine, alert priority/routing with external adapter placeholders, handling action chain + review aggregation, and reporting export scope enhancement (`task_id`/`from_ts`/`to_ts`/`topic`); delivered demo script `infra/scripts/demo_phase13_data_alert_closure.py`, generated report `logs/phase-13-data-outcomes-alert-closure.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase13_data_alert_closure`).

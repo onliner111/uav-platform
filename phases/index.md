@@ -34,6 +34,16 @@ Codex MUST execute phases sequentially.
 24. phase-13-data-outcomes-alert-closure.md
 25. phase-14-ai-assistant-evidence-chain.md
 26. phase-15-kpi-open-platform.md
+27. phase-16-saas-console-ui.md
+28. phase-17-multi-org-data-perimeter-v2.md
+29. phase-18-outcomes-repository-object-storage.md
+30. phase-19-real-device-video-integration.md
+31. phase-20-task-center-v2-optimization.md
+32. phase-21-airspace-compliance-hub-v2.md
+33. phase-22-alert-oncall-notification-v2.md
+34. phase-23-ai-model-governance-v2.md
+35. phase-24-billing-quota-system.md
+36. phase-25-observability-reliability.md
 
 ---
 
