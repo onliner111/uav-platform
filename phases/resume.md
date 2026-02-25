@@ -21,21 +21,27 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 17. `phases/phase-08c-audit-hardening.md`
 18. `phases/phase-08d-integration-acceptance.md`
 19. `phases/phase-09-flight-resource-asset-management.md`
+20. `phases/phase-10-unified-map-situation-v1.md`
+21. `phases/phase-11-unified-task-center-workflow.md`
+22. `phases/phase-12-airspace-compliance-safety-rails.md`
+23. `phases/phase-13-data-outcomes-alert-closure.md`
+24. `phases/phase-14-ai-assistant-evidence-chain.md`
+25. `phases/phase-15-kpi-open-platform.md`
 
 Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-24T18:25:07Z`
-- current_phase: `DONE`
-- phase_status: `DONE`
-- last_success_phase: `phase-09-flight-resource-asset-management.md`
-- current_focus: `Phase 09 closed; execution chain in phases/index.md is fully completed`
+- updated_at_utc: `2026-02-25T04:15:26Z`
+- current_phase: `phase-12-airspace-compliance-safety-rails.md`
+- phase_status: `READY`
+- last_success_phase: `phase-11-unified-task-center-workflow.md`
+- current_focus: `Phase 11 closed as DONE; next focus is phase-12 P0 airspace baseline guardrails`
 
 ## Next TODO (Execution Target)
-1. No pending TODO in current index chain (phase 01..09 complete).
-2. Keep Docker Compose baseline gate commands below as regression checklist.
-3. Wait for next phase blueprint/index update before new implementation.
+1. Start phase-12 P0: `12-WP1` + `12-WP3(最小指令前置拦截护栏)`.
+2. Keep Docker Compose baseline gate commands below as phase-entry regression checklist.
+3. Follow `P0 -> P1 -> P2 -> WP4` sequencing in phase-11..15 documents.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -53,5 +59,11 @@ Use Docker Compose commands directly in this environment:
 - If any Docker command returns npipe access denial (e.g. `permission denied ... dockerDesktopLinuxEngine`), immediately retry the same command with escalated permissions in the same turn.
 - This rule is persistent and must be applied on every restarted session.
 
+## Intra-Phase Auto-Continue Rule (Mandatory)
+- Within current phase, execute small stages continuously in declared order (for example `P0 -> P1 -> P2 -> WP4`).
+- If a small stage passes checks, immediately continue to the next small stage without asking.
+- Only stop for hard blockers or when the whole phase is completed.
+- This rule is persistent and must be applied on every restarted session.
+
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=DONE（phase 01..09 已完成）；仅执行回归门禁并等待下一阶段蓝图或 index 更新。`
+`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=phase-12-airspace-compliance-safety-rails.md（status=READY）；从 phase-12 P0 开始执行，并按 P0->P1->P2->WP4 顺序推进。`

@@ -28,6 +28,12 @@ Codex MUST execute phases sequentially.
 18. phase-08c-audit-hardening.md
 19. phase-08d-integration-acceptance.md
 20. phase-09-flight-resource-asset-management.md
+21. phase-10-unified-map-situation-v1.md
+22. phase-11-unified-task-center-workflow.md
+23. phase-12-airspace-compliance-safety-rails.md
+24. phase-13-data-outcomes-alert-closure.md
+25. phase-14-ai-assistant-evidence-chain.md
+26. phase-15-kpi-open-platform.md
 
 ---
 
@@ -43,6 +49,9 @@ Codex MUST execute phases sequentially.
 - MUST NOT skip phases.
 - MUST NOT reorder phases.
 - MUST start from `phases/state.md -> current_phase`.
+- MUST execute intra-phase small stages sequentially and auto-continue:
+  - if a small stage passes checks, immediately proceed to the next small stage
+  - continue until the whole phase is DONE or blocked by hard failure policy
 
 ---
 

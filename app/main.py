@@ -16,9 +16,11 @@ from app.api.routers import (
     identity,
     incident,
     inspection,
+    map_router,
     mission,
     registry,
     reporting,
+    task_center,
     telemetry,
     tenant_export,
     tenant_purge,
@@ -49,6 +51,8 @@ app.include_router(telemetry.router, prefix="/api/telemetry", tags=["telemetry"]
 app.include_router(telemetry.ws_router, tags=["telemetry-ws"])
 app.include_router(command.router, prefix="/api/command", tags=["command"])
 app.include_router(alert.router, prefix="/api/alert", tags=["alert"])
+app.include_router(map_router.router, prefix="/api/map", tags=["map"])
+app.include_router(task_center.router, prefix="/api/task-center", tags=["task-center"])
 app.include_router(inspection.router, prefix="/api/inspection", tags=["inspection"])
 app.include_router(defect.router, prefix="/api/defects", tags=["defects"])
 app.include_router(incident.router, prefix="/api/incidents", tags=["incidents"])

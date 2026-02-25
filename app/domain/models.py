@@ -10,7 +10,7 @@ from pydantic import Field as PydanticField
 from sqlalchemy import JSON, Column, ForeignKeyConstraint, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-from app.domain.state_machine import MissionState
+from app.domain.state_machine import MissionState, TaskCenterState
 
 
 def now_utc() -> datetime:
@@ -476,6 +476,172 @@ class MissionRun(SQLModel, table=True):
     state: MissionState = Field(index=True)
     started_at: datetime = Field(default_factory=now_utc, index=True)
     ended_at: datetime | None = Field(default=None, index=True)
+
+
+class TaskCenterDispatchMode(StrEnum):
+    MANUAL = "MANUAL"
+    AUTO = "AUTO"
+
+
+class TaskTypeCatalog(SQLModel, table=True):
+    __tablename__ = "task_type_catalogs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_task_type_catalogs_tenant_id_id"),
+        UniqueConstraint("tenant_id", "code", name="uq_task_type_catalogs_tenant_code"),
+        Index("ix_task_type_catalogs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_task_type_catalogs_tenant_code", "tenant_id", "code"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    code: str = Field(max_length=50, index=True)
+    name: str = Field(max_length=100, index=True)
+    description: str | None = None
+    is_active: bool = Field(default=True, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class TaskTemplate(SQLModel, table=True):
+    __tablename__ = "task_templates"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_task_templates_tenant_id_id"),
+        UniqueConstraint("tenant_id", "template_key", name="uq_task_templates_tenant_template_key"),
+        ForeignKeyConstraint(
+            ["tenant_id", "task_type_id"],
+            ["task_type_catalogs.tenant_id", "task_type_catalogs.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_task_templates_tenant_id_id", "tenant_id", "id"),
+        Index("ix_task_templates_tenant_type", "tenant_id", "task_type_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_type_id: str = Field(index=True)
+    template_key: str = Field(max_length=100, index=True)
+    name: str = Field(max_length=100, index=True)
+    description: str | None = None
+    requires_approval: bool = Field(default=False, index=True)
+    default_priority: int = Field(default=5, ge=1, le=10, index=True)
+    default_risk_level: int = Field(default=3, ge=1, le=5, index=True)
+    default_checklist: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    default_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    is_active: bool = Field(default=True, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class TaskCenterTask(SQLModel, table=True):
+    __tablename__ = "task_center_tasks"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_task_center_tasks_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "task_type_id"],
+            ["task_type_catalogs.tenant_id", "task_type_catalogs.id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "template_id"],
+            ["task_templates.tenant_id", "task_templates.id"],
+            ondelete="SET NULL",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "org_unit_id"],
+            ["org_units.tenant_id", "org_units.id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "mission_id"],
+            ["missions.tenant_id", "missions.id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "assigned_to"],
+            ["users.tenant_id", "users.id"],
+            ondelete="SET NULL",
+        ),
+        Index("ix_task_center_tasks_tenant_id_id", "tenant_id", "id"),
+        Index("ix_task_center_tasks_tenant_state", "tenant_id", "state"),
+        Index("ix_task_center_tasks_tenant_assigned", "tenant_id", "assigned_to"),
+        Index("ix_task_center_tasks_tenant_org_unit", "tenant_id", "org_unit_id"),
+        Index("ix_task_center_tasks_tenant_task_type", "tenant_id", "task_type_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_type_id: str = Field(index=True)
+    template_id: str | None = Field(default=None, index=True)
+    mission_id: str | None = Field(default=None, index=True)
+    name: str = Field(max_length=200, index=True)
+    description: str | None = None
+    state: TaskCenterState = Field(default=TaskCenterState.DRAFT, index=True)
+    requires_approval: bool = Field(default=False, index=True)
+    priority: int = Field(default=5, ge=1, le=10, index=True)
+    risk_level: int = Field(default=3, ge=1, le=5, index=True)
+    org_unit_id: str | None = Field(default=None, index=True)
+    project_code: str | None = Field(default=None, max_length=100, index=True)
+    area_code: str | None = Field(default=None, max_length=100, index=True)
+    area_geom: str = Field(default="")
+    checklist: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    attachments: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    context_data: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    dispatch_mode: TaskCenterDispatchMode | None = Field(default=None, index=True)
+    assigned_to: str | None = Field(default=None, index=True)
+    dispatched_by: str | None = Field(default=None, index=True)
+    dispatched_at: datetime | None = Field(default=None, index=True)
+    started_at: datetime | None = Field(default=None, index=True)
+    accepted_at: datetime | None = Field(default=None, index=True)
+    archived_at: datetime | None = Field(default=None, index=True)
+    canceled_at: datetime | None = Field(default=None, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class TaskCenterTaskHistory(SQLModel, table=True):
+    __tablename__ = "task_center_task_histories"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_task_center_task_histories_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["task_center_tasks.tenant_id", "task_center_tasks.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_task_center_task_histories_tenant_id_id", "tenant_id", "id"),
+        Index("ix_task_center_task_histories_tenant_task", "tenant_id", "task_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_id: str = Field(index=True)
+    action: str = Field(max_length=50, index=True)
+    from_state: TaskCenterState | None = Field(default=None, index=True)
+    to_state: TaskCenterState | None = Field(default=None, index=True)
+    note: str | None = None
+    actor_id: str | None = Field(default=None, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class EventEnvelope(BaseModel):
@@ -999,6 +1165,183 @@ class MissionTransitionRequest(BaseModel):
     target_state: MissionState
 
 
+class TaskTypeCatalogCreate(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+    is_active: bool = True
+
+
+class TaskTypeCatalogRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    code: str
+    name: str
+    description: str | None
+    is_active: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class TaskTemplateCreate(BaseModel):
+    task_type_id: str
+    template_key: str
+    name: str
+    description: str | None = None
+    requires_approval: bool = False
+    default_priority: int = PydanticField(default=5, ge=1, le=10)
+    default_risk_level: int = PydanticField(default=3, ge=1, le=5)
+    default_checklist: list[dict[str, Any]] = PydanticField(default_factory=list)
+    default_payload: dict[str, Any] = PydanticField(default_factory=dict)
+    is_active: bool = True
+
+
+class TaskTemplateRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_type_id: str
+    template_key: str
+    name: str
+    description: str | None
+    requires_approval: bool
+    default_priority: int
+    default_risk_level: int
+    default_checklist: list[dict[str, Any]]
+    default_payload: dict[str, Any]
+    is_active: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class TaskCenterTaskCreate(BaseModel):
+    task_type_id: str
+    template_id: str | None = None
+    mission_id: str | None = None
+    name: str
+    description: str | None = None
+    requires_approval: bool | None = None
+    priority: int | None = PydanticField(default=None, ge=1, le=10)
+    risk_level: int | None = PydanticField(default=None, ge=1, le=5)
+    org_unit_id: str | None = None
+    project_code: str | None = None
+    area_code: str | None = None
+    area_geom: str = ""
+    checklist: list[dict[str, Any]] = PydanticField(default_factory=list)
+    attachments: list[dict[str, Any]] = PydanticField(default_factory=list)
+    context_data: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class TaskCenterTaskRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_type_id: str
+    template_id: str | None
+    mission_id: str | None
+    name: str
+    description: str | None
+    state: TaskCenterState
+    requires_approval: bool
+    priority: int
+    risk_level: int
+    org_unit_id: str | None
+    project_code: str | None
+    area_code: str | None
+    area_geom: str
+    checklist: list[dict[str, Any]]
+    attachments: list[dict[str, Any]]
+    context_data: dict[str, Any]
+    dispatch_mode: TaskCenterDispatchMode | None
+    assigned_to: str | None
+    dispatched_by: str | None
+    dispatched_at: datetime | None
+    started_at: datetime | None
+    accepted_at: datetime | None
+    archived_at: datetime | None
+    canceled_at: datetime | None
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class TaskCenterTaskSubmitApprovalRequest(BaseModel):
+    note: str | None = None
+
+
+class TaskCenterTaskApproveRequest(BaseModel):
+    decision: ApprovalDecision
+    note: str | None = None
+
+
+class TaskCenterTaskDispatchRequest(BaseModel):
+    assigned_to: str
+    note: str | None = None
+
+
+class TaskCenterTaskAutoDispatchRequest(BaseModel):
+    candidate_user_ids: list[str] = PydanticField(default_factory=list)
+    note: str | None = None
+
+
+class TaskCenterCandidateScoreRead(BaseModel):
+    user_id: str
+    total_score: float
+    breakdown: dict[str, float]
+    reasons: list[str]
+
+
+class TaskCenterTaskAutoDispatchRead(BaseModel):
+    task: TaskCenterTaskRead
+    selected_user_id: str
+    dispatch_mode: TaskCenterDispatchMode
+    scores: list[TaskCenterCandidateScoreRead]
+    resource_snapshot: dict[str, Any]
+
+
+class TaskCenterTaskTransitionRequest(BaseModel):
+    target_state: TaskCenterState
+    note: str | None = None
+
+
+class TaskCenterRiskChecklistUpdateRequest(BaseModel):
+    risk_level: int | None = PydanticField(default=None, ge=1, le=5)
+    checklist: list[dict[str, Any]] | None = None
+    note: str | None = None
+
+
+class TaskCenterAttachmentAddRequest(BaseModel):
+    name: str
+    url: str
+    media_type: str | None = None
+    size_bytes: int | None = PydanticField(default=None, ge=0)
+    note: str | None = None
+
+
+class TaskCenterCommentCreateRequest(BaseModel):
+    content: str
+
+
+class TaskCenterCommentRead(BaseModel):
+    id: str
+    content: str
+    created_by: str
+    created_at: datetime
+
+
+class TaskCenterTaskHistoryRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_id: str
+    action: str
+    from_state: TaskCenterState | None
+    to_state: TaskCenterState | None
+    note: str | None
+    actor_id: str | None
+    detail: dict[str, Any]
+    created_at: datetime
+
+
 class CommandDispatchRequest(BaseModel):
     drone_id: str
     type: CommandType
@@ -1473,6 +1816,60 @@ class DashboardStatsRead(BaseModel):
     today_inspections: int
     defects_total: int
     realtime_alerts: int
+
+
+class MapLayerName(StrEnum):
+    RESOURCES = "resources"
+    TASKS = "tasks"
+    ALERTS = "alerts"
+    EVENTS = "events"
+
+
+class MapPointRead(BaseModel):
+    lat: float
+    lon: float
+    alt_m: float | None = None
+    ts: datetime | None = None
+
+
+class MapLayerItemRead(BaseModel):
+    id: str
+    category: str
+    label: str
+    status: str | None = None
+    point: MapPointRead | None = None
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class MapLayerRead(BaseModel):
+    layer: MapLayerName
+    total: int
+    items: list[MapLayerItemRead]
+
+
+class MapOverviewRead(BaseModel):
+    generated_at: datetime
+    resources_total: int
+    tasks_total: int
+    alerts_total: int
+    events_total: int
+    layers: list[MapLayerRead]
+
+
+class MapTrackPointRead(BaseModel):
+    drone_id: str
+    ts: datetime
+    lat: float
+    lon: float
+    alt_m: float | None = None
+    mode: str | None = None
+
+
+class MapTrackReplayRead(BaseModel):
+    drone_id: str
+    from_ts: datetime | None = None
+    to_ts: datetime | None = None
+    points: list[MapTrackPointRead]
 
 
 class ApprovalRecordCreate(BaseModel):

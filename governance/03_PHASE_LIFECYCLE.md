@@ -108,6 +108,15 @@ During execution:
 - Stay strictly within declared scope.
   严格保持在声明范围内。
 
+- Within a phase, execute small stages (work packages/subtasks) sequentially.
+  在单个阶段内，按小阶段（工作包/子任务）顺序执行。
+
+- If a small stage passes checks, automatically continue to the next small stage without waiting for manual confirmation.
+  若小阶段通过校验，必须自动推进下一个小阶段，无需人工确认。
+
+- Continue until the whole phase is completed, or stop only on hard blockers / failure policy.
+  必须连续执行直至整阶段完成；仅在硬阻塞或失败策略触发时停止。
+
 ---
 
 # 6. Phase Completion Rules

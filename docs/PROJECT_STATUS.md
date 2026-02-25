@@ -6,18 +6,18 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: DONE (phase-09-flight-resource-asset-management.md closed; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 09 complete (WP1-WP4 accepted)
-- Next Target: wait for next phase blueprint update after current index chain completion
+- Current Phase: phase-12-airspace-compliance-safety-rails.md (READY; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 11 closed as DONE (`11-WP1`..`11-WP4`)
+- Next Target: execute phase-12 P0 (`12-WP1/12-WP3-min-guardrails`)
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-24T18:25:07Z
+> Last verified at (UTC): 2026-02-25T04:15:26Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> WIP note (2026-02-24T18:25:07Z): Phase 09 closed as DONE after WP4 regional pool aggregation + acceptance demo and full baseline gate rerun.
+> WIP note (2026-02-25T04:15:26Z): Phase 11 closed as DONE after completing P1/P2 enhancements and WP4 closeout (`demo_phase11_task_center` + full gate rerun).
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
-- mypy: PASS (54 source files)
+- mypy: PASS (60 source files)
 - pytest: PASS (`docker compose ... app pytest -q`)
 - e2e: PASS (`demo_e2e.py` + `verify_smoke.py`)
 - phase08 integration: PASS (`verify_phase08_integration.py`)
@@ -62,6 +62,8 @@
 - phase-08c-audit-hardening.md: DONE
 - phase-08d-integration-acceptance.md: DONE
 - phase-09-flight-resource-asset-management.md: DONE
+- phase-10-unified-map-situation-v1.md: DONE
+- phase-11-unified-task-center-workflow.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -76,10 +78,19 @@
 - 09-WP2 availability/health artifacts are present: `AssetAvailabilityStatus/AssetHealthStatus`, API `POST /api/assets/{id}/availability`, `POST /api/assets/{id}/health`, `GET /api/assets/pool`, migration chain `202602240038/039/040`, and WP2 regression coverage in `tests/test_asset.py`.
 - 09-WP3 maintenance artifacts are present: `AssetMaintenanceWorkOrder/AssetMaintenanceHistory`, API `/api/assets/maintenance/workorders*`, migration chain `202602240041/042/043`, and workflow regression coverage in `tests/test_asset_maintenance.py`.
 - 09-WP4 closeout artifacts are present: `GET /api/assets/pool/summary`, `infra/scripts/demo_phase09_resource_pool_maintenance.py`, `logs/phase-09-flight-resource-asset-management.md.report.md`.
+- 10-WP1/WP2/WP3 artifacts are present: `app/services/map_service.py`, `app/api/routers/map_router.py`, map DTOs in `app/domain/models.py`, command-center one-map UI updates (`app/web/templates/command_center.html`, `app/web/static/command_center.js`), and regression coverage `tests/test_map.py`.
+- 11-WP1/WP2/WP3 artifacts are present: `app/services/task_center_service.py`, `app/api/routers/task_center.py`, task-center DTOs/models in `app/domain/models.py`, migration chain `202602240044/045/046`, regression coverage `tests/test_task_center.py`, and phase demo `infra/scripts/demo_phase11_task_center.py`.
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-25T04:15:26Z (UTC): Phase 11 closed as DONE. Completed P1/P2 capabilities (auto-dispatch scoring explainability, risk/checklist update, attachment/comment collaboration), delivered demo script `infra/scripts/demo_phase11_task_center.py`, generated report `logs/phase-11-unified-task-center-workflow.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase11_task_center`).
+- 2026-02-25T03:56:32Z (UTC): Phase 11 moved to RUNNING and delivered P0 baseline (`11-WP1`, `11-WP2` manual dispatch minimal chain, `11-WP3` core lifecycle state machine). Added task-center domain/service/router/migrations (`202602240044/045/046`) and regression coverage (`tests/test_task_center.py`). Verification passed via Docker Compose (`ruff check app tests infra/scripts`, `mypy app`, `pytest -q`, `alembic upgrade head`).
+- 2026-02-25T03:40:43Z (UTC): Phase 10 closed as DONE. Completed WP4 closeout with acceptance demo script `infra/scripts/demo_phase10_one_map.py` and report `logs/phase-10-unified-map-situation-v1.md.report.md`; full gate chain passed (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase10_one_map`). Checkpoint advanced to `phase-11-unified-task-center-workflow.md` with `READY`.
+- 2026-02-25T03:36:43Z (UTC): Phase 10 WP3 completed. Enhanced `/ui/command-center` with layer toggles, track replay controls, alert highlight panel, and video-slot placeholder abstraction; wired UI to `/api/map/*` while keeping `ws/dashboard` stats stream. Verification passed via Docker Compose (`ruff check app tests infra/scripts`, `mypy app`, `pytest -q`).
+- 2026-02-24T19:06:22Z (UTC): Phase 10 moved into active implementation (`RUNNING`). Completed P0 work packages `10-WP1/10-WP2`: added map aggregation service (`app/services/map_service.py`), map APIs (`/api/map/overview`, `/api/map/layers/{resources|tasks|alerts|events}`, `/api/map/tracks/replay`), model DTOs, and regression coverage (`tests/test_map.py`). Verification passed via Docker Compose: `ruff check app tests infra/scripts`, `mypy app`, `pytest -q`.
+- 2026-02-24T18:53:40Z (UTC): Priority tuning completed for `phase-10`..`phase-15` blueprints. Added explicit `P0/P1/P2` sequencing sections and standardized execution order (`P0 -> P1 -> P2 -> WP4`) to reduce implementation risk and keep non-blocking features deferrable.
+- 2026-02-24T18:49:21Z (UTC): Added phase blueprints `phase-10`..`phase-15`, updated `phases/index.md` execution order, and switched checkpoint from `DONE` to `current_phase=phase-10-unified-map-situation-v1.md` with `status=READY` for next implementation cycle.
 - 2026-02-24T18:25:07Z (UTC): Phase 09 closed as DONE (WP1-WP4 complete). Added regional resource pool summary API (`GET /api/assets/pool/summary`) and acceptance demo script (`infra/scripts/demo_phase09_resource_pool_maintenance.py`), then passed full baseline Docker Compose gates (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration.py`, phase09 demo). Report generated at `logs/phase-09-flight-resource-asset-management.md.report.md`; checkpoint switched to `DONE`.
 - 2026-02-24T18:11:32Z (UTC): Phase 09 WP3 completed (maintenance workorder/history model + APIs + explicit audit action contexts + migration chain `202602240041/042/043` + `tests/test_asset_maintenance.py`). Baseline Docker Compose gates passed: `ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, and `verify_phase08_integration.py`.
 - 2026-02-24T18:01:57Z (UTC): Phase 09 WP2 completed (asset availability/health model + pool query APIs + migration chain `202602240038/039/040` + WP2 tests in `tests/test_asset.py`). Baseline Docker Compose gates passed: `ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`.

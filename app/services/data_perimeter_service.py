@@ -12,6 +12,7 @@ from app.domain.models import (
     Incident,
     InspectionTask,
     Mission,
+    TaskCenterTask,
 )
 
 
@@ -103,4 +104,13 @@ class DataPerimeterService:
             project_code=incident.project_code,
             area_code=incident.area_code,
             task_id=incident.linked_task_id,
+        )
+
+    def task_center_visible(self, task: TaskCenterTask, scope: DataPerimeterScope) -> bool:
+        return self.allows(
+            scope,
+            org_unit_id=task.org_unit_id,
+            project_code=task.project_code,
+            area_code=task.area_code,
+            task_id=task.id,
         )

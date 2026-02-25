@@ -32,6 +32,9 @@
 - MUST implement ONLY the current phase.
 - MUST NOT implement future phases early.
 - MUST strictly follow phases/*.md specification.
+- MUST execute current phase small stages sequentially and continuously (for example P0 -> P1 -> P2 -> WP4).
+- MUST auto-advance to the next small stage once current small stage passes checks, unless a hard blocker occurs.
+- MUST continue until current phase is fully completed; MUST NOT pause only to ask whether to continue.
 
 ## Architecture Constraint
 - MUST keep monolith + plugin adapters.

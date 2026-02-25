@@ -21,6 +21,12 @@
 - [x] phase-08c-audit-hardening.md - ✅ success - phase-08c-audit-hardening.md.report.md
 - [x] phase-08d-integration-acceptance.md - ✅ success - phase-08d-integration-acceptance.md.report.md
 - [x] phase-09-flight-resource-asset-management.md - ✅ success - phase-09-flight-resource-asset-management.md.report.md
+- [x] phase-10-unified-map-situation-v1.md - ✅ success - phase-10-unified-map-situation-v1.md.report.md
+- [x] phase-11-unified-task-center-workflow.md - ✅ success - phase-11-unified-task-center-workflow.md.report.md
+- [ ] phase-12-airspace-compliance-safety-rails.md - ⏳ pending
+- [ ] phase-13-data-outcomes-alert-closure.md - ⏳ pending
+- [ ] phase-14-ai-assistant-evidence-chain.md - ⏳ pending
+- [ ] phase-15-kpi-open-platform.md - ⏳ pending
 
 ## Notes
 - ✅ success
@@ -46,3 +52,10 @@
 - 2026-02-24T18:01:57Z (UTC): Phase 09 WP2 completed (availability/health model + `/api/assets/{id}/availability` + `/api/assets/{id}/health` + `/api/assets/pool` + migration chain `202602240038/039/040` + WP2 test coverage in `tests/test_asset.py`); baseline Docker Compose gates passed, move focus to WP3.
 - 2026-02-24T18:11:32Z (UTC): Phase 09 WP3 completed (maintenance workorder/history model + `/api/assets/maintenance/workorders*` APIs + explicit audit actions + migration chain `202602240041/042/043` + `tests/test_asset_maintenance.py`); baseline Docker Compose gates passed (including `verify_phase08_integration.py` regression), move focus to WP4.
 - 2026-02-24T18:25:07Z (UTC): Phase 09 closed as DONE. WP4 delivered (`GET /api/assets/pool/summary` + `demo_phase09_resource_pool_maintenance.py`) and full baseline gate chain passed (`ruff`, `mypy`, `pytest -q`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration.py`, phase09 demo); report written to `logs/phase-09-flight-resource-asset-management.md.report.md`.
+- 2026-02-24T18:49:21Z (UTC): Added phase blueprints `phase-10`..`phase-15`, updated execution index chain, and switched checkpoint to `phase-10-unified-map-situation-v1.md` (`READY`).
+- 2026-02-24T18:53:40Z (UTC): Tuned priorities for phase-10..phase-15 blueprints with explicit `P0/P1/P2` sequencing; implementation entry remains `phase-10` `P0` (`10-WP1`, `10-WP2`).
+- 2026-02-24T19:06:22Z (UTC): Phase 10 RUNNING with P0 delivered (`10-WP1/10-WP2`): map aggregation service + `/api/map/overview` + `/api/map/layers/{resources|tasks|alerts|events}` + `/api/map/tracks/replay` + `tests/test_map.py`; gates passed (`ruff`, `mypy`, `pytest -q`).
+- 2026-02-25T03:36:43Z (UTC): Phase 10 WP3 completed: command-center UI now supports layer switching, replay controls, alert highlight panel, and video-slot placeholder abstraction with `/api/map/*` integration; gates passed (`ruff`, `mypy`, `pytest -q`).
+- 2026-02-25T03:40:43Z (UTC): Phase 10 closed as DONE (WP1-WP4 complete). Added `infra/scripts/demo_phase10_one_map.py`, generated `logs/phase-10-unified-map-situation-v1.md.report.md`, and passed full closeout gates (`ruff`, `mypy`, `pytest -q`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase10_one_map`); checkpoint moved to `phase-11-unified-task-center-workflow.md` (`READY`).
+- 2026-02-25T03:56:32Z (UTC): Phase 11 switched to `RUNNING` and completed P0 baseline (`11-WP1` task type/template center, `11-WP2` manual dispatch minimal chain, `11-WP3` core lifecycle state machine). Added `app/services/task_center_service.py`, `app/api/routers/task_center.py`, migration chain `202602240044/045/046`, and `tests/test_task_center.py`; Docker Compose checks passed (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`).
+- 2026-02-25T04:15:26Z (UTC): Phase 11 closed as DONE. Completed P1/P2 enhancement set (`auto-dispatch` scoring explainability, risk/checklist updates, attachment/comment collaboration), delivered `infra/scripts/demo_phase11_task_center.py`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase11_task_center`); checkpoint moved to `phase-12-airspace-compliance-safety-rails.md` (`READY`).
