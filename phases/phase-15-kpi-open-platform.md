@@ -49,16 +49,16 @@
 
 ## 8. Execution Progress
 
-- [ ] 15-WP1 KPI 指标模型与聚合
+- [x] 15-WP1 KPI 指标模型与聚合
   - 指标口径定义、聚合任务、查询 API
   - 热力图数据接口
-- [ ] 15-WP2 开放接口与安全治理
+- [x] 15-WP2 开放接口与安全治理
   - Webhook/Adapter 契约
   - API key/签名/审计策略
-- [ ] 15-WP3 外部系统联调与报告模板
+- [x] 15-WP3 外部系统联调与报告模板
   - 工单或资产系统联调样例
   - 月/季治理报告模板
-- [ ] 15-WP4 验收关账
+- [x] 15-WP4 验收关账
   - 演示脚本：`infra/scripts/demo_phase15_kpi_open_platform.py`
   - 报告：`logs/phase-15-kpi-open-platform.md.report.md`
   - 全门禁复验通过

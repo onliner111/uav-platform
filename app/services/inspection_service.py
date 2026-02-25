@@ -21,6 +21,7 @@ from app.domain.models import (
 from app.infra.db import get_engine
 from app.infra.events import event_bus
 from app.services.data_perimeter_service import DataPerimeterService
+from app.services.outcome_service import OutcomeService
 
 
 class InspectionError(Exception):
@@ -38,6 +39,7 @@ class ConflictError(InspectionError):
 class InspectionService:
     def __init__(self) -> None:
         self._data_perimeter = DataPerimeterService()
+        self._outcome = OutcomeService()
 
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
@@ -233,6 +235,11 @@ class InspectionService:
             "inspection.observation.created",
             tenant_id,
             {"task_id": task_id, "observation_id": observation.id, "severity": observation.severity},
+        )
+        _ = self._outcome.materialize_outcome_from_observation(
+            tenant_id,
+            viewer_user_id or "system",
+            observation.id,
         )
         return observation
 

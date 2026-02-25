@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routers import (
+    ai,
     alert,
     approval,
     asset,
@@ -17,8 +18,11 @@ from app.api.routers import (
     identity,
     incident,
     inspection,
+    kpi,
     map_router,
     mission,
+    open_platform,
+    outcomes,
     registry,
     reporting,
     task_center,
@@ -53,6 +57,7 @@ app.include_router(telemetry.ws_router, tags=["telemetry-ws"])
 app.include_router(command.router, prefix="/api/command", tags=["command"])
 app.include_router(compliance.router, prefix="/api/compliance", tags=["compliance"])
 app.include_router(alert.router, prefix="/api/alert", tags=["alert"])
+app.include_router(outcomes.router, prefix="/api/outcomes", tags=["outcomes"])
 app.include_router(map_router.router, prefix="/api/map", tags=["map"])
 app.include_router(task_center.router, prefix="/api/task-center", tags=["task-center"])
 app.include_router(inspection.router, prefix="/api/inspection", tags=["inspection"])
@@ -62,6 +67,9 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(dashboard.ws_router, tags=["dashboard-ws"])
 app.include_router(approval.router, prefix="/api/approvals", tags=["approvals"])
 app.include_router(reporting.router, prefix="/api/reporting", tags=["reporting"])
+app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(kpi.router, prefix="/api/kpi", tags=["kpi"])
+app.include_router(open_platform.router, prefix="/api/open-platform", tags=["open-platform"])
 app.include_router(tenant_export.router, prefix="/api", tags=["tenant-export"])
 app.include_router(tenant_purge.router, prefix="/api", tags=["tenant-purge"])
 app.include_router(ui.router, tags=["ui"])

@@ -877,6 +877,136 @@ class AlertSeverity(StrEnum):
     CRITICAL = "CRITICAL"
 
 
+class AlertPriority(StrEnum):
+    P1 = "P1"
+    P2 = "P2"
+    P3 = "P3"
+
+
+class AlertRouteStatus(StrEnum):
+    UNROUTED = "UNROUTED"
+    ROUTED = "ROUTED"
+
+
+class AlertRouteChannel(StrEnum):
+    IN_APP = "IN_APP"
+    EMAIL = "EMAIL"
+    SMS = "SMS"
+    WEBHOOK = "WEBHOOK"
+
+
+class AlertRouteDeliveryStatus(StrEnum):
+    SENT = "SENT"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+
+class AlertHandlingActionType(StrEnum):
+    ACK = "ACK"
+    DISPATCH = "DISPATCH"
+    VERIFY = "VERIFY"
+    REVIEW = "REVIEW"
+    CLOSE = "CLOSE"
+
+
+class RawDataType(StrEnum):
+    TELEMETRY = "TELEMETRY"
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+    DOCUMENT = "DOCUMENT"
+    LOG = "LOG"
+
+
+class OutcomeSourceType(StrEnum):
+    INSPECTION_OBSERVATION = "INSPECTION_OBSERVATION"
+    ALERT = "ALERT"
+    MANUAL = "MANUAL"
+
+
+class OutcomeType(StrEnum):
+    DEFECT = "DEFECT"
+    HIDDEN_RISK = "HIDDEN_RISK"
+    INCIDENT = "INCIDENT"
+    OTHER = "OTHER"
+
+
+class OutcomeStatus(StrEnum):
+    NEW = "NEW"
+    IN_REVIEW = "IN_REVIEW"
+    VERIFIED = "VERIFIED"
+    ARCHIVED = "ARCHIVED"
+
+
+class AiJobType(StrEnum):
+    SUMMARY = "SUMMARY"
+    SUGGESTION = "SUGGESTION"
+
+
+class AiTriggerMode(StrEnum):
+    MANUAL = "MANUAL"
+    SCHEDULED = "SCHEDULED"
+    NEAR_REALTIME = "NEAR_REALTIME"
+
+
+class AiJobStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+
+
+class AiRunStatus(StrEnum):
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
+class AiEvidenceType(StrEnum):
+    MODEL_CONFIG = "MODEL_CONFIG"
+    INPUT_SNAPSHOT = "INPUT_SNAPSHOT"
+    OUTPUT_SNAPSHOT = "OUTPUT_SNAPSHOT"
+    TRACE = "TRACE"
+
+
+class AiOutputReviewStatus(StrEnum):
+    PENDING_REVIEW = "PENDING_REVIEW"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    OVERRIDDEN = "OVERRIDDEN"
+
+
+class AiReviewActionType(StrEnum):
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
+    OVERRIDE = "OVERRIDE"
+
+
+class KpiWindowType(StrEnum):
+    DAILY = "DAILY"
+    WEEKLY = "WEEKLY"
+    MONTHLY = "MONTHLY"
+    QUARTERLY = "QUARTERLY"
+    CUSTOM = "CUSTOM"
+
+
+class KpiHeatmapSource(StrEnum):
+    OUTCOME = "OUTCOME"
+    ALERT = "ALERT"
+
+
+class OpenWebhookAuthType(StrEnum):
+    HMAC_SHA256 = "HMAC_SHA256"
+
+
+class OpenWebhookDeliveryStatus(StrEnum):
+    SENT = "SENT"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+
+class OpenAdapterIngressStatus(StrEnum):
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
 class AlertStatus(StrEnum):
     OPEN = "OPEN"
     ACKED = "ACKED"
@@ -885,13 +1015,19 @@ class AlertStatus(StrEnum):
 
 class AlertRecord(SQLModel, table=True):
     __tablename__ = "alerts"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alerts_tenant_id_id"),
+        Index("ix_alerts_tenant_id_id", "tenant_id", "id"),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     drone_id: str = Field(index=True)
     alert_type: AlertType = Field(index=True)
     severity: AlertSeverity = Field(index=True)
+    priority_level: AlertPriority = Field(default=AlertPriority.P3, index=True)
     status: AlertStatus = Field(default=AlertStatus.OPEN, index=True)
+    route_status: AlertRouteStatus = Field(default=AlertRouteStatus.UNROUTED, index=True)
     message: str
     detail: dict[str, Any] = Field(
         default_factory=dict,
@@ -903,6 +1039,429 @@ class AlertRecord(SQLModel, table=True):
     acked_at: datetime | None = Field(default=None, index=True)
     closed_by: str | None = Field(default=None, index=True)
     closed_at: datetime | None = Field(default=None, index=True)
+    routed_at: datetime | None = Field(default=None, index=True)
+
+
+class AlertRoutingRule(SQLModel, table=True):
+    __tablename__ = "alert_routing_rules"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_routing_rules_tenant_id_id"),
+        Index("ix_alert_routing_rules_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_routing_rules_tenant_priority", "tenant_id", "priority_level"),
+        Index("ix_alert_routing_rules_tenant_type", "tenant_id", "alert_type"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    priority_level: AlertPriority = Field(index=True)
+    alert_type: AlertType | None = Field(default=None, index=True)
+    channel: AlertRouteChannel = Field(default=AlertRouteChannel.IN_APP, index=True)
+    target: str = Field(max_length=200)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AlertRouteLog(SQLModel, table=True):
+    __tablename__ = "alert_route_logs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_route_logs_tenant_id_id"),
+        Index("ix_alert_route_logs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_route_logs_tenant_alert", "tenant_id", "alert_id"),
+        Index("ix_alert_route_logs_tenant_priority", "tenant_id", "priority_level"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    alert_id: str = Field(foreign_key="alerts.id", index=True)
+    rule_id: str | None = Field(default=None, foreign_key="alert_routing_rules.id", index=True)
+    priority_level: AlertPriority = Field(index=True)
+    channel: AlertRouteChannel = Field(default=AlertRouteChannel.IN_APP, index=True)
+    target: str = Field(max_length=200)
+    delivery_status: AlertRouteDeliveryStatus = Field(default=AlertRouteDeliveryStatus.SENT, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AlertHandlingAction(SQLModel, table=True):
+    __tablename__ = "alert_handling_actions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_handling_actions_tenant_id_id"),
+        Index("ix_alert_handling_actions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_handling_actions_tenant_alert", "tenant_id", "alert_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    alert_id: str = Field(foreign_key="alerts.id", index=True)
+    action_type: AlertHandlingActionType = Field(index=True)
+    note: str | None = None
+    actor_id: str | None = Field(default=None, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class RawDataCatalogRecord(SQLModel, table=True):
+    __tablename__ = "raw_data_catalog_records"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_raw_data_catalog_records_tenant_id_id"),
+        Index("ix_raw_data_catalog_records_tenant_id_id", "tenant_id", "id"),
+        Index("ix_raw_data_catalog_records_tenant_type", "tenant_id", "data_type"),
+        Index("ix_raw_data_catalog_records_tenant_task", "tenant_id", "task_id"),
+        Index("ix_raw_data_catalog_records_tenant_mission", "tenant_id", "mission_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_id: str | None = Field(default=None, foreign_key="inspection_tasks.id", index=True)
+    mission_id: str | None = Field(default=None, foreign_key="missions.id", index=True)
+    data_type: RawDataType = Field(index=True)
+    source_uri: str
+    checksum: str | None = Field(default=None, max_length=200, index=True)
+    meta: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    captured_at: datetime = Field(default_factory=now_utc, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OutcomeCatalogRecord(SQLModel, table=True):
+    __tablename__ = "outcome_catalog_records"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_outcome_catalog_records_tenant_id_id"),
+        Index("ix_outcome_catalog_records_tenant_id_id", "tenant_id", "id"),
+        Index("ix_outcome_catalog_records_tenant_status", "tenant_id", "status"),
+        Index("ix_outcome_catalog_records_tenant_type", "tenant_id", "outcome_type"),
+        Index("ix_outcome_catalog_records_tenant_task", "tenant_id", "task_id"),
+        Index("ix_outcome_catalog_records_tenant_mission", "tenant_id", "mission_id"),
+        Index("ix_outcome_catalog_records_tenant_source", "tenant_id", "source_type", "source_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_id: str | None = Field(default=None, foreign_key="inspection_tasks.id", index=True)
+    mission_id: str | None = Field(default=None, foreign_key="missions.id", index=True)
+    source_type: OutcomeSourceType = Field(index=True)
+    source_id: str = Field(index=True)
+    outcome_type: OutcomeType = Field(index=True)
+    status: OutcomeStatus = Field(default=OutcomeStatus.NEW, index=True)
+    point_lat: float | None = Field(default=None)
+    point_lon: float | None = Field(default=None)
+    alt_m: float | None = Field(default=None)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    reviewed_by: str | None = Field(default=None, index=True)
+    reviewed_at: datetime | None = Field(default=None, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AiAnalysisJob(SQLModel, table=True):
+    __tablename__ = "ai_analysis_jobs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_analysis_jobs_tenant_id_id"),
+        Index("ix_ai_analysis_jobs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_analysis_jobs_tenant_task", "tenant_id", "task_id"),
+        Index("ix_ai_analysis_jobs_tenant_mission", "tenant_id", "mission_id"),
+        Index("ix_ai_analysis_jobs_tenant_topic", "tenant_id", "topic"),
+        Index("ix_ai_analysis_jobs_tenant_type", "tenant_id", "job_type"),
+        Index("ix_ai_analysis_jobs_tenant_status", "tenant_id", "status"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_id: str | None = Field(default=None, foreign_key="inspection_tasks.id", index=True)
+    mission_id: str | None = Field(default=None, foreign_key="missions.id", index=True)
+    topic: str | None = Field(default=None, max_length=120, index=True)
+    job_type: AiJobType = Field(default=AiJobType.SUMMARY, index=True)
+    trigger_mode: AiTriggerMode = Field(default=AiTriggerMode.MANUAL, index=True)
+    status: AiJobStatus = Field(default=AiJobStatus.ACTIVE, index=True)
+    model_provider: str = Field(default="builtin", max_length=80)
+    model_name: str = Field(default="uav-assistant-lite", max_length=120)
+    model_version: str = Field(default="phase14.v1", max_length=120)
+    threshold_config: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    input_config: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AiAnalysisRun(SQLModel, table=True):
+    __tablename__ = "ai_analysis_runs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_analysis_runs_tenant_id_id"),
+        Index("ix_ai_analysis_runs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_analysis_runs_tenant_job", "tenant_id", "job_id"),
+        Index("ix_ai_analysis_runs_tenant_status", "tenant_id", "status"),
+        Index("ix_ai_analysis_runs_tenant_retry_of", "tenant_id", "retry_of_run_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    job_id: str = Field(foreign_key="ai_analysis_jobs.id", index=True)
+    retry_of_run_id: str | None = Field(default=None, foreign_key="ai_analysis_runs.id", index=True)
+    retry_count: int = Field(default=0, ge=0)
+    status: AiRunStatus = Field(default=AiRunStatus.RUNNING, index=True)
+    trigger_mode: AiTriggerMode = Field(default=AiTriggerMode.MANUAL, index=True)
+    input_hash: str | None = Field(default=None, max_length=200, index=True)
+    output_hash: str | None = Field(default=None, max_length=200, index=True)
+    metrics: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    error_message: str | None = None
+    started_at: datetime = Field(default_factory=now_utc, index=True)
+    finished_at: datetime | None = Field(default=None, index=True)
+    triggered_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AiAnalysisOutput(SQLModel, table=True):
+    __tablename__ = "ai_analysis_outputs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_analysis_outputs_tenant_id_id"),
+        Index("ix_ai_analysis_outputs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_analysis_outputs_tenant_job", "tenant_id", "job_id"),
+        Index("ix_ai_analysis_outputs_tenant_run", "tenant_id", "run_id"),
+        Index("ix_ai_analysis_outputs_tenant_review", "tenant_id", "review_status"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    job_id: str = Field(foreign_key="ai_analysis_jobs.id", index=True)
+    run_id: str = Field(foreign_key="ai_analysis_runs.id", index=True)
+    summary_text: str = Field(default="")
+    suggestion_text: str = Field(default="")
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    control_allowed: bool = Field(default=False, index=True)
+    review_status: AiOutputReviewStatus = Field(default=AiOutputReviewStatus.PENDING_REVIEW, index=True)
+    reviewed_by: str | None = Field(default=None, index=True)
+    reviewed_at: datetime | None = Field(default=None, index=True)
+    review_note: str | None = None
+    override_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AiEvidenceRecord(SQLModel, table=True):
+    __tablename__ = "ai_evidence_records"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_evidence_records_tenant_id_id"),
+        Index("ix_ai_evidence_records_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_evidence_records_tenant_run", "tenant_id", "run_id"),
+        Index("ix_ai_evidence_records_tenant_output", "tenant_id", "output_id"),
+        Index("ix_ai_evidence_records_tenant_type", "tenant_id", "evidence_type"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    run_id: str = Field(foreign_key="ai_analysis_runs.id", index=True)
+    output_id: str | None = Field(default=None, foreign_key="ai_analysis_outputs.id", index=True)
+    evidence_type: AiEvidenceType = Field(index=True)
+    content_hash: str = Field(max_length=200, index=True)
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AiOutputReviewAction(SQLModel, table=True):
+    __tablename__ = "ai_output_review_actions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_output_review_actions_tenant_id_id"),
+        Index("ix_ai_output_review_actions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_output_review_actions_tenant_output", "tenant_id", "output_id"),
+        Index("ix_ai_output_review_actions_tenant_run", "tenant_id", "run_id"),
+        Index("ix_ai_output_review_actions_tenant_action", "tenant_id", "action_type"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    output_id: str = Field(foreign_key="ai_analysis_outputs.id", index=True)
+    run_id: str = Field(foreign_key="ai_analysis_runs.id", index=True)
+    action_type: AiReviewActionType = Field(index=True)
+    note: str | None = None
+    actor_id: str = Field(index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class KpiSnapshotRecord(SQLModel, table=True):
+    __tablename__ = "kpi_snapshot_records"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_kpi_snapshot_records_tenant_id_id"),
+        Index("ix_kpi_snapshot_records_tenant_id_id", "tenant_id", "id"),
+        Index("ix_kpi_snapshot_records_tenant_window", "tenant_id", "window_type"),
+        Index("ix_kpi_snapshot_records_tenant_period", "tenant_id", "from_ts", "to_ts"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    window_type: KpiWindowType = Field(default=KpiWindowType.CUSTOM, index=True)
+    from_ts: datetime = Field(index=True)
+    to_ts: datetime = Field(index=True)
+    metrics: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    generated_by: str = Field(index=True)
+    generated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class KpiHeatmapBinRecord(SQLModel, table=True):
+    __tablename__ = "kpi_heatmap_bin_records"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_kpi_heatmap_bin_records_tenant_id_id"),
+        Index("ix_kpi_heatmap_bin_records_tenant_id_id", "tenant_id", "id"),
+        Index("ix_kpi_heatmap_bin_records_tenant_snapshot", "tenant_id", "snapshot_id"),
+        Index("ix_kpi_heatmap_bin_records_tenant_source", "tenant_id", "source"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    snapshot_id: str = Field(foreign_key="kpi_snapshot_records.id", index=True)
+    source: KpiHeatmapSource = Field(index=True)
+    grid_lat: float = Field(index=True)
+    grid_lon: float = Field(index=True)
+    count: int = Field(default=0, ge=0)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OpenPlatformCredential(SQLModel, table=True):
+    __tablename__ = "open_platform_credentials"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_open_platform_credentials_tenant_id_id"),
+        UniqueConstraint("tenant_id", "key_id", name="uq_open_platform_credentials_tenant_key"),
+        Index("ix_open_platform_credentials_tenant_id_id", "tenant_id", "id"),
+        Index("ix_open_platform_credentials_tenant_key", "tenant_id", "key_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    key_id: str = Field(max_length=120, index=True)
+    api_key: str = Field(max_length=200, index=True)
+    signing_secret: str = Field(max_length=200)
+    is_active: bool = Field(default=True, index=True)
+    created_by: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OpenWebhookEndpoint(SQLModel, table=True):
+    __tablename__ = "open_webhook_endpoints"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_open_webhook_endpoints_tenant_id_id"),
+        Index("ix_open_webhook_endpoints_tenant_id_id", "tenant_id", "id"),
+        Index("ix_open_webhook_endpoints_tenant_event", "tenant_id", "event_type"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=120, index=True)
+    endpoint_url: str
+    event_type: str = Field(max_length=120, index=True)
+    credential_id: str | None = Field(default=None, foreign_key="open_platform_credentials.id", index=True)
+    auth_type: OpenWebhookAuthType = Field(default=OpenWebhookAuthType.HMAC_SHA256, index=True)
+    is_active: bool = Field(default=True, index=True)
+    extra_headers: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OpenWebhookDelivery(SQLModel, table=True):
+    __tablename__ = "open_webhook_deliveries"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_open_webhook_deliveries_tenant_id_id"),
+        Index("ix_open_webhook_deliveries_tenant_id_id", "tenant_id", "id"),
+        Index("ix_open_webhook_deliveries_tenant_endpoint", "tenant_id", "endpoint_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    endpoint_id: str = Field(foreign_key="open_webhook_endpoints.id", index=True)
+    event_type: str = Field(max_length=120, index=True)
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    signature: str | None = Field(default=None, max_length=200, index=True)
+    request_headers: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    status: OpenWebhookDeliveryStatus = Field(default=OpenWebhookDeliveryStatus.SENT, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OpenAdapterIngressEvent(SQLModel, table=True):
+    __tablename__ = "open_adapter_ingress_events"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_open_adapter_ingress_events_tenant_id_id"),
+        Index("ix_open_adapter_ingress_events_tenant_id_id", "tenant_id", "id"),
+        Index("ix_open_adapter_ingress_events_tenant_key", "tenant_id", "key_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    key_id: str = Field(max_length=120, index=True)
+    event_type: str = Field(max_length=120, index=True)
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    signature_valid: bool = Field(default=False, index=True)
+    status: OpenAdapterIngressStatus = Field(default=OpenAdapterIngressStatus.ACCEPTED, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class Command(BaseModel):
@@ -1573,7 +2132,9 @@ class AlertRead(ORMReadModel):
     drone_id: str
     alert_type: AlertType
     severity: AlertSeverity
+    priority_level: AlertPriority
     status: AlertStatus
+    route_status: AlertRouteStatus
     message: str
     detail: dict[str, Any]
     first_seen_at: datetime
@@ -1582,10 +2143,368 @@ class AlertRead(ORMReadModel):
     acked_at: datetime | None
     closed_by: str | None
     closed_at: datetime | None
+    routed_at: datetime | None
 
 
 class AlertActionRequest(BaseModel):
     comment: str | None = None
+
+
+class AlertHandlingActionCreate(BaseModel):
+    action_type: AlertHandlingActionType
+    note: str | None = None
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AlertHandlingActionRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    alert_id: str
+    action_type: AlertHandlingActionType
+    note: str | None
+    actor_id: str | None
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class AlertReviewRead(BaseModel):
+    alert: AlertRead
+    routes: list[AlertRouteLogRead]
+    actions: list[AlertHandlingActionRead]
+
+
+class AlertRoutingRuleCreate(BaseModel):
+    priority_level: AlertPriority
+    alert_type: AlertType | None = None
+    channel: AlertRouteChannel = AlertRouteChannel.IN_APP
+    target: str
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AlertRoutingRuleRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    priority_level: AlertPriority
+    alert_type: AlertType | None
+    channel: AlertRouteChannel
+    target: str
+    is_active: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AlertRouteLogRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    alert_id: str
+    rule_id: str | None
+    priority_level: AlertPriority
+    channel: AlertRouteChannel
+    target: str
+    delivery_status: AlertRouteDeliveryStatus
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class RawDataCatalogCreate(BaseModel):
+    task_id: str | None = None
+    mission_id: str | None = None
+    data_type: RawDataType
+    source_uri: str
+    checksum: str | None = None
+    meta: dict[str, Any] = PydanticField(default_factory=dict)
+    captured_at: datetime = PydanticField(default_factory=now_utc)
+
+
+class RawDataCatalogRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_id: str | None
+    mission_id: str | None
+    data_type: RawDataType
+    source_uri: str
+    checksum: str | None
+    meta: dict[str, Any]
+    captured_at: datetime
+    created_by: str
+    created_at: datetime
+
+
+class OutcomeCatalogCreate(BaseModel):
+    task_id: str | None = None
+    mission_id: str | None = None
+    source_type: OutcomeSourceType = OutcomeSourceType.MANUAL
+    source_id: str
+    outcome_type: OutcomeType
+    status: OutcomeStatus = OutcomeStatus.NEW
+    point_lat: float | None = None
+    point_lon: float | None = None
+    alt_m: float | None = None
+    confidence: float | None = PydanticField(default=None, ge=0, le=1)
+    payload: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class OutcomeCatalogStatusUpdateRequest(BaseModel):
+    status: OutcomeStatus
+    note: str | None = None
+
+
+class OutcomeCatalogRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_id: str | None
+    mission_id: str | None
+    source_type: OutcomeSourceType
+    source_id: str
+    outcome_type: OutcomeType
+    status: OutcomeStatus
+    point_lat: float | None
+    point_lon: float | None
+    alt_m: float | None
+    confidence: float | None
+    payload: dict[str, Any]
+    reviewed_by: str | None
+    reviewed_at: datetime | None
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiAnalysisJobCreate(BaseModel):
+    task_id: str | None = None
+    mission_id: str | None = None
+    topic: str | None = None
+    job_type: AiJobType = AiJobType.SUMMARY
+    trigger_mode: AiTriggerMode = AiTriggerMode.MANUAL
+    model_provider: str = "builtin"
+    model_name: str = "uav-assistant-lite"
+    model_version: str = "phase14.v1"
+    threshold_config: dict[str, Any] = PydanticField(default_factory=dict)
+    input_config: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AiAnalysisJobRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    task_id: str | None
+    mission_id: str | None
+    topic: str | None
+    job_type: AiJobType
+    trigger_mode: AiTriggerMode
+    status: AiJobStatus
+    model_provider: str
+    model_name: str
+    model_version: str
+    threshold_config: dict[str, Any]
+    input_config: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiAnalysisRunTriggerRequest(BaseModel):
+    force_fail: bool = False
+    trigger_mode: AiTriggerMode | None = None
+    context: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AiAnalysisRunRetryRequest(BaseModel):
+    force_fail: bool = False
+    context: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AiAnalysisRunRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    job_id: str
+    retry_of_run_id: str | None
+    retry_count: int
+    status: AiRunStatus
+    trigger_mode: AiTriggerMode
+    input_hash: str | None
+    output_hash: str | None
+    metrics: dict[str, Any]
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+    triggered_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiAnalysisOutputRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    job_id: str
+    run_id: str
+    summary_text: str
+    suggestion_text: str
+    payload: dict[str, Any]
+    control_allowed: bool
+    review_status: AiOutputReviewStatus
+    reviewed_by: str | None
+    reviewed_at: datetime | None
+    review_note: str | None
+    override_payload: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiEvidenceRecordRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    run_id: str
+    output_id: str | None
+    evidence_type: AiEvidenceType
+    content_hash: str
+    payload: dict[str, Any]
+    created_at: datetime
+
+
+class AiOutputReviewActionCreate(BaseModel):
+    action_type: AiReviewActionType
+    note: str | None = None
+    override_payload: dict[str, Any] = PydanticField(default_factory=dict)
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AiOutputReviewActionRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    output_id: str
+    run_id: str
+    action_type: AiReviewActionType
+    note: str | None
+    actor_id: str
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class AiOutputReviewRead(BaseModel):
+    output: AiAnalysisOutputRead
+    actions: list[AiOutputReviewActionRead]
+    evidences: list[AiEvidenceRecordRead]
+
+
+class KpiSnapshotRecomputeRequest(BaseModel):
+    from_ts: datetime
+    to_ts: datetime
+    window_type: KpiWindowType = KpiWindowType.CUSTOM
+
+
+class KpiSnapshotRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    window_type: KpiWindowType
+    from_ts: datetime
+    to_ts: datetime
+    metrics: dict[str, Any]
+    generated_by: str
+    generated_at: datetime
+
+
+class KpiHeatmapBinRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    snapshot_id: str
+    source: KpiHeatmapSource
+    grid_lat: float
+    grid_lon: float
+    count: int
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class KpiGovernanceExportRequest(BaseModel):
+    title: str = "UAV Governance Monthly Report"
+    window_type: KpiWindowType = KpiWindowType.MONTHLY
+    from_ts: datetime | None = None
+    to_ts: datetime | None = None
+
+
+class KpiGovernanceExportRead(BaseModel):
+    file_path: str
+
+
+class OpenPlatformCredentialCreate(BaseModel):
+    key_id: str | None = None
+    api_key: str | None = None
+    signing_secret: str | None = None
+    is_active: bool = True
+
+
+class OpenPlatformCredentialRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    key_id: str
+    api_key: str
+    signing_secret: str
+    is_active: bool
+    created_by: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OpenWebhookEndpointCreate(BaseModel):
+    name: str
+    endpoint_url: str
+    event_type: str
+    credential_id: str | None = None
+    auth_type: OpenWebhookAuthType = OpenWebhookAuthType.HMAC_SHA256
+    is_active: bool = True
+    extra_headers: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class OpenWebhookEndpointRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    endpoint_url: str
+    event_type: str
+    credential_id: str | None
+    auth_type: OpenWebhookAuthType
+    is_active: bool
+    extra_headers: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class OpenWebhookDispatchRequest(BaseModel):
+    payload: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class OpenWebhookDeliveryRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    endpoint_id: str
+    event_type: str
+    payload: dict[str, Any]
+    signature: str | None
+    request_headers: dict[str, Any]
+    status: OpenWebhookDeliveryStatus
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class OpenAdapterIngressRequest(BaseModel):
+    event_type: str
+    payload: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class OpenAdapterIngressRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    key_id: str
+    event_type: str
+    payload: dict[str, Any]
+    signature_valid: bool
+    status: OpenAdapterIngressStatus
+    detail: dict[str, Any]
+    created_at: datetime
 
 
 class InspectionTaskStatus(StrEnum):
@@ -2111,3 +3030,7 @@ class DeviceUtilizationRead(BaseModel):
 
 class ReportingExportRequest(BaseModel):
     title: str = "Quarterly UAV Governance Report"
+    task_id: str | None = None
+    from_ts: datetime | None = None
+    to_ts: datetime | None = None
+    topic: str | None = None

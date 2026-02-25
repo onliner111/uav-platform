@@ -6,18 +6,18 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-13-data-outcomes-alert-closure.md (READY; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 12 closed as DONE (`12-WP1`..`12-WP4`)
-- Next Target: execute phase-13 P0 (`13-WP1/13-WP2-on-site-closure`)
+- Current Phase: phase-15-kpi-open-platform.md (DONE; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 15 closed as DONE (`15-WP1`..`15-WP4`)
+- Next Target: all indexed phases completed; waiting for next roadmap extension
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-25T04:46:32Z
+> Last verified at (UTC): 2026-02-25T06:03:33Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> WIP note (2026-02-25T04:46:32Z): Phase 12 closed as DONE after completing guardrails/checklist/compliance interception and WP4 closeout (`demo_phase12_airspace_compliance` + full gate rerun).
+> WIP note (2026-02-25T06:03:33Z): Phase 15 closed as DONE after completing KPI + open-platform governance and WP4 closeout (`demo_phase15_kpi_open_platform` + full gate rerun).
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
-- mypy: PASS (60 source files)
+- mypy: PASS (71 source files)
 - pytest: PASS (`docker compose ... app pytest -q`)
 - e2e: PASS (`demo_e2e.py` + `verify_smoke.py`)
 - phase08 integration: PASS (`verify_phase08_integration.py`)
@@ -65,6 +65,9 @@
 - phase-10-unified-map-situation-v1.md: DONE
 - phase-11-unified-task-center-workflow.md: DONE
 - phase-12-airspace-compliance-safety-rails.md: DONE
+- phase-13-data-outcomes-alert-closure.md: DONE
+- phase-14-ai-assistant-evidence-chain.md: DONE
+- phase-15-kpi-open-platform.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -82,12 +85,18 @@
 - 10-WP1/WP2/WP3 artifacts are present: `app/services/map_service.py`, `app/api/routers/map_router.py`, map DTOs in `app/domain/models.py`, command-center one-map UI updates (`app/web/templates/command_center.html`, `app/web/static/command_center.js`), and regression coverage `tests/test_map.py`.
 - 11-WP1/WP2/WP3 artifacts are present: `app/services/task_center_service.py`, `app/api/routers/task_center.py`, task-center DTOs/models in `app/domain/models.py`, migration chain `202602240044/045/046`, regression coverage `tests/test_task_center.py`, and phase demo `infra/scripts/demo_phase11_task_center.py`.
 - 12-WP1/WP2/WP3 artifacts are present: `app/services/compliance_service.py`, `app/api/routers/compliance.py`, mission/command compliance interception updates (`app/services/mission_service.py`, `app/services/command_service.py`, `app/api/routers/mission.py`, `app/api/routers/command.py`), migration chain `202602250047/048/049`, regression coverage `tests/test_compliance.py`, and phase demo `infra/scripts/demo_phase12_airspace_compliance.py`.
+- 13-WP1/WP2/WP3 artifacts are present: `app/services/outcome_service.py`, `app/api/routers/outcomes.py`, alert routing/action-chain updates (`app/services/alert_service.py`, `app/api/routers/alert.py`), reporting export scope enhancement (`app/services/reporting_service.py`), migration chain `202602250050/051/052/053/054/055`, regression coverage `tests/test_outcomes.py` + `tests/test_reporting.py`, and phase demo `infra/scripts/demo_phase13_data_alert_closure.py`.
+- 14-WP1/WP2/WP3 artifacts are present: `app/services/ai_service.py`, `app/api/routers/ai.py`, AI models/DTOs in `app/domain/models.py`, migration chain `202602250056/057/058`, regression coverage `tests/test_ai_assistant.py`, and phase demo `infra/scripts/demo_phase14_ai_evidence.py`.
+- 15-WP1/WP2/WP3 artifacts are present: `app/services/kpi_service.py`, `app/services/open_platform_service.py`, KPI/open-platform APIs (`app/api/routers/kpi.py`, `app/api/routers/open_platform.py`), migration chain `202602250059/060/061`, regression coverage `tests/test_kpi_open_platform.py`, and phase demo `infra/scripts/demo_phase15_kpi_open_platform.py`.
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
 - 2026-02-25T04:15:26Z (UTC): Phase 11 closed as DONE. Completed P1/P2 capabilities (auto-dispatch scoring explainability, risk/checklist update, attachment/comment collaboration), delivered demo script `infra/scripts/demo_phase11_task_center.py`, generated report `logs/phase-11-unified-task-center-workflow.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase11_task_center`).
 - 2026-02-25T04:46:32Z (UTC): Phase 12 closed as DONE. Completed airspace zoning + mission plan guardrails, preflight checklist lifecycle and run-gate enforcement, and command pre-dispatch interception with standardized reason codes; delivered demo script `infra/scripts/demo_phase12_airspace_compliance.py`, generated report `logs/phase-12-airspace-compliance-safety-rails.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase12_airspace_compliance`).
+- 2026-02-25T05:20:21Z (UTC): Phase 13 closed as DONE. Completed outcomes/raw catalog and structured outcome state machine, alert priority/routing with external adapter placeholders, handling action chain + review aggregation, and reporting export scope enhancement (`task_id`/`from_ts`/`to_ts`/`topic`); delivered demo script `infra/scripts/demo_phase13_data_alert_closure.py`, generated report `logs/phase-13-data-outcomes-alert-closure.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase13_data_alert_closure`).
+- 2026-02-25T05:36:23Z (UTC): Phase 14 closed as DONE. Completed AI analysis job/run/output/evidence/review-action chain, summary/suggestion generation with retry path, human review approve/reject/override flow, and non-control guardrail enforcement (`control_allowed=false`); delivered demo script `infra/scripts/demo_phase14_ai_evidence.py`, generated report `logs/phase-14-ai-assistant-evidence-chain.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase14_ai_evidence`).
+- 2026-02-25T06:03:33Z (UTC): Phase 15 closed as DONE. Completed KPI snapshot/heatmap aggregation chain, open-platform credential/webhook/adapter signature governance, governance monthly/quarterly export template, and external integration sample flow; delivered demo script `infra/scripts/demo_phase15_kpi_open_platform.py`, generated report `logs/phase-15-kpi-open-platform.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase15_kpi_open_platform`).
 - 2026-02-25T03:56:32Z (UTC): Phase 11 moved to RUNNING and delivered P0 baseline (`11-WP1`, `11-WP2` manual dispatch minimal chain, `11-WP3` core lifecycle state machine). Added task-center domain/service/router/migrations (`202602240044/045/046`) and regression coverage (`tests/test_task_center.py`). Verification passed via Docker Compose (`ruff check app tests infra/scripts`, `mypy app`, `pytest -q`, `alembic upgrade head`).
 - 2026-02-25T03:40:43Z (UTC): Phase 10 closed as DONE. Completed WP4 closeout with acceptance demo script `infra/scripts/demo_phase10_one_map.py` and report `logs/phase-10-unified-map-situation-v1.md.report.md`; full gate chain passed (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase10_one_map`). Checkpoint advanced to `phase-11-unified-task-center-workflow.md` with `READY`.
 - 2026-02-25T03:36:43Z (UTC): Phase 10 WP3 completed. Enhanced `/ui/command-center` with layer toggles, track replay controls, alert highlight panel, and video-slot placeholder abstraction; wired UI to `/api/map/*` while keeping `ws/dashboard` stats stream. Verification passed via Docker Compose (`ruff check app tests infra/scripts`, `mypy app`, `pytest -q`).

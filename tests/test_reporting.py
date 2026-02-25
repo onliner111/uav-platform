@@ -82,6 +82,33 @@ def _create_mission(client: TestClient, token: str, name: str) -> str:
     return response.json()["id"]
 
 
+def _create_template(client: TestClient, token: str, name: str) -> str:
+    response = client.post(
+        "/api/inspection/templates",
+        json={"name": name, "category": "reporting", "description": "reporting", "is_active": True},
+        headers=_auth_header(token),
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def _create_task(client: TestClient, token: str, template_id: str, name: str, mission_id: str | None = None) -> str:
+    response = client.post(
+        "/api/inspection/tasks",
+        json={
+            "name": name,
+            "template_id": template_id,
+            "mission_id": mission_id,
+            "area_geom": "POLYGON((114.30 30.58,114.31 30.58,114.31 30.59,114.30 30.59,114.30 30.58))",
+            "priority": 3,
+            "status": "SCHEDULED",
+        },
+        headers=_auth_header(token),
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 def test_reporting_overview_is_tenant_scoped(reporting_client: TestClient) -> None:
     tenant_a = _create_tenant(reporting_client, "reporting-scope-a")
     tenant_b = _create_tenant(reporting_client, "reporting-scope-b")
@@ -108,3 +135,66 @@ def test_reporting_overview_is_tenant_scoped(reporting_client: TestClient) -> No
     assert body_b["inspections_total"] == 0
     assert body_a["defects_total"] == 0
     assert body_b["defects_total"] == 0
+
+
+def test_reporting_export_supports_task_time_topic_scope(reporting_client: TestClient) -> None:
+    tenant_id = _create_tenant(reporting_client, "reporting-export-scope")
+    _bootstrap_admin(reporting_client, tenant_id, "admin", "admin-pass")
+    token = _login(reporting_client, tenant_id, "admin", "admin-pass")
+
+    mission_id = _create_mission(reporting_client, token, "reporting-mission")
+    template_id = _create_template(reporting_client, token, "reporting-template")
+    task_id = _create_task(reporting_client, token, template_id, "reporting-task", mission_id=mission_id)
+
+    obs_resp = reporting_client.post(
+        f"/api/inspection/tasks/{task_id}/observations",
+        json={
+            "position_lat": 30.5801,
+            "position_lon": 114.3001,
+            "alt_m": 50.0,
+            "item_code": "RPT-1",
+            "severity": 2,
+            "note": "reporting observation",
+            "confidence": 0.9,
+        },
+        headers=_auth_header(token),
+    )
+    assert obs_resp.status_code == 201
+
+    ingest_resp = reporting_client.post(
+        "/api/telemetry/ingest",
+        json={
+            "tenant_id": "spoofed",
+            "drone_id": "reporting-drone",
+            "position": {"lat": 30.12, "lon": 114.45, "alt_m": 120.0},
+            "battery": {"percent": 10.0},
+            "link": {"latency_ms": 50},
+            "mode": "AUTO",
+            "health": {"low_battery": True},
+        },
+        headers=_auth_header(token),
+    )
+    assert ingest_resp.status_code == 200
+
+    alerts_resp = reporting_client.get("/api/alert/alerts", headers=_auth_header(token))
+    assert alerts_resp.status_code == 200
+    alert_id = alerts_resp.json()[0]["id"]
+    ack_resp = reporting_client.post(
+        f"/api/alert/alerts/{alert_id}/ack",
+        json={"comment": "for reporting export"},
+        headers=_auth_header(token),
+    )
+    assert ack_resp.status_code == 200
+
+    export_resp = reporting_client.post(
+        "/api/reporting/export",
+        json={"title": "Phase13 Report", "task_id": task_id, "topic": "other"},
+        headers=_auth_header(token),
+    )
+    assert export_resp.status_code == 200
+    export_path = Path(export_resp.json()["file_path"])
+    assert export_path.exists()
+    content = export_path.read_bytes()
+    assert b"outcomes_total=" in content
+    assert b"alerts_total=" in content
+    assert b"alert_actions_total=" in content

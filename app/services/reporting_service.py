@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from sqlmodel import Session, select
 
 from app.domain.models import (
+    AlertHandlingAction,
+    AlertRecord,
     Defect,
     DefectStatus,
     DeviceUtilizationRead,
     Drone,
     InspectionTask,
     Mission,
+    OutcomeCatalogRecord,
     ReportingClosureRateRead,
     ReportingExportRequest,
     ReportingOverviewRead,
@@ -92,16 +96,64 @@ class ReportingService:
     ) -> str:
         overview = self.overview(tenant_id, viewer_user_id=viewer_user_id)
         closure = self.closure_rate(tenant_id, viewer_user_id=viewer_user_id)
+        with self._session() as session:
+            outcomes = list(
+                session.exec(select(OutcomeCatalogRecord).where(OutcomeCatalogRecord.tenant_id == tenant_id)).all()
+            )
+            alerts = list(session.exec(select(AlertRecord).where(AlertRecord.tenant_id == tenant_id)).all())
+            actions = list(
+                session.exec(select(AlertHandlingAction).where(AlertHandlingAction.tenant_id == tenant_id)).all()
+            )
+
+        if payload.task_id is not None:
+            outcomes = [item for item in outcomes if item.task_id == payload.task_id]
+
+        def _within(ts: datetime) -> bool:
+            if payload.from_ts is not None and ts < payload.from_ts:
+                return False
+            return not (payload.to_ts is not None and ts > payload.to_ts)
+
+        outcomes = [item for item in outcomes if _within(item.created_at)]
+        alerts = [item for item in alerts if _within(item.first_seen_at)]
+        actions = [item for item in actions if _within(item.created_at)]
+
+        if payload.topic:
+            topic = payload.topic.strip().lower()
+            outcomes = [
+                item
+                for item in outcomes
+                if topic in item.outcome_type.value.lower() or topic in str(item.payload).lower()
+            ]
+            alerts = [
+                item
+                for item in alerts
+                if topic in item.alert_type.value.lower()
+                or topic in item.message.lower()
+                or topic in str(item.detail).lower()
+            ]
+            actions = [
+                item
+                for item in actions
+                if topic in item.action_type.value.lower() or topic in str(item.note or "").lower()
+            ]
+
         export_dir = Path("logs") / "exports"
         export_dir.mkdir(parents=True, exist_ok=True)
         output_file = export_dir / f"report_{tenant_id}.pdf"
         text = (
             f"{payload.title}\n"
+            f"task_id={payload.task_id or ''}\n"
+            f"from_ts={payload.from_ts.isoformat() if payload.from_ts else ''}\n"
+            f"to_ts={payload.to_ts.isoformat() if payload.to_ts else ''}\n"
+            f"topic={payload.topic or ''}\n"
             f"missions_total={overview.missions_total}\n"
             f"inspections_total={overview.inspections_total}\n"
             f"defects_total={overview.defects_total}\n"
             f"defects_closed={overview.defects_closed}\n"
             f"closure_rate={closure.closure_rate:.4f}\n"
+            f"outcomes_total={len(outcomes)}\n"
+            f"alerts_total={len(alerts)}\n"
+            f"alert_actions_total={len(actions)}\n"
         )
         self._write_minimal_pdf(output_file, text)
         return str(output_file)

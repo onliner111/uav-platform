@@ -49,16 +49,16 @@
 
 ## 8. Execution Progress
 
-- [ ] 14-WP1 AI 任务与证据链建模
+- [x] 14-WP1 AI 任务与证据链建模
   - AI job/run/output/evidence 模型
   - 租户与数据边界约束
-- [ ] 14-WP2 摘要与建议流水线
+- [x] 14-WP2 摘要与建议流水线
   - 离线/准实时处理流程
   - 结果持久化与重试机制
-- [ ] 14-WP3 人审覆写与审计
+- [x] 14-WP3 人审覆写与审计
   - 审核/驳回/覆写 API
   - 审计明细与责任追踪
-- [ ] 14-WP4 验收关账
+- [x] 14-WP4 验收关账
   - 演示脚本：`infra/scripts/demo_phase14_ai_evidence.py`
   - 报告：`logs/phase-14-ai-assistant-evidence-chain.md.report.md`
   - 全门禁复验通过

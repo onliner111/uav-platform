@@ -50,16 +50,16 @@
 
 ## 8. Execution Progress
 
-- [ ] 13-WP1 成果目录与结构化模型
+- [x] 13-WP1 成果目录与结构化模型
   - 原始数据/成果数据索引模型
   - 结构化字段与状态机
-- [ ] 13-WP2 告警分级与值守路由
+- [x] 13-WP2 告警分级与值守路由
   - P1/P2/P3 策略与值班规则
   - 通知接口预留（短信/邮件/企微/钉钉）
-- [ ] 13-WP3 处置闭环与报告增强
+- [x] 13-WP3 处置闭环与报告增强
   - 处置动作链与复盘记录
   - 报告导出按任务/周期/专题增强
-- [ ] 13-WP4 验收关账
+- [x] 13-WP4 验收关账
   - 演示脚本：`infra/scripts/demo_phase13_data_alert_closure.py`
   - 报告：`logs/phase-13-data-outcomes-alert-closure.md.report.md`
   - 全门禁复验通过
