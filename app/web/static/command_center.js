@@ -1,5 +1,6 @@
 (function () {
-  const token = window.__TOKEN;
+  const auth = window.__CONSOLE_AUTH || {};
+  const token = window.__TOKEN || auth.token;
   if (!token) {
     return;
   }

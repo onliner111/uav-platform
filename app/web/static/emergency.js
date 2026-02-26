@@ -1,10 +1,19 @@
 (function () {
-  const token = window.__TOKEN;
+  const auth = window.__CONSOLE_AUTH || {};
+  const token = window.__TOKEN || auth.token;
+  const csrfToken = auth.csrfToken || "";
   const resultNode = document.getElementById("emergency-result");
   const titleInput = document.getElementById("incident-title");
   const levelSelect = document.getElementById("incident-level");
   const createIncidentBtn = document.getElementById("create-incident-btn");
   const createTaskBtn = document.getElementById("create-task-btn");
+
+  if (!token) {
+    if (resultNode) {
+      resultNode.textContent = "Missing session token.";
+    }
+    return;
+  }
 
   let selected = { lat: 30.5928, lon: 114.3055 };
   let incidentId = "";
@@ -27,6 +36,7 @@
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
       },
       body: JSON.stringify(payload),
     });

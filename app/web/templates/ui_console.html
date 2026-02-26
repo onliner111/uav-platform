@@ -1,0 +1,34 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards">
+  <div class="card">
+    <div>Online Devices</div>
+    <div class="value">{{ stats.online_devices }}</div>
+  </div>
+  <div class="card">
+    <div>Today Inspections</div>
+    <div class="value">{{ stats.today_inspections }}</div>
+  </div>
+  <div class="card">
+    <div>Total Defects</div>
+    <div class="value">{{ stats.defects_total }}</div>
+  </div>
+  <div class="card">
+    <div>Realtime Alerts</div>
+    <div class="value">{{ stats.realtime_alerts }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Module Entries</h2>
+  <div class="module-grid">
+    {% for item in module_entries %}
+    <a class="module-card" href="{{ item.href }}" data-nav-item data-nav-label="{{ item.label | lower }}">
+      <h3>{{ item.label }}</h3>
+      <p>{{ item.description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

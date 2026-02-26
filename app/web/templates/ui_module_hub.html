@@ -1,0 +1,32 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="panel">
+  <h2>Capabilities</h2>
+  <ul>
+    {% for point in capability_points %}
+    <li>{{ point }}</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="panel">
+  <h2>API Entries</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Capability</th>
+        <th>Endpoint</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in api_links %}
+      <tr>
+        <td>{{ item.label }}</td>
+        <td><code>{{ item.href }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

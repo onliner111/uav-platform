@@ -1,160 +1,146 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Command Center</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/ui.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <style>
-    .shell { max-width: 100%; padding: 14px; }
-    .map-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 320px;
-      gap: 12px;
-      align-items: start;
-    }
-    #live-map { height: calc(100vh - 260px); min-height: 460px; }
-    .side-panel .panel { margin-top: 0; }
-    .control-list {
-      display: grid;
-      gap: 8px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    .control-list label {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      font-weight: 600;
-    }
-    .replay-row {
-      display: grid;
-      grid-template-columns: 1fr 88px;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .replay-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .replay-actions button { flex: 1; }
-    .video-slots {
-      display: grid;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .video-slot {
-      border: 1px dashed #b7c8ba;
-      border-radius: 10px;
-      padding: 8px;
-      background: #f8fbf8;
-    }
-    .video-slot .title {
-      display: flex;
-      justify-content: space-between;
-      font-weight: 700;
-      font-size: 13px;
-    }
-    .video-slot .meta {
-      color: var(--muted);
-      font-size: 12px;
-      margin-top: 4px;
-    }
-    .alert-list {
-      margin: 8px 0 0;
-      padding: 0;
-      list-style: none;
-      display: grid;
-      gap: 6px;
-    }
-    .alert-item {
-      border-left: 4px solid var(--danger);
-      background: #fff7f7;
-      border-radius: 8px;
-      padding: 6px 8px;
-      font-size: 13px;
-    }
-    .alert-item small {
-      color: var(--muted);
-      display: block;
-      margin-top: 2px;
-    }
-    .card.alert-hot {
-      box-shadow: 0 0 0 2px rgba(188, 71, 73, 0.3);
-      border-color: #bc4749;
-    }
-    @media (max-width: 1100px) {
-      .map-grid { grid-template-columns: 1fr; }
-      #live-map { height: 460px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="shell">
-    <div class="bar">
-      <h1>UAV Command Center</h1>
-      <a href="/ui/inspection?token={{ token }}">Exit</a>
-    </div>
-    <div class="cards">
-      <div class="card"><div>Online Devices</div><div id="stat-online" class="value">{{ stats.online_devices }}</div></div>
-      <div class="card"><div>Today Inspections</div><div id="stat-inspection" class="value">{{ stats.today_inspections }}</div></div>
-      <div class="card"><div>Defects</div><div id="stat-defect" class="value">{{ stats.defects_total }}</div></div>
-      <div class="card" id="card-alert"><div>Realtime Alerts</div><div id="stat-alert" class="value">{{ stats.realtime_alerts }}</div></div>
-    </div>
-    <div class="map-grid">
-      <div class="panel">
-        <div id="live-map"></div>
-      </div>
-      <div class="side-panel">
-        <div class="panel">
-          <h3 style="margin:0;">Layer Switch</h3>
-          <ul class="control-list">
-            <li><label><input id="layer-resources" type="checkbox" checked> Resources</label></li>
-            <li><label><input id="layer-tasks" type="checkbox" checked> Tasks</label></li>
-            <li><label><input id="layer-alerts" type="checkbox" checked> Alerts</label></li>
-            <li><label><input id="layer-events" type="checkbox"> Events</label></li>
-          </ul>
-        </div>
-        <div class="panel">
-          <h3 style="margin:0;">Track Replay</h3>
-          <select id="replay-drone">
-            <option value="">Select drone</option>
-          </select>
-          <div class="replay-row">
-            <input id="replay-step" type="number" min="1" max="20" value="1">
-            <button id="replay-refresh" type="button">Load</button>
-          </div>
-          <div class="replay-actions">
-            <button id="replay-play" type="button">Play</button>
-            <button id="replay-stop" type="button" class="danger">Stop</button>
-          </div>
-          <div id="replay-status" class="hint" style="margin-top:8px;">Replay idle.</div>
-        </div>
-        <div class="panel">
-          <h3 style="margin:0;">Alert Highlight</h3>
-          <ul id="alert-list" class="alert-list">
-            <li class="hint">No active alerts.</li>
-          </ul>
-        </div>
-        <div class="panel">
-          <h3 style="margin:0;">Video Slots</h3>
-          <div id="video-slots" class="video-slots"></div>
-          <div class="hint" style="margin-top:8px;">Placeholder abstraction for RTSP/WebRTC providers.</div>
-        </div>
-      </div>
-    </div>
-    <div class="hint">Streams: <code>/ws/dashboard</code> + <code>/api/map/*</code></div>
+{% extends "console_base.html" %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  .map-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 12px;
+    align-items: start;
+  }
+  #live-map { height: calc(100vh - 300px); min-height: 460px; }
+  .side-panel .panel { margin-top: 0; }
+  .control-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .control-list label {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-weight: 600;
+  }
+  .replay-row {
+    display: grid;
+    grid-template-columns: 1fr 88px;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .replay-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .replay-actions button { flex: 1; }
+  .video-slots {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .video-slot {
+    border: 1px dashed #b7c8ba;
+    border-radius: 10px;
+    padding: 8px;
+    background: #f8fbf8;
+  }
+  .video-slot .title {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .video-slot .meta {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  .alert-list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+  }
+  .alert-item {
+    border-left: 4px solid var(--danger);
+    background: #fff7f7;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  .alert-item small {
+    color: var(--muted);
+    display: block;
+    margin-top: 2px;
+  }
+  .card.alert-hot {
+    box-shadow: 0 0 0 2px rgba(188, 71, 73, 0.3);
+    border-color: #bc4749;
+  }
+  @media (max-width: 1100px) {
+    .map-grid { grid-template-columns: 1fr; }
+    #live-map { height: 460px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cards">
+  <div class="card"><div>Online Devices</div><div id="stat-online" class="value">{{ stats.online_devices }}</div></div>
+  <div class="card"><div>Today Inspections</div><div id="stat-inspection" class="value">{{ stats.today_inspections }}</div></div>
+  <div class="card"><div>Defects</div><div id="stat-defect" class="value">{{ stats.defects_total }}</div></div>
+  <div class="card" id="card-alert"><div>Realtime Alerts</div><div id="stat-alert" class="value">{{ stats.realtime_alerts }}</div></div>
+</div>
+<div class="map-grid">
+  <div class="panel">
+    <div id="live-map"></div>
   </div>
-  <script>
-    window.__TOKEN = "{{ token }}";
-  </script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/command_center.js"></script>
-</body>
-</html>
+  <div class="side-panel">
+    <div class="panel">
+      <h3 style="margin:0;">Layer Switch</h3>
+      <ul class="control-list">
+        <li><label><input id="layer-resources" type="checkbox" checked> Resources</label></li>
+        <li><label><input id="layer-tasks" type="checkbox" checked> Tasks</label></li>
+        <li><label><input id="layer-alerts" type="checkbox" checked> Alerts</label></li>
+        <li><label><input id="layer-events" type="checkbox"> Events</label></li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3 style="margin:0;">Track Replay</h3>
+      <select id="replay-drone">
+        <option value="">Select drone</option>
+      </select>
+      <div class="replay-row">
+        <input id="replay-step" type="number" min="1" max="20" value="1">
+        <button id="replay-refresh" type="button">Load</button>
+      </div>
+      <div class="replay-actions">
+        <button id="replay-play" type="button">Play</button>
+        <button id="replay-stop" type="button" class="danger">Stop</button>
+      </div>
+      <div id="replay-status" class="hint" style="margin-top:8px;">Replay idle.</div>
+    </div>
+    <div class="panel">
+      <h3 style="margin:0;">Alert Highlight</h3>
+      <ul id="alert-list" class="alert-list">
+        <li class="hint">No active alerts.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3 style="margin:0;">Video Slots</h3>
+      <div id="video-slots" class="video-slots"></div>
+      <div class="hint" style="margin-top:8px;">Placeholder abstraction for RTSP/WebRTC providers.</div>
+    </div>
+  </div>
+</div>
+<div class="hint">Streams: <code>/ws/dashboard</code> + <code>/api/map/*</code></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/command_center.js"></script>
+{% endblock %}

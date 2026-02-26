@@ -1,4 +1,6 @@
 (function () {
+  const auth = window.__CONSOLE_AUTH || {};
+  const token = window.__TOKEN || auth.token;
   const observations = Array.isArray(window.__OBS) ? window.__OBS : [];
   const map = L.map("map");
   const center = observations.length
@@ -31,7 +33,6 @@
 
   exportBtn.addEventListener("click", async () => {
     const taskId = exportBtn.getAttribute("data-task-id");
-    const token = exportBtn.getAttribute("data-token");
     if (!taskId || !token) {
       exportResult.textContent = "Missing task id or token.";
       return;

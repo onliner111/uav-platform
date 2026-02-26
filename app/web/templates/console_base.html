@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/ui.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="console-body">
+  <div class="console-app">
+    <header class="console-topbar">
+      <div>
+        <div class="console-title">UAV SaaS Console</div>
+        <div class="console-breadcrumbs">
+          {% for crumb in breadcrumbs %}
+          <span>{{ crumb }}</span>
+          {% if not loop.last %}<span>/</span>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      <div class="console-top-actions">
+        <input
+          id="global-search"
+          class="console-search"
+          type="search"
+          placeholder="Search modules and quick entries"
+          autocomplete="off"
+        >
+        <a class="console-link" href="/ui/login?switch=1&next={{ request.url.path }}">Switch Tenant</a>
+        <span class="console-meta">Tenant: {{ tenant_id }}</span>
+        <span class="console-meta">User: {{ user_id }}</span>
+        <form action="/ui/logout" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="ghost">Sign Out</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="console-frame">
+      <aside class="console-sidebar">
+        <div class="console-sidebar-title">Navigation</div>
+        <ul class="console-nav">
+          {% for item in nav_items %}
+          <li class="console-nav-item {% if item.active %}active{% endif %}" data-nav-item data-nav-label="{{ item.label | lower }}">
+            <a href="{{ item.href }}" data-nav-link>{{ item.label }}</a>
+            <button type="button" class="fav-toggle" data-fav-toggle data-fav-key="{{ item.key }}">Fav</button>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="console-sidebar-title">Quick Access</div>
+        <ul id="quick-access" class="console-quick-list">
+          <li class="hint">Use "Fav" to pin entries.</li>
+        </ul>
+      </aside>
+
+      <main class="console-main">
+        <section class="console-page-head">
+          <h1>{{ page_title }}</h1>
+          <p>{{ page_subtitle }}</p>
+        </section>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <script>
+    window.__CONSOLE_AUTH = {{ {"token": token, "csrfToken": csrf_token, "tenantId": tenant_id, "userId": user_id} | tojson }};
+    window.__TOKEN = {{ token | tojson }};
+  </script>
+  <script src="/static/console_shell.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

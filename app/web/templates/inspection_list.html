@@ -1,54 +1,31 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Inspection Tasks</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/ui.css">
-</head>
-<body>
-  <div class="shell">
-    <div class="bar">
-      <h1>City Inspection</h1>
-      <div class="tabs">
-        <a href="/ui/inspection?token={{ token }}">Inspection</a>
-        <a href="/ui/defects?token={{ token }}">Defects</a>
-        <a href="/ui/emergency?token={{ token }}">Emergency</a>
-        <a href="/ui/command-center?token={{ token }}">Command Center</a>
-      </div>
-    </div>
+{% extends "console_base.html" %}
 
-    <div class="panel">
-      <div class="hint">Tenant: {{ tenant_id }}</div>
-      <h2>Inspection Task List</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>Created</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for task in tasks %}
-          <tr>
-            <td>{{ task.id }}</td>
-            <td>{{ task.name }}</td>
-            <td><span class="status-pill">{{ task.status }}</span></td>
-            <td>{{ task.priority }}</td>
-            <td>{{ task.created_at }}</td>
-            <td><a href="/ui/inspection/tasks/{{ task.id }}?token={{ token }}">Open Map</a></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</body>
-</html>
+{% block content %}
+<div class="panel">
+  <h2>Inspection Task List</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Status</th>
+        <th>Priority</th>
+        <th>Created</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr>
+        <td>{{ task.id }}</td>
+        <td>{{ task.name }}</td>
+        <td><span class="status-pill">{{ task.status }}</span></td>
+        <td>{{ task.priority }}</td>
+        <td>{{ task.created_at }}</td>
+        <td><a href="/ui/inspection/tasks/{{ task.id }}">Open Map</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

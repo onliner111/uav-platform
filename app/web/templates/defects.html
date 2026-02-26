@@ -1,82 +1,62 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Defect Management</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/ui.css">
-</head>
-<body>
-  <div class="shell">
-    <div class="bar">
-      <h1>Defect Closure</h1>
-      <div class="tabs">
-        <a href="/ui/inspection?token={{ token }}">Inspection</a>
-        <a href="/ui/defects?token={{ token }}">Defects</a>
-      </div>
-    </div>
+{% extends "console_base.html" %}
 
-    <div class="panel">
-      <h2>Defect List</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Severity</th>
-            <th>Status</th>
-            <th>Assigned</th>
-            <th>Observation</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in defects %}
-          <tr>
-            <td>{{ item.id }}</td>
-            <td>{{ item.severity }}</td>
-            <td>{{ item.status }}</td>
-            <td>{{ item.assigned_to }}</td>
-            <td>{{ item.observation_id }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+{% block content %}
+<div class="panel">
+  <h2>Defect List</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Severity</th>
+        <th>Status</th>
+        <th>Assigned</th>
+        <th>Observation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in defects %}
+      <tr>
+        <td>{{ item.id }}</td>
+        <td>{{ item.severity }}</td>
+        <td>{{ item.status }}</td>
+        <td>{{ item.assigned_to }}</td>
+        <td>{{ item.observation_id }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
-    <div class="panel">
-      <h2>Quick Actions</h2>
-      <div class="grid cols-2">
-        <div>
-          <label>Defect ID</label>
-          <input id="defect-id" placeholder="defect id">
-        </div>
-        <div>
-          <label>Assign To (user id)</label>
-          <input id="assigned-to" placeholder="user id">
-        </div>
-      </div>
-      <div class="grid cols-2" style="margin-top:12px;">
-        <button id="assign-btn">Assign</button>
-        <div>
-          <label>New Status</label>
-          <select id="next-status">
-            <option>ASSIGNED</option>
-            <option>IN_PROGRESS</option>
-            <option>FIXED</option>
-            <option>VERIFIED</option>
-            <option>CLOSED</option>
-          </select>
-        </div>
-      </div>
-      <button id="status-btn" style="margin-top:10px;">Update Status</button>
-      <div class="hint" id="defect-result"></div>
+<div class="panel">
+  <h2>Quick Actions</h2>
+  <div class="grid cols-2">
+    <div>
+      <label>Defect ID</label>
+      <input id="defect-id" placeholder="defect id">
+    </div>
+    <div>
+      <label>Assign To (user id)</label>
+      <input id="assigned-to" placeholder="user id">
     </div>
   </div>
-  <script>
-    window.__TOKEN = "{{ token }}";
-  </script>
-  <script src="/static/defects.js"></script>
-</body>
-</html>
+  <div class="grid cols-2" style="margin-top:12px;">
+    <button id="assign-btn">Assign</button>
+    <div>
+      <label>New Status</label>
+      <select id="next-status">
+        <option>ASSIGNED</option>
+        <option>IN_PROGRESS</option>
+        <option>FIXED</option>
+        <option>VERIFIED</option>
+        <option>CLOSED</option>
+      </select>
+    </div>
+  </div>
+  <button id="status-btn" style="margin-top:10px;">Update Status</button>
+  <div class="hint" id="defect-result"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/defects.js"></script>
+{% endblock %}

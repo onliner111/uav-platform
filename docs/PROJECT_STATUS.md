@@ -6,15 +6,15 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-16-saas-console-ui.md (READY; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 16 queued (`16-WP1`..`16-WP4`)
-- Next Target: execute phase-16..phase-25 extension sequentially with full gate closeout per phase
+- Current Phase: phase-17-multi-org-data-perimeter-v2.md (READY; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 17 queued (`17-WP1`..`17-WP4`)
+- Next Target: execute phase-17..phase-25 extension sequentially with full gate closeout per phase
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-25T06:03:33Z
+> Last verified at (UTC): 2026-02-26T16:01:54Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> WIP note (2026-02-25T06:03:33Z): Phase 15 closed as DONE after completing KPI + open-platform governance and WP4 closeout (`demo_phase15_kpi_open_platform` + full gate rerun).
+> WIP note (2026-02-26T16:01:54Z): Phase 16 closed as DONE after completing SaaS console UI shell/session/RBAC enhancements and WP4 closeout (`demo_phase16_saas_console_ui` + full gate rerun).
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
 - mypy: PASS (71 source files)
@@ -39,6 +39,7 @@
   - docker compose -f infra/docker-compose.yml run --rm --build app-tools python -m app.infra.openapi_export
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py
+  - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase16_saas_console_ui.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_phase08_integration.py
 
 ## 4. Completed Phases（已完成阶段）
@@ -68,6 +69,7 @@
 - phase-13-data-outcomes-alert-closure.md: DONE
 - phase-14-ai-assistant-evidence-chain.md: DONE
 - phase-15-kpi-open-platform.md: DONE
+- phase-16-saas-console-ui.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -88,10 +90,12 @@
 - 13-WP1/WP2/WP3 artifacts are present: `app/services/outcome_service.py`, `app/api/routers/outcomes.py`, alert routing/action-chain updates (`app/services/alert_service.py`, `app/api/routers/alert.py`), reporting export scope enhancement (`app/services/reporting_service.py`), migration chain `202602250050/051/052/053/054/055`, regression coverage `tests/test_outcomes.py` + `tests/test_reporting.py`, and phase demo `infra/scripts/demo_phase13_data_alert_closure.py`.
 - 14-WP1/WP2/WP3 artifacts are present: `app/services/ai_service.py`, `app/api/routers/ai.py`, AI models/DTOs in `app/domain/models.py`, migration chain `202602250056/057/058`, regression coverage `tests/test_ai_assistant.py`, and phase demo `infra/scripts/demo_phase14_ai_evidence.py`.
 - 15-WP1/WP2/WP3 artifacts are present: `app/services/kpi_service.py`, `app/services/open_platform_service.py`, KPI/open-platform APIs (`app/api/routers/kpi.py`, `app/api/routers/open_platform.py`), migration chain `202602250059/060/061`, regression coverage `tests/test_kpi_open_platform.py`, and phase demo `infra/scripts/demo_phase15_kpi_open_platform.py`.
+- 16-WP1/WP2/WP3 artifacts are present: `app/api/routers/ui.py` (session + csrf + rbac nav gating), console shell/templates (`app/web/templates/console_base.html`, `app/web/templates/ui_login.html`, `app/web/templates/ui_console.html`, `app/web/templates/ui_module_hub.html`), unified static assets (`app/web/static/console_shell.js`, `app/web/static/ui.css`), legacy page migration (`app/web/templates/{inspection_list,inspection_task_detail,defects,emergency,command_center}.html`), and regression/demo coverage (`tests/test_ui_console.py`, `infra/scripts/demo_phase16_saas_console_ui.py`).
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-26T16:01:54Z (UTC): Phase 16 closed as DONE. Delivered UI session login/logout + CSRF guard and tenant-context validation, unified SaaS shell/navigation with RBAC menu visibility, module entry hubs and UX enhancements (global search + favorites quick access), demo script `infra/scripts/demo_phase16_saas_console_ui.py`, report `logs/phase-16-saas-console-ui.md.report.md`, and full closeout chain pass (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase16_saas_console_ui`).
 - 2026-02-25T16:54:45Z (UTC): Roadmap extended with planning blueprints `phase-16`..`phase-25` (UI-first SaaS console, multi-org/data perimeter v2, outcomes/object storage, real device/video integration, task/compliance/alert/AI v2 enhancements, billing/quota, observability/reliability). Execution checkpoint moved to `phase-16-saas-console-ui.md` with `READY`; index and resume entrypoint updated accordingly.
 - 2026-02-25T04:15:26Z (UTC): Phase 11 closed as DONE. Completed P1/P2 capabilities (auto-dispatch scoring explainability, risk/checklist update, attachment/comment collaboration), delivered demo script `infra/scripts/demo_phase11_task_center.py`, generated report `logs/phase-11-unified-task-center-workflow.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase11_task_center`).
 - 2026-02-25T04:46:32Z (UTC): Phase 12 closed as DONE. Completed airspace zoning + mission plan guardrails, preflight checklist lifecycle and run-gate enforcement, and command pre-dispatch interception with standardized reason codes; delivered demo script `infra/scripts/demo_phase12_airspace_compliance.py`, generated report `logs/phase-12-airspace-compliance-safety-rails.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase12_airspace_compliance`).
@@ -127,4 +131,3 @@
 - 2026-02-24T12:07:43Z (UTC): 07B B5 landed (`202602240026`/`202602240027`/`202602240028`) and gates rerun passed via Docker Compose (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI generation, `demo_e2e`, `verify_smoke`).
 - 2026-02-24T12:22:51Z (UTC): 07C-2/07C-3 code landed, but gate rerun blocked by Docker daemon permission (`permission denied while trying to connect to npipe:////./pipe/dockerDesktopLinuxEngine`).
 - 2026-02-24T12:46:47Z (UTC): 07C full gate chain rerun passed (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head`, OpenAPI generation, `demo_e2e`, `verify_smoke`); phase marked DONE.
-

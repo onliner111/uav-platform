@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Console Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/ui.css">
+</head>
+<body class="auth-body">
+  <div class="auth-shell">
+    <div class="auth-panel">
+      <h1>UAV SaaS Console</h1>
+      <p>Sign in with tenant context to enter the unified console.</p>
+
+      {% if error_message %}
+      <div class="auth-error">{{ error_message }}</div>
+      {% endif %}
+
+      <form method="post" action="/ui/login" class="auth-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next_path }}">
+
+        {% if tenant_options %}
+        <label for="tenant_id">Tenant</label>
+        <select id="tenant_id" name="tenant_id" required>
+          <option value="">Select tenant</option>
+          {% for tenant in tenant_options %}
+          <option value="{{ tenant.id }}" {% if selected_tenant == tenant.id %}selected{% endif %}>{{ tenant.name }} ({{ tenant.id }})</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <label for="tenant_id">Tenant ID</label>
+        <input id="tenant_id" name="tenant_id" value="{{ selected_tenant }}" required placeholder="tenant id">
+        {% endif %}
+
+        <label for="username">Username</label>
+        <input id="username" name="username" value="{{ username }}" required autocomplete="username" placeholder="username">
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="password">
+
+        <button type="submit">Sign In</button>
+      </form>
+      <div class="hint">Session is cookie-based and UI auth actions enforce CSRF token validation.</div>
+    </div>
+  </div>
+</body>
+</html>
