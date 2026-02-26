@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Generator
 from pathlib import Path
 
@@ -192,6 +193,73 @@ def test_raw_data_catalog_create_and_filter(outcomes_client: TestClient) -> None
     rows = list_raw_resp.json()
     assert len(rows) == 1
     assert rows[0]["id"] == raw_id
+
+
+def test_raw_data_upload_session_complete_and_download(outcomes_client: TestClient) -> None:
+    tenant_a = _create_tenant(outcomes_client, "phase18-raw-upload-a")
+    tenant_b = _create_tenant(outcomes_client, "phase18-raw-upload-b")
+    _bootstrap_admin(outcomes_client, tenant_a, "admin_a", "admin-pass-a")
+    _bootstrap_admin(outcomes_client, tenant_b, "admin_b", "admin-pass-b")
+    token_a = _login(outcomes_client, tenant_a, "admin_a", "admin-pass-a")
+    token_b = _login(outcomes_client, tenant_b, "admin_b", "admin-pass-b")
+
+    content = b"phase18-object-storage-upload-content"
+    checksum = f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+    init_resp = outcomes_client.post(
+        "/api/outcomes/raw/uploads:init",
+        json={
+            "data_type": "DOCUMENT",
+            "file_name": "phase18-evidence.txt",
+            "content_type": "text/plain",
+            "size_bytes": len(content),
+            "checksum": checksum,
+            "meta": {"topic": "phase18"},
+        },
+        headers=_auth_header(token_a),
+    )
+    assert init_resp.status_code == 201
+    session_id = init_resp.json()["session_id"]
+    upload_token = init_resp.json()["upload_token"]
+    assert init_resp.json()["upload_url"].endswith(f"/api/outcomes/raw/uploads/{session_id}/content")
+
+    upload_resp = outcomes_client.put(
+        f"/api/outcomes/raw/uploads/{session_id}/content",
+        content=content,
+        headers={
+            **_auth_header(token_a),
+            "X-Upload-Token": upload_token,
+            "Content-Type": "application/octet-stream",
+        },
+    )
+    assert upload_resp.status_code == 200
+    assert upload_resp.json()["status"] == "UPLOADED"
+
+    complete_resp = outcomes_client.post(
+        f"/api/outcomes/raw/uploads/{session_id}:complete",
+        json={"upload_token": upload_token},
+        headers=_auth_header(token_a),
+    )
+    assert complete_resp.status_code == 200
+    raw_id = complete_resp.json()["id"]
+    assert complete_resp.json()["bucket"] is not None
+    assert complete_resp.json()["object_key"] is not None
+    assert complete_resp.json()["size_bytes"] == len(content)
+    assert complete_resp.json()["content_type"] == "text/plain"
+    assert complete_resp.json()["checksum"] == checksum
+
+    download_resp = outcomes_client.get(
+        f"/api/outcomes/raw/{raw_id}/download",
+        headers=_auth_header(token_a),
+    )
+    assert download_resp.status_code == 200
+    assert download_resp.content == content
+
+    cross_tenant_download = outcomes_client.get(
+        f"/api/outcomes/raw/{raw_id}/download",
+        headers=_auth_header(token_b),
+    )
+    assert cross_tenant_download.status_code == 404
 
 
 def test_alert_priority_and_routing_rules(outcomes_client: TestClient) -> None:

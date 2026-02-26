@@ -349,3 +349,248 @@ def test_data_perimeter_filters_core_domains(perimeter_client: TestClient) -> No
         headers=_auth_header(scoped_token),
     )
     assert cross_defect_resp.status_code == 404
+
+
+def test_data_perimeter_area_task_resource_minimum_loop(perimeter_client: TestClient) -> None:
+    tenant_id = _create_tenant(perimeter_client, "perimeter-resource-tenant")
+    _bootstrap_admin(perimeter_client, tenant_id, "admin_res", "admin-pass")
+    admin_token = _login(perimeter_client, tenant_id, "admin_res", "admin-pass")
+
+    mission_a_resp = perimeter_client.post(
+        "/api/mission/missions",
+        json={
+            "name": "mission-area-a",
+            "project_code": "PROJ-A",
+            "area_code": "AREA-A",
+            "type": "POINT_TASK",
+            "payload": {},
+            "constraints": {},
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert mission_a_resp.status_code == 201
+    mission_a = mission_a_resp.json()["id"]
+
+    mission_b_resp = perimeter_client.post(
+        "/api/mission/missions",
+        json={
+            "name": "mission-area-b",
+            "project_code": "PROJ-B",
+            "area_code": "AREA-B",
+            "type": "POINT_TASK",
+            "payload": {},
+            "constraints": {},
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert mission_b_resp.status_code == 201
+    mission_b = mission_b_resp.json()["id"]
+
+    drone_a_resp = perimeter_client.post(
+        "/api/registry/drones",
+        json={"name": "drone-a", "vendor": "FAKE", "capabilities": {"camera": True}},
+        headers=_auth_header(admin_token),
+    )
+    assert drone_a_resp.status_code == 201
+    drone_a = drone_a_resp.json()["id"]
+
+    drone_b_resp = perimeter_client.post(
+        "/api/registry/drones",
+        json={"name": "drone-b", "vendor": "FAKE", "capabilities": {"camera": True}},
+        headers=_auth_header(admin_token),
+    )
+    assert drone_b_resp.status_code == 201
+    drone_b = drone_b_resp.json()["id"]
+
+    asset_a_resp = perimeter_client.post(
+        "/api/assets",
+        json={"asset_type": "PAYLOAD", "asset_code": "PAY-A", "name": "payload-a"},
+        headers=_auth_header(admin_token),
+    )
+    assert asset_a_resp.status_code == 201
+    asset_a = asset_a_resp.json()["id"]
+
+    asset_b_resp = perimeter_client.post(
+        "/api/assets",
+        json={"asset_type": "PAYLOAD", "asset_code": "PAY-B", "name": "payload-b"},
+        headers=_auth_header(admin_token),
+    )
+    assert asset_b_resp.status_code == 201
+    asset_b = asset_b_resp.json()["id"]
+
+    mark_asset_a_resp = perimeter_client.post(
+        f"/api/assets/{asset_a}/availability",
+        json={"availability_status": "AVAILABLE", "region_code": "AREA-A"},
+        headers=_auth_header(admin_token),
+    )
+    assert mark_asset_a_resp.status_code == 200
+
+    mark_asset_b_resp = perimeter_client.post(
+        f"/api/assets/{asset_b}/availability",
+        json={"availability_status": "AVAILABLE", "region_code": "AREA-B"},
+        headers=_auth_header(admin_token),
+    )
+    assert mark_asset_b_resp.status_code == 200
+
+    scoped_user_id = _create_user_with_permissions(
+        perimeter_client,
+        admin_token,
+        tenant_id,
+        "scoped_resource_reader",
+        "reader-pass",
+        ["mission.read", "registry.read"],
+    )
+
+    perimeter_policy_resp = perimeter_client.put(
+        f"/api/identity/users/{scoped_user_id}/data-policy",
+        json={
+            "scope_mode": "SCOPED",
+            "org_unit_ids": [],
+            "project_codes": [],
+            "area_codes": ["AREA-A"],
+            "task_ids": [mission_a],
+            "resource_ids": [asset_a],
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert perimeter_policy_resp.status_code == 200
+
+    scoped_token = _login(perimeter_client, tenant_id, "scoped_resource_reader", "reader-pass")
+
+    missions_resp = perimeter_client.get("/api/mission/missions", headers=_auth_header(scoped_token))
+    assert missions_resp.status_code == 200
+    assert [item["id"] for item in missions_resp.json()] == [mission_a]
+
+    assets_resp = perimeter_client.get("/api/assets", headers=_auth_header(scoped_token))
+    assert assets_resp.status_code == 200
+    assert [item["id"] for item in assets_resp.json()] == [asset_a]
+
+    mission_b_get = perimeter_client.get(
+        f"/api/mission/missions/{mission_b}",
+        headers=_auth_header(scoped_token),
+    )
+    assert mission_b_get.status_code == 404
+
+    asset_b_get = perimeter_client.get(
+        f"/api/assets/{asset_b}",
+        headers=_auth_header(scoped_token),
+    )
+    assert asset_b_get.status_code == 404
+
+    resource_only_policy_resp = perimeter_client.put(
+        f"/api/identity/users/{scoped_user_id}/data-policy",
+        json={
+            "scope_mode": "SCOPED",
+            "org_unit_ids": [],
+            "project_codes": [],
+            "area_codes": [],
+            "task_ids": [],
+            "resource_ids": [drone_a],
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert resource_only_policy_resp.status_code == 200
+
+    drones_resp = perimeter_client.get("/api/registry/drones", headers=_auth_header(scoped_token))
+    assert drones_resp.status_code == 200
+    assert [item["id"] for item in drones_resp.json()] == [drone_a]
+
+    drone_b_get = perimeter_client.get(
+        f"/api/registry/drones/{drone_b}",
+        headers=_auth_header(scoped_token),
+    )
+    assert drone_b_get.status_code == 404
+
+
+def test_data_perimeter_conflict_resolution_order(perimeter_client: TestClient) -> None:
+    tenant_id = _create_tenant(perimeter_client, "perimeter-resolution-tenant")
+    _bootstrap_admin(perimeter_client, tenant_id, "admin_resolution", "admin-pass")
+    admin_token = _login(perimeter_client, tenant_id, "admin_resolution", "admin-pass")
+
+    mission_a_resp = perimeter_client.post(
+        "/api/mission/missions",
+        json={
+            "name": "mission-allow-by-role",
+            "project_code": "PROJ-A",
+            "area_code": "AREA-A",
+            "type": "POINT_TASK",
+            "payload": {},
+            "constraints": {},
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert mission_a_resp.status_code == 201
+    mission_a = mission_a_resp.json()["id"]
+
+    mission_b_resp = perimeter_client.post(
+        "/api/mission/missions",
+        json={
+            "name": "mission-allow-by-user",
+            "project_code": "PROJ-B",
+            "area_code": "AREA-B",
+            "type": "POINT_TASK",
+            "payload": {},
+            "constraints": {},
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert mission_b_resp.status_code == 201
+    mission_b = mission_b_resp.json()["id"]
+
+    scoped_user_id = _create_user_with_permissions(
+        perimeter_client,
+        admin_token,
+        tenant_id,
+        "resolution_reader",
+        "reader-pass",
+        ["mission.read"],
+    )
+
+    role_resp = perimeter_client.post(
+        "/api/identity/roles",
+        json={"name": "resolution-role", "description": "inherit allow AREA-A"},
+        headers=_auth_header(admin_token),
+    )
+    assert role_resp.status_code == 201
+    role_id = role_resp.json()["id"]
+
+    bind_role_resp = perimeter_client.post(
+        f"/api/identity/users/{scoped_user_id}/roles/{role_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert bind_role_resp.status_code == 204
+
+    role_policy_resp = perimeter_client.put(
+        f"/api/identity/roles/{role_id}/data-policy",
+        json={"scope_mode": "SCOPED", "area_codes": ["AREA-A"]},
+        headers=_auth_header(admin_token),
+    )
+    assert role_policy_resp.status_code == 200
+
+    user_policy_resp = perimeter_client.put(
+        f"/api/identity/users/{scoped_user_id}/data-policy",
+        json={
+            "scope_mode": "SCOPED",
+            "area_codes": ["AREA-B"],
+            "denied_area_codes": ["AREA-A"],
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert user_policy_resp.status_code == 200
+
+    scoped_token = _login(perimeter_client, tenant_id, "resolution_reader", "reader-pass")
+    missions_resp = perimeter_client.get("/api/mission/missions", headers=_auth_header(scoped_token))
+    assert missions_resp.status_code == 200
+    assert [item["id"] for item in missions_resp.json()] == [mission_b]
+
+    mission_a_get = perimeter_client.get(
+        f"/api/mission/missions/{mission_a}",
+        headers=_auth_header(scoped_token),
+    )
+    assert mission_a_get.status_code == 404
+
+    mission_b_get = perimeter_client.get(
+        f"/api/mission/missions/{mission_b}",
+        headers=_auth_header(scoped_token),
+    )
+    assert mission_b_get.status_code == 200

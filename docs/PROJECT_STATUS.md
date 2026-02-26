@@ -6,18 +6,18 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-17-multi-org-data-perimeter-v2.md (READY; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 17 queued (`17-WP1`..`17-WP4`)
-- Next Target: execute phase-17..phase-25 extension sequentially with full gate closeout per phase
+- Current Phase: phase-18-outcomes-repository-object-storage.md (RUNNING; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 18 `18-WP1` completed (object storage minimal loop: init upload session, upload content, complete to raw catalog, download)
+- Next Target: continue P0 by implementing `18-WP2` (outcome version model + access control), then proceed `P1 -> P2 -> 18-WP6`
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-26T16:01:54Z
+> Last verified at (UTC): 2026-02-26T19:10:25Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> WIP note (2026-02-26T16:01:54Z): Phase 16 closed as DONE after completing SaaS console UI shell/session/RBAC enhancements and WP4 closeout (`demo_phase16_saas_console_ui` + full gate rerun).
+> WIP note (2026-02-26T19:10:25Z): Phase 18 is RUNNING and `18-WP1` is complete. Current iteration verification passed in live source context: `ruff` (changed files), `mypy app` (72 source files), and targeted pytest (`tests/test_outcomes.py` + `tests/test_reporting.py`).
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
-- mypy: PASS (71 source files)
+- mypy: PASS (72 source files)
 - pytest: PASS (`docker compose ... app pytest -q`)
 - e2e: PASS (`demo_e2e.py` + `verify_smoke.py`)
 - phase08 integration: PASS (`verify_phase08_integration.py`)
@@ -70,6 +70,7 @@
 - phase-14-ai-assistant-evidence-chain.md: DONE
 - phase-15-kpi-open-platform.md: DONE
 - phase-16-saas-console-ui.md: DONE
+- phase-17-multi-org-data-perimeter-v2.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -91,10 +92,21 @@
 - 14-WP1/WP2/WP3 artifacts are present: `app/services/ai_service.py`, `app/api/routers/ai.py`, AI models/DTOs in `app/domain/models.py`, migration chain `202602250056/057/058`, regression coverage `tests/test_ai_assistant.py`, and phase demo `infra/scripts/demo_phase14_ai_evidence.py`.
 - 15-WP1/WP2/WP3 artifacts are present: `app/services/kpi_service.py`, `app/services/open_platform_service.py`, KPI/open-platform APIs (`app/api/routers/kpi.py`, `app/api/routers/open_platform.py`), migration chain `202602250059/060/061`, regression coverage `tests/test_kpi_open_platform.py`, and phase demo `infra/scripts/demo_phase15_kpi_open_platform.py`.
 - 16-WP1/WP2/WP3 artifacts are present: `app/api/routers/ui.py` (session + csrf + rbac nav gating), console shell/templates (`app/web/templates/console_base.html`, `app/web/templates/ui_login.html`, `app/web/templates/ui_console.html`, `app/web/templates/ui_module_hub.html`), unified static assets (`app/web/static/console_shell.js`, `app/web/static/ui.css`), legacy page migration (`app/web/templates/{inspection_list,inspection_task_detail,defects,emergency,command_center}.html`), and regression/demo coverage (`tests/test_ui_console.py`, `infra/scripts/demo_phase16_saas_console_ui.py`).
+- 17-WP1 artifacts are present: org type + member-position model extension (`app/domain/models.py`), identity org/membership service-router update (`app/services/identity_service.py`, `app/api/routers/identity.py`), migration chain `202602260062/063/064`, and regression coverage (`tests/test_identity.py`).
+- 17-WP2 artifacts are present: policy resource scope extension (`resource_ids`) and perimeter engine update (`app/domain/models.py`, `app/services/data_perimeter_service.py`, `app/services/identity_service.py`), resource-domain enforcement (`app/services/{asset_service,registry_service}.py`, `app/api/routers/{asset,registry}.py`), migration chain `202602260065/066/067`, and regression coverage (`tests/test_data_perimeter.py`, `tests/test_asset.py`, `tests/test_registry.py`).
+- 17-WP3 artifacts are present: platform super-admin permission constant (`app/domain/permissions.py`), cross-tenant governance APIs (`GET /api/identity/platform/tenants`, `GET /api/identity/platform/tenants/{tenant_id}/users`) and explicit gate/audit actions (`app/api/routers/identity.py`), tenant-wide list service (`app/services/identity_service.py`), and regression coverage (`tests/test_identity.py::test_identity_platform_super_admin_cross_tenant_governance`).
+- 17-P2 artifacts are present: role data-policy model/API (`RoleDataAccessPolicy`, `GET/PUT /api/identity/roles/{role_id}/data-policy`), user effective policy API (`GET /api/identity/users/{user_id}/data-policy:effective`), explicit deny fields in user policy (`denied_*`), conflict-resolution perimeter engine (`app/services/data_perimeter_service.py`), migration chain `202602260068/069/070`, and regression coverage (`tests/test_identity.py`, `tests/test_data_perimeter.py`).
+- 18-WP1 artifacts are present: object storage adapter/service (`app/services/object_storage_service.py`), raw upload session APIs (`POST /api/outcomes/raw/uploads:init`, `PUT /api/outcomes/raw/uploads/{session_id}/content`, `POST /api/outcomes/raw/uploads/{session_id}:complete`, `GET /api/outcomes/raw/{raw_id}/download`), domain/migration chain (`RawUploadSession`, `202602260071/072/073`), and regression coverage (`tests/test_outcomes.py::test_raw_data_upload_session_complete_and_download`).
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-26T19:10:25Z (UTC): Phase 18 moved to RUNNING with `18-WP1` completed. Delivered local object-storage minimal chain (upload-init/upload-content/complete/download), migration chain `202602260071/072/073`, and fixed upload-session expiry datetime compare (naive vs aware UTC) in `OutcomeService`. Verification passed via Docker Compose (`app-tools pytest -q tests/test_outcomes.py tests/test_reporting.py`, `app-tools ruff check` on changed files, `app-tools mypy app`).
+- 2026-02-26T18:33:13Z (UTC): Phase 17 closed as DONE (`17-WP4`). Full gate chain passed via Docker Compose (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`) and migration head advanced to `202602260070`. Checkpoint moved to `phase-18-outcomes-repository-object-storage.md` with `READY`.
+- 2026-02-26T18:33:13Z (UTC): Phase 17 `P2` completed. Added role-inherited data policies + user explicit deny fields, exposed role/effective policy APIs, and enforced fixed resolution order `explicit_deny > explicit_allow > inherited_allow > default_deny` in perimeter scope evaluation. Verification passed (`ruff`, `mypy`, `python -B -m pytest -q tests/test_identity.py tests/test_data_perimeter.py tests/test_asset.py tests/test_registry.py`, `alembic upgrade head`, markdown UTF-8 check).
+- 2026-02-26T17:55:59Z (UTC): Phase 17 `17-WP3` completed. Delivered explicit `platform.super_admin` gated cross-tenant governance APIs (`/api/identity/platform/tenants`, `/api/identity/platform/tenants/{tenant_id}/users`) and attached audit actions (`identity.platform.tenants.list`, `identity.platform.tenant_users.list`). Verification passed (`ruff check app tests`, `mypy app`, `python -B -m pytest -q tests/test_identity.py tests/test_data_perimeter.py tests/test_asset.py tests/test_registry.py`, `alembic upgrade head`, `python infra/scripts/check_markdown_utf8.py`).
+- 2026-02-26T17:39:20Z (UTC): Phase 17 `17-WP2` completed. Delivered area/task/resource minimum data-perimeter loop by adding `resource_ids` policy scope, integrating perimeter checks into asset/registry read+write flows with `404` deny semantics, and extending regression matrix for mission/asset/drone filtering. Verification passed (`ruff` changed files, `mypy` perimeter modules, `pytest -q tests/test_identity.py tests/test_data_perimeter.py tests/test_asset.py tests/test_registry.py`, `alembic upgrade head` to `202602260067`).
+- 2026-02-26T17:03:17Z (UTC): Phase 17 moved to RUNNING with `17-WP1` completed. Added org node type (`ORGANIZATION`/`DEPARTMENT`) and user-org position fields (`job_title`/`job_code`/`is_manager`) across model/service/API, delivered migration chain `202602260062/063/064`, and passed targeted verification (`ruff` on changed files, `mypy` on identity modules, `pytest -q tests/test_identity.py tests/test_identity_org.py`, `alembic upgrade head`).
 - 2026-02-26T16:01:54Z (UTC): Phase 16 closed as DONE. Delivered UI session login/logout + CSRF guard and tenant-context validation, unified SaaS shell/navigation with RBAC menu visibility, module entry hubs and UX enhancements (global search + favorites quick access), demo script `infra/scripts/demo_phase16_saas_console_ui.py`, report `logs/phase-16-saas-console-ui.md.report.md`, and full closeout chain pass (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase16_saas_console_ui`).
 - 2026-02-25T16:54:45Z (UTC): Roadmap extended with planning blueprints `phase-16`..`phase-25` (UI-first SaaS console, multi-org/data perimeter v2, outcomes/object storage, real device/video integration, task/compliance/alert/AI v2 enhancements, billing/quota, observability/reliability). Execution checkpoint moved to `phase-16-saas-console-ui.md` with `READY`; index and resume entrypoint updated accordingly.
 - 2026-02-25T04:15:26Z (UTC): Phase 11 closed as DONE. Completed P1/P2 capabilities (auto-dispatch scoring explainability, risk/checklist update, attachment/comment collaboration), delivered demo script `infra/scripts/demo_phase11_task_center.py`, generated report `logs/phase-11-unified-task-center-workflow.md.report.md`, and passed full closeout chain (`ruff`, `mypy`, `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase11_task_center`).

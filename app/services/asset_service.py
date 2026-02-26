@@ -22,6 +22,7 @@ from app.domain.models import (
 )
 from app.infra.db import get_engine
 from app.infra.events import event_bus
+from app.services.data_perimeter_service import DataPerimeterService
 
 
 class AssetError(Exception):
@@ -37,6 +38,9 @@ class ConflictError(AssetError):
 
 
 class AssetService:
+    def __init__(self) -> None:
+        self._data_perimeter = DataPerimeterService()
+
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
 
@@ -50,6 +54,19 @@ class AssetService:
         drone = session.exec(select(Drone).where(Drone.tenant_id == tenant_id).where(Drone.id == drone_id)).first()
         if drone is None:
             raise NotFoundError("drone not found")
+
+    def _ensure_asset_visible(
+        self,
+        session: Session,
+        tenant_id: str,
+        viewer_user_id: str | None,
+        asset: Asset,
+    ) -> None:
+        if viewer_user_id is None:
+            return
+        scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+        if not self._data_perimeter.asset_visible(asset, scope):
+            raise NotFoundError("asset not found")
 
     def create_asset(self, tenant_id: str, payload: AssetCreate) -> Asset:
         with self._session() as session:
@@ -93,6 +110,7 @@ class AssetService:
         availability_status: AssetAvailabilityStatus | None = None,
         health_status: AssetHealthStatus | None = None,
         region_code: str | None = None,
+        viewer_user_id: str | None = None,
     ) -> list[Asset]:
         with self._session() as session:
             statement = select(Asset).where(Asset.tenant_id == tenant_id)
@@ -106,7 +124,11 @@ class AssetService:
                 statement = statement.where(Asset.health_status == health_status)
             if region_code is not None:
                 statement = statement.where(Asset.region_code == region_code)
-            return list(session.exec(statement).all())
+            rows = list(session.exec(statement).all())
+            if viewer_user_id is None:
+                return rows
+            scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+            return [item for item in rows if self._data_perimeter.asset_visible(item, scope)]
 
     def list_resource_pool(
         self,
@@ -117,6 +139,7 @@ class AssetService:
         health_status: AssetHealthStatus | None = None,
         region_code: str | None = None,
         min_health_score: int | None = None,
+        viewer_user_id: str | None = None,
     ) -> list[Asset]:
         with self._session() as session:
             statement = select(Asset).where(Asset.tenant_id == tenant_id)
@@ -129,6 +152,9 @@ class AssetService:
             if region_code is not None:
                 statement = statement.where(Asset.region_code == region_code)
             rows = list(session.exec(statement).all())
+            if viewer_user_id is not None:
+                scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+                rows = [item for item in rows if self._data_perimeter.asset_visible(item, scope)]
             if min_health_score is not None:
                 rows = [
                     item
@@ -145,6 +171,7 @@ class AssetService:
         health_status: AssetHealthStatus | None = None,
         region_code: str | None = None,
         min_health_score: int | None = None,
+        viewer_user_id: str | None = None,
     ) -> list[dict[str, Any]]:
         assets = self.list_resource_pool(
             tenant_id,
@@ -153,6 +180,7 @@ class AssetService:
             health_status=health_status,
             region_code=region_code,
             min_health_score=min_health_score,
+            viewer_user_id=viewer_user_id,
         )
         grouped: dict[str, dict[str, Any]] = {}
         for asset in assets:
@@ -201,13 +229,22 @@ class AssetService:
             )
         return result
 
-    def get_asset(self, tenant_id: str, asset_id: str) -> Asset:
-        with self._session() as session:
-            return self._get_scoped_asset(session, tenant_id, asset_id)
-
-    def bind_asset(self, tenant_id: str, asset_id: str, payload: AssetBindRequest) -> Asset:
+    def get_asset(self, tenant_id: str, asset_id: str, viewer_user_id: str | None = None) -> Asset:
         with self._session() as session:
             asset = self._get_scoped_asset(session, tenant_id, asset_id)
+            self._ensure_asset_visible(session, tenant_id, viewer_user_id, asset)
+            return asset
+
+    def bind_asset(
+        self,
+        tenant_id: str,
+        asset_id: str,
+        payload: AssetBindRequest,
+        viewer_user_id: str | None = None,
+    ) -> Asset:
+        with self._session() as session:
+            asset = self._get_scoped_asset(session, tenant_id, asset_id)
+            self._ensure_asset_visible(session, tenant_id, viewer_user_id, asset)
             if asset.lifecycle_status == AssetLifecycleStatus.RETIRED:
                 raise ConflictError("retired asset cannot be bound")
             self._ensure_scoped_drone(session, tenant_id, payload.bound_to_drone_id)
@@ -231,9 +268,16 @@ class AssetService:
         )
         return asset
 
-    def retire_asset(self, tenant_id: str, asset_id: str, payload: AssetRetireRequest) -> Asset:
+    def retire_asset(
+        self,
+        tenant_id: str,
+        asset_id: str,
+        payload: AssetRetireRequest,
+        viewer_user_id: str | None = None,
+    ) -> Asset:
         with self._session() as session:
             asset = self._get_scoped_asset(session, tenant_id, asset_id)
+            self._ensure_asset_visible(session, tenant_id, viewer_user_id, asset)
             asset.lifecycle_status = AssetLifecycleStatus.RETIRED
             asset.retired_reason = payload.reason
             asset.retired_at = datetime.now(UTC)
@@ -260,9 +304,11 @@ class AssetService:
         tenant_id: str,
         asset_id: str,
         payload: AssetAvailabilityUpdateRequest,
+        viewer_user_id: str | None = None,
     ) -> Asset:
         with self._session() as session:
             asset = self._get_scoped_asset(session, tenant_id, asset_id)
+            self._ensure_asset_visible(session, tenant_id, viewer_user_id, asset)
             if asset.lifecycle_status == AssetLifecycleStatus.RETIRED:
                 raise ConflictError("retired asset cannot update availability")
             asset.availability_status = payload.availability_status
@@ -288,9 +334,11 @@ class AssetService:
         tenant_id: str,
         asset_id: str,
         payload: AssetHealthUpdateRequest,
+        viewer_user_id: str | None = None,
     ) -> Asset:
         with self._session() as session:
             asset = self._get_scoped_asset(session, tenant_id, asset_id)
+            self._ensure_asset_visible(session, tenant_id, viewer_user_id, asset)
             if asset.lifecycle_status == AssetLifecycleStatus.RETIRED:
                 raise ConflictError("retired asset cannot update health")
             asset.health_status = payload.health_status

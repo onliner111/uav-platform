@@ -70,11 +70,23 @@
 | GET | `/api/identity/users/{user_id}/org-units` | 查询用户组织绑定 |
 | GET | `/api/identity/users/{user_id}/data-policy` | 查询用户数据边界策略 |
 | PUT | `/api/identity/users/{user_id}/data-policy` | 设置用户数据边界策略 |
+| GET | `/api/identity/users/{user_id}/data-policy:effective` | 查询用户有效数据边界策略（显式/继承/冲突解析结果） |
+| GET | `/api/identity/roles/{role_id}/data-policy` | 查询角色继承数据边界策略 |
+| PUT | `/api/identity/roles/{role_id}/data-policy` | 设置角色继承数据边界策略 |
 | POST | `/api/identity/users/{user_id}/roles:batch-bind` | 批量绑定用户角色（返回逐项结果） |
 | POST | `/api/identity/users/{user_id}/roles/{role_id}` | 用户绑定角色 |
 | DELETE | `/api/identity/users/{user_id}/roles/{role_id}` | 用户解绑角色 |
 | POST | `/api/identity/roles/{role_id}/permissions/{permission_id}` | 角色绑定权限 |
 | DELETE | `/api/identity/roles/{role_id}/permissions/{permission_id}` | 角色解绑权限 |
+| GET | `/api/identity/platform/tenants` | 平台超管查看全租户列表（需显式 `platform.super_admin`） |
+| GET | `/api/identity/platform/tenants/{tenant_id}/users` | 平台超管查看指定租户用户列表 |
+
+组织与岗位字段补充：
+- `OrgUnit` 支持 `unit_type`：`ORGANIZATION` / `DEPARTMENT`
+- 用户组织绑定请求支持：`is_primary`、`job_title`、`job_code`、`is_manager`
+- 用户数据边界策略支持 `resource_ids`（资源级过滤，适用于资产与设备）
+- 用户数据边界策略支持显式拒绝维度：`denied_org_unit_ids`、`denied_project_codes`、`denied_area_codes`、`denied_task_ids`、`denied_resource_ids`
+- 冲突解析顺序固定为：`explicit_deny > explicit_allow > inherited_allow > default_deny`
 
 ---
 
@@ -380,4 +392,3 @@
 | POST | `/api/open-platform/webhooks/{endpoint_id}/dispatch-test` | Webhook 发送测试 |
 | POST | `/api/open-platform/adapters/events/ingest` | 外部适配器事件入口（签名鉴权） |
 | GET | `/api/open-platform/adapters/events` | 外部事件入站记录列表 |
-

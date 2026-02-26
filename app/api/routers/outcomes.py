@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import FileResponse
 
 from app.api.deps import get_current_claims, require_perm
 from app.domain.models import (
@@ -16,6 +17,9 @@ from app.domain.models import (
     RawDataCatalogCreate,
     RawDataCatalogRead,
     RawDataType,
+    RawUploadCompleteRequest,
+    RawUploadInitRead,
+    RawUploadInitRequest,
 )
 from app.domain.permissions import PERM_INSPECTION_READ, PERM_INSPECTION_WRITE
 from app.services.outcome_service import ConflictError, NotFoundError, OutcomeService
@@ -54,6 +58,68 @@ def create_raw_data(payload: RawDataCatalogCreate, claims: Claims, service: Serv
         raise
 
 
+@router.post(
+    "/raw/uploads:init",
+    response_model=RawUploadInitRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm(PERM_INSPECTION_WRITE))],
+)
+def init_raw_upload(
+    payload: RawUploadInitRequest,
+    claims: Claims,
+    service: Service,
+) -> RawUploadInitRead:
+    try:
+        result = service.init_raw_upload_session(claims["tenant_id"], claims["sub"], payload)
+        return RawUploadInitRead.model_validate(result)
+    except (NotFoundError, ConflictError) as exc:
+        _handle_outcome_error(exc)
+        raise
+
+
+@router.put(
+    "/raw/uploads/{session_id}/content",
+    dependencies=[Depends(require_perm(PERM_INSPECTION_WRITE))],
+)
+async def upload_raw_content(
+    session_id: str,
+    request: Request,
+    claims: Claims,
+    service: Service,
+    upload_token: Annotated[str, Header(alias="X-Upload-Token")],
+) -> dict[str, Any]:
+    try:
+        content = await request.body()
+        return service.write_raw_upload_content(claims["tenant_id"], session_id, upload_token, content)
+    except (NotFoundError, ConflictError) as exc:
+        _handle_outcome_error(exc)
+        raise
+
+
+@router.post(
+    "/raw/uploads/{session_id}:complete",
+    response_model=RawDataCatalogRead,
+    dependencies=[Depends(require_perm(PERM_INSPECTION_WRITE))],
+)
+def complete_raw_upload(
+    session_id: str,
+    payload: RawUploadCompleteRequest,
+    claims: Claims,
+    service: Service,
+) -> RawDataCatalogRead:
+    try:
+        row = service.complete_raw_upload_session(
+            claims["tenant_id"],
+            claims["sub"],
+            session_id,
+            payload.upload_token,
+        )
+        return RawDataCatalogRead.model_validate(row)
+    except (NotFoundError, ConflictError) as exc:
+        _handle_outcome_error(exc)
+        raise
+
+
 @router.get(
     "/raw",
     response_model=list[RawDataCatalogRead],
@@ -78,6 +144,23 @@ def list_raw_data(
         viewer_user_id=claims["sub"],
     )
     return [RawDataCatalogRead.model_validate(item) for item in rows]
+
+
+@router.get(
+    "/raw/{raw_id}/download",
+    dependencies=[Depends(require_perm(PERM_INSPECTION_READ))],
+)
+def download_raw_data(
+    raw_id: str,
+    claims: Claims,
+    service: Service,
+) -> FileResponse:
+    try:
+        path = service.get_raw_download_path(claims["tenant_id"], raw_id, viewer_user_id=claims["sub"])
+    except (NotFoundError, ConflictError) as exc:
+        _handle_outcome_error(exc)
+        raise
+    return FileResponse(path=path, filename=path.name, media_type="application/octet-stream")
 
 
 @router.post(

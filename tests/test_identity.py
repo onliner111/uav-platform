@@ -86,6 +86,14 @@ def _latest_audit(
     return sorted(rows, key=lambda item: item.ts)[-1]
 
 
+def _get_permission_id_by_name(client: TestClient, token: str, name: str) -> str:
+    response = client.get("/api/identity/permissions", headers=_auth_header(token))
+    assert response.status_code == 200
+    matches = [item for item in response.json() if item["name"] == name]
+    assert matches
+    return matches[0]["id"]
+
+
 def test_identity_tenant_isolation(identity_client: TestClient) -> None:
     tenant_a = _create_tenant(identity_client, "tenant-a")
     tenant_b = _create_tenant(identity_client, "tenant-b")
@@ -140,6 +148,83 @@ def test_identity_permission_denied(identity_client: TestClient) -> None:
     bob_token = _login(identity_client, tenant_id, "bob", "bob-pass")
     forbidden_resp = identity_client.get("/api/identity/users", headers=_auth_header(bob_token))
     assert forbidden_resp.status_code == 403
+
+
+def test_identity_platform_super_admin_cross_tenant_governance(identity_client: TestClient) -> None:
+    tenant_a = _create_tenant(identity_client, "tenant-platform-a")
+    tenant_b = _create_tenant(identity_client, "tenant-platform-b")
+    _bootstrap_admin(identity_client, tenant_a, "admin_pa", "pass-a")
+    _bootstrap_admin(identity_client, tenant_b, "admin_pb", "pass-b")
+
+    token_a = _login(identity_client, tenant_a, "admin_pa", "pass-a")
+    token_b = _login(identity_client, tenant_b, "admin_pb", "pass-b")
+
+    create_perm_resp = identity_client.post(
+        "/api/identity/permissions",
+        json={"name": "platform.super_admin", "description": "platform governance capability"},
+        headers=_auth_header(token_a),
+    )
+    assert create_perm_resp.status_code == 201
+    perm_id = create_perm_resp.json()["id"]
+
+    super_role_resp = identity_client.post(
+        "/api/identity/roles",
+        json={"name": "platform-super-admin", "description": "platform governance role"},
+        headers=_auth_header(token_a),
+    )
+    assert super_role_resp.status_code == 201
+    super_role_id = super_role_resp.json()["id"]
+
+    bind_perm_resp = identity_client.post(
+        f"/api/identity/roles/{super_role_id}/permissions/{perm_id}",
+        headers=_auth_header(token_a),
+    )
+    assert bind_perm_resp.status_code == 204
+
+    super_user_resp = identity_client.post(
+        "/api/identity/users",
+        json={"username": "platform_super", "password": "super-pass", "is_active": True},
+        headers=_auth_header(token_a),
+    )
+    assert super_user_resp.status_code == 201
+    super_user_id = super_user_resp.json()["id"]
+
+    bind_super_role_resp = identity_client.post(
+        f"/api/identity/users/{super_user_id}/roles/{super_role_id}",
+        headers=_auth_header(token_a),
+    )
+    assert bind_super_role_resp.status_code == 204
+
+    super_token = _login(identity_client, tenant_a, "platform_super", "super-pass")
+
+    platform_tenants_resp = identity_client.get(
+        "/api/identity/platform/tenants",
+        headers=_auth_header(super_token),
+    )
+    assert platform_tenants_resp.status_code == 200
+    tenant_ids = {item["id"] for item in platform_tenants_resp.json()}
+    assert tenant_a in tenant_ids
+    assert tenant_b in tenant_ids
+
+    platform_users_resp = identity_client.get(
+        f"/api/identity/platform/tenants/{tenant_b}/users",
+        headers=_auth_header(super_token),
+    )
+    assert platform_users_resp.status_code == 200
+    usernames = {item["username"] for item in platform_users_resp.json()}
+    assert "admin_pb" in usernames
+
+    normal_admin_resp = identity_client.get(
+        "/api/identity/platform/tenants",
+        headers=_auth_header(token_a),
+    )
+    assert normal_admin_resp.status_code == 403
+
+    cross_tenant_admin_resp = identity_client.get(
+        "/api/identity/platform/tenants",
+        headers=_auth_header(token_b),
+    )
+    assert cross_tenant_admin_resp.status_code == 403
 
 
 def test_identity_cross_tenant_bind_unbind_returns_404(identity_client: TestClient) -> None:
@@ -310,7 +395,7 @@ def test_identity_org_units_crud_and_membership_guards(identity_client: TestClie
 
     create_root_resp = identity_client.post(
         "/api/identity/org-units",
-        json={"name": "HQ", "code": "HQ"},
+        json={"name": "HQ", "code": "HQ", "unit_type": "ORGANIZATION"},
         headers=_auth_header(token),
     )
     assert create_root_resp.status_code == 201
@@ -318,7 +403,7 @@ def test_identity_org_units_crud_and_membership_guards(identity_client: TestClie
 
     create_child_resp = identity_client.post(
         "/api/identity/org-units",
-        json={"name": "Ops", "code": "OPS", "parent_id": root_id},
+        json={"name": "Ops", "code": "OPS", "unit_type": "DEPARTMENT", "parent_id": root_id},
         headers=_auth_header(token),
     )
     assert create_child_resp.status_code == 201
@@ -326,7 +411,7 @@ def test_identity_org_units_crud_and_membership_guards(identity_client: TestClie
 
     create_field_resp = identity_client.post(
         "/api/identity/org-units",
-        json={"name": "Field", "code": "FIELD", "parent_id": root_id},
+        json={"name": "Field", "code": "FIELD", "unit_type": "DEPARTMENT", "parent_id": root_id},
         headers=_auth_header(token),
     )
     assert create_field_resp.status_code == 201
@@ -342,31 +427,44 @@ def test_identity_org_units_crud_and_membership_guards(identity_client: TestClie
     get_child_resp = identity_client.get(f"/api/identity/org-units/{child_id}", headers=_auth_header(token))
     assert get_child_resp.status_code == 200
     assert get_child_resp.json()["parent_id"] == root_id
+    assert get_child_resp.json()["unit_type"] == "DEPARTMENT"
 
     update_child_resp = identity_client.patch(
         f"/api/identity/org-units/{child_id}",
-        json={"name": "Ops-Renamed", "is_active": False},
+        json={"name": "Ops-Renamed", "unit_type": "ORGANIZATION", "is_active": False},
         headers=_auth_header(token),
     )
     assert update_child_resp.status_code == 200
     assert update_child_resp.json()["name"] == "Ops-Renamed"
+    assert update_child_resp.json()["unit_type"] == "ORGANIZATION"
     assert update_child_resp.json()["is_active"] is False
 
     bind_child_resp = identity_client.post(
         f"/api/identity/users/{user_id}/org-units/{child_id}",
-        json={"is_primary": True},
+        json={
+            "is_primary": True,
+            "job_title": "Ops Manager",
+            "job_code": "OPS-MGR",
+            "is_manager": True,
+        },
         headers=_auth_header(token),
     )
     assert bind_child_resp.status_code == 200
     assert bind_child_resp.json()["is_primary"] is True
+    assert bind_child_resp.json()["job_title"] == "Ops Manager"
+    assert bind_child_resp.json()["job_code"] == "OPS-MGR"
+    assert bind_child_resp.json()["is_manager"] is True
 
     bind_field_resp = identity_client.post(
         f"/api/identity/users/{user_id}/org-units/{field_id}",
-        json={"is_primary": True},
+        json={"is_primary": True, "job_title": "Field Inspector", "job_code": "FIELD-INSP"},
         headers=_auth_header(token),
     )
     assert bind_field_resp.status_code == 200
     assert bind_field_resp.json()["is_primary"] is True
+    assert bind_field_resp.json()["job_title"] == "Field Inspector"
+    assert bind_field_resp.json()["job_code"] == "FIELD-INSP"
+    assert bind_field_resp.json()["is_manager"] is False
 
     list_user_org_resp = identity_client.get(
         f"/api/identity/users/{user_id}/org-units",
@@ -375,7 +473,13 @@ def test_identity_org_units_crud_and_membership_guards(identity_client: TestClie
     assert list_user_org_resp.status_code == 200
     user_orgs = {item["org_unit_id"]: item for item in list_user_org_resp.json()}
     assert user_orgs[child_id]["is_primary"] is False
+    assert user_orgs[child_id]["job_title"] == "Ops Manager"
+    assert user_orgs[child_id]["job_code"] == "OPS-MGR"
+    assert user_orgs[child_id]["is_manager"] is True
     assert user_orgs[field_id]["is_primary"] is True
+    assert user_orgs[field_id]["job_title"] == "Field Inspector"
+    assert user_orgs[field_id]["job_code"] == "FIELD-INSP"
+    assert user_orgs[field_id]["is_manager"] is False
 
     delete_root_resp = identity_client.delete(f"/api/identity/org-units/{root_id}", headers=_auth_header(token))
     assert delete_root_resp.status_code == 409
@@ -469,6 +573,9 @@ def test_identity_user_data_policy_upsert_and_get(identity_client: TestClient) -
             "project_codes": ["PROJ-A"],
             "area_codes": ["AREA-NORTH"],
             "task_ids": ["TASK-1"],
+            "resource_ids": ["RES-1"],
+            "denied_area_codes": ["AREA-BLOCK"],
+            "denied_resource_ids": ["RES-DENY"],
         },
         headers=_auth_header(token),
     )
@@ -477,6 +584,9 @@ def test_identity_user_data_policy_upsert_and_get(identity_client: TestClient) -
     assert body["scope_mode"] == "SCOPED"
     assert body["org_unit_ids"] == ["OU-1", "OU-2"]
     assert body["project_codes"] == ["PROJ-A"]
+    assert body["resource_ids"] == ["RES-1"]
+    assert body["denied_area_codes"] == ["AREA-BLOCK"]
+    assert body["denied_resource_ids"] == ["RES-DENY"]
 
     get_resp = identity_client.get(
         f"/api/identity/users/{user_id}/data-policy",
@@ -484,6 +594,115 @@ def test_identity_user_data_policy_upsert_and_get(identity_client: TestClient) -
     )
     assert get_resp.status_code == 200
     assert get_resp.json()["task_ids"] == ["TASK-1"]
+    assert get_resp.json()["resource_ids"] == ["RES-1"]
+    assert get_resp.json()["denied_area_codes"] == ["AREA-BLOCK"]
+    assert get_resp.json()["denied_resource_ids"] == ["RES-DENY"]
+
+
+def test_identity_role_data_policy_and_effective_resolution(identity_client: TestClient) -> None:
+    tenant_id = _create_tenant(identity_client, "tenant-role-policy")
+    _bootstrap_admin(identity_client, tenant_id, "admin_role_policy", "pass-role-policy")
+    token = _login(identity_client, tenant_id, "admin_role_policy", "pass-role-policy")
+
+    create_user_resp = identity_client.post(
+        "/api/identity/users",
+        json={"username": "role_policy_user", "password": "role-pass", "is_active": True},
+        headers=_auth_header(token),
+    )
+    assert create_user_resp.status_code == 201
+    user_id = create_user_resp.json()["id"]
+
+    create_role_resp = identity_client.post(
+        "/api/identity/roles",
+        json={"name": "inherit-area-role", "description": "inherited area allow"},
+        headers=_auth_header(token),
+    )
+    assert create_role_resp.status_code == 201
+    role_id = create_role_resp.json()["id"]
+
+    bind_role_resp = identity_client.post(
+        f"/api/identity/users/{user_id}/roles/{role_id}",
+        headers=_auth_header(token),
+    )
+    assert bind_role_resp.status_code == 204
+
+    upsert_role_policy_resp = identity_client.put(
+        f"/api/identity/roles/{role_id}/data-policy",
+        json={
+            "scope_mode": "SCOPED",
+            "area_codes": ["AREA-A"],
+            "project_codes": ["PROJ-A"],
+        },
+        headers=_auth_header(token),
+    )
+    assert upsert_role_policy_resp.status_code == 200
+    assert upsert_role_policy_resp.json()["area_codes"] == ["AREA-A"]
+    assert upsert_role_policy_resp.json()["project_codes"] == ["PROJ-A"]
+
+    upsert_user_policy_resp = identity_client.put(
+        f"/api/identity/users/{user_id}/data-policy",
+        json={
+            "scope_mode": "SCOPED",
+            "area_codes": ["AREA-B"],
+            "denied_area_codes": ["AREA-A"],
+        },
+        headers=_auth_header(token),
+    )
+    assert upsert_user_policy_resp.status_code == 200
+
+    effective_resp = identity_client.get(
+        f"/api/identity/users/{user_id}/data-policy:effective",
+        headers=_auth_header(token),
+    )
+    assert effective_resp.status_code == 200
+    body = effective_resp.json()
+    assert body["scope_mode"] == "SCOPED"
+    assert body["explicit_allow_area_codes"] == ["AREA-B"]
+    assert body["explicit_deny_area_codes"] == ["AREA-A"]
+    assert body["inherited_allow_area_codes"] == ["AREA-A"]
+    assert body["inherited_allow_project_codes"] == ["PROJ-A"]
+    assert body["resolution_order"] == [
+        "explicit_deny",
+        "explicit_allow",
+        "inherited_allow",
+        "default_deny",
+    ]
+
+
+def test_identity_role_data_policy_cross_tenant_404(identity_client: TestClient) -> None:
+    tenant_a = _create_tenant(identity_client, "tenant-role-policy-a")
+    tenant_b = _create_tenant(identity_client, "tenant-role-policy-b")
+    _bootstrap_admin(identity_client, tenant_a, "admin_role_a", "pass-a")
+    _bootstrap_admin(identity_client, tenant_b, "admin_role_b", "pass-b")
+    token_a = _login(identity_client, tenant_a, "admin_role_a", "pass-a")
+    token_b = _login(identity_client, tenant_b, "admin_role_b", "pass-b")
+
+    create_role_resp = identity_client.post(
+        "/api/identity/roles",
+        json={"name": "role-a", "description": "tenant a role"},
+        headers=_auth_header(token_a),
+    )
+    assert create_role_resp.status_code == 201
+    role_a_id = create_role_resp.json()["id"]
+
+    cross_get_resp = identity_client.get(
+        f"/api/identity/roles/{role_a_id}/data-policy",
+        headers=_auth_header(token_b),
+    )
+    assert cross_get_resp.status_code == 404
+
+    cross_put_resp = identity_client.put(
+        f"/api/identity/roles/{role_a_id}/data-policy",
+        json={"scope_mode": "SCOPED", "area_codes": ["AREA-X"]},
+        headers=_auth_header(token_b),
+    )
+    assert cross_put_resp.status_code == 404
+
+    denied_log = _latest_audit(tenant_b, "identity.role_data_policy.upsert", status_code=404)
+    denied_detail = denied_log.detail
+    assert denied_detail["what"]["target"]["role_id"] == role_a_id
+    assert denied_detail["result"]["outcome"] == "denied"
+    assert denied_detail["result"]["reason"] == "cross_tenant_boundary"
 
 
 def test_identity_user_data_policy_cross_tenant_404(identity_client: TestClient) -> None:
@@ -540,6 +759,7 @@ def test_identity_user_data_policy_audit_hardening(identity_client: TestClient) 
             "project_codes": ["PROJ-A"],
             "area_codes": ["AREA-1"],
             "task_ids": ["TASK-1"],
+            "resource_ids": ["RES-A"],
         },
         headers=_auth_header(token_a),
     )

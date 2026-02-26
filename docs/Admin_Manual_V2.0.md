@@ -108,6 +108,8 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 1. 先建组织树（根组织 -> 子组织），再进行用户绑定。
 2. 有子组织或成员绑定时删除组织会被拒绝（409）。
 3. 跨租户访问按 404 语义处理，不暴露目标资源存在性。
+4. 组织节点建议显式设置 `unit_type`（`ORGANIZATION` / `DEPARTMENT`）。
+5. 用户绑定组织时可写入岗位信息（`job_title`、`job_code`、`is_manager`）。
 
 ### 3.6 数据边界策略（08B）
 
@@ -126,7 +128,13 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
   "org_unit_ids": ["<org_unit_id>"],
   "project_codes": ["PROJ-A"],
   "area_codes": ["AREA-NORTH"],
-  "task_ids": []
+  "task_ids": [],
+  "resource_ids": ["<asset_or_drone_id>"],
+  "denied_org_unit_ids": [],
+  "denied_project_codes": [],
+  "denied_area_codes": [],
+  "denied_task_ids": [],
+  "denied_resource_ids": []
 }
 ```
 
@@ -136,6 +144,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 2. `scope_mode=SCOPED` 时，非空维度会参与过滤。
 3. 未命中的资源在 API 层返回 404 语义。
 4. 08C 起策略变更与跨租户拒绝会写入结构化审计字段（`who/when/where/what/result`）。
+5. 17-P2 起支持显式拒绝维度（`denied_*`），并按固定顺序解析冲突：`explicit_deny > explicit_allow > inherited_allow > default_deny`。
 
 ### 3.6.1 批量授权（08C）
 
@@ -159,6 +168,36 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 2. `already_bound_count`：已绑定（幂等）数量。
 3. `denied_count`：跨租户拒绝数量（`cross_tenant_denied`）。
 4. `missing_count`：角色不存在数量（`not_found`）。
+
+### 3.6.2 平台超管治理（17-WP3）
+
+用途：提供跨租户治理只读入口（租户清单、按租户查看用户）。
+
+接口：
+
+- `GET /api/identity/platform/tenants`
+- `GET /api/identity/platform/tenants/{tenant_id}/users`
+
+授权要求：
+
+1. 必须显式拥有 `platform.super_admin` 权限。
+2. 仅 `*`（wildcard）权限不足以调用该入口。
+
+### 3.6.3 角色继承策略与冲突解析（17-P2）
+
+用途：通过角色策略提供“继承允许”，并与用户显式允许/显式拒绝组合计算最终可见范围。
+
+接口：
+
+- `GET /api/identity/roles/{role_id}/data-policy`
+- `PUT /api/identity/roles/{role_id}/data-policy`
+- `GET /api/identity/users/{user_id}/data-policy:effective`
+
+建议流程：
+
+1. 先在角色上配置公共可见域（继承允许）。
+2. 再在用户上写入显式允许或显式拒绝，处理例外。
+3. 通过 `data-policy:effective` 校验最终结果是否符合预期。
 
 ### 3.7 推荐角色划分
 

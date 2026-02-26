@@ -57,16 +57,16 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-26T16:01:54Z`
-- current_phase: `phase-17-multi-org-data-perimeter-v2.md`
-- phase_status: `READY`
-- last_success_phase: `phase-16-saas-console-ui.md`
-- current_focus: `Phase 16 SaaS console UI closed as DONE; execution is queued from phase-17 (READY)`
+- updated_at_utc: `2026-02-26T19:10:25Z`
+- current_phase: `phase-18-outcomes-repository-object-storage.md`
+- phase_status: `RUNNING`
+- last_success_phase: `phase-17-multi-org-data-perimeter-v2.md`
+- current_focus: `Phase 18 is RUNNING: 18-WP1 completed (object storage minimal upload/download loop); continue P0 with 18-WP2`
 
 ## Next TODO (Execution Target)
-1. Start Phase 17 from `P0 -> P1 -> P2 -> 17-WP4` and keep full gate pass as closeout condition.
-2. Keep Docker Compose baseline gate commands below as regression checklist for each new phase.
-3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> WP4`) for all future phases.
+1. Continue Phase 18 P0 by implementing `18-WP2` (outcome version model + access control), based on completed `18-WP1`.
+2. After P0 closeout, continue in order `18-WP3 -> 18-WP4 -> 18-WP5 -> 18-WP6` with full gate pass as phase closeout condition.
+3. Keep Docker Compose baseline gate commands below as regression checklist for each new stage.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -91,4 +91,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-17-multi-org-data-perimeter-v2.md；按 P0 -> P1 -> P2 -> WP4 执行并通过全量门禁。当前 Phase 完成后停止，等待下一步命令。`
+`先读取 phases/resume.md 和 phases/state.md。当前 status=RUNNING，current_phase=phase-18-outcomes-repository-object-storage.md；继续执行 Phase 18，从 18-WP2 开始并按顺序推进到 18-WP6，全部门禁通过后关账。`

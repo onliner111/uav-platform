@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from app.api.deps import get_current_claims, require_perm
 from app.domain.models import (
     BootstrapAdminRequest,
+    DataAccessPolicyEffectiveRead,
     DataAccessPolicyRead,
     DataAccessPolicyUpdate,
     DevLoginRequest,
@@ -17,6 +18,8 @@ from app.domain.models import (
     PermissionRead,
     PermissionUpdate,
     RoleCreate,
+    RoleDataAccessPolicyRead,
+    RoleDataAccessPolicyUpdate,
     RoleFromTemplateCreateRequest,
     RoleRead,
     RoleTemplateRead,
@@ -33,7 +36,11 @@ from app.domain.models import (
     UserRoleBatchBindRequest,
     UserUpdate,
 )
-from app.domain.permissions import PERM_IDENTITY_READ, PERM_IDENTITY_WRITE
+from app.domain.permissions import (
+    PERM_IDENTITY_READ,
+    PERM_IDENTITY_WRITE,
+    PERM_PLATFORM_SUPER_ADMIN,
+)
 from app.infra.audit import set_audit_context
 from app.infra.auth import create_access_token
 from app.services.identity_service import AuthError, ConflictError, IdentityService, NotFoundError
@@ -67,6 +74,12 @@ def _policy_snapshot(policy: Any) -> dict[str, Any]:
         "project_codes": list(policy.project_codes),
         "area_codes": list(policy.area_codes),
         "task_ids": list(policy.task_ids),
+        "resource_ids": list(policy.resource_ids),
+        "denied_org_unit_ids": list(getattr(policy, "denied_org_unit_ids", [])),
+        "denied_project_codes": list(getattr(policy, "denied_project_codes", [])),
+        "denied_area_codes": list(getattr(policy, "denied_area_codes", [])),
+        "denied_task_ids": list(getattr(policy, "denied_task_ids", [])),
+        "denied_resource_ids": list(getattr(policy, "denied_resource_ids", [])),
     }
 
 
@@ -81,6 +94,16 @@ def _set_scope_deny_audit(
     if target is not None:
         detail["what"] = {"target": target}
     set_audit_context(request, action=action, detail=detail)
+
+
+def require_platform_super_admin(claims: Claims) -> Claims:
+    permissions = claims.get("permissions", [])
+    if not isinstance(permissions, list) or PERM_PLATFORM_SUPER_ADMIN not in permissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Missing explicit permission: {PERM_PLATFORM_SUPER_ADMIN}",
+        )
+    return claims
 
 
 @router.post("/tenants", response_model=TenantRead, status_code=status.HTTP_201_CREATED)
@@ -101,6 +124,42 @@ def create_tenant(payload: TenantCreate, service: Service) -> TenantRead:
 def list_tenants(claims: Claims, service: Service) -> list[TenantRead]:
     tenants = service.list_tenants(claims["tenant_id"])
     return [TenantRead.model_validate(item) for item in tenants]
+
+
+@router.get(
+    "/platform/tenants",
+    response_model=list[TenantRead],
+    dependencies=[Depends(require_platform_super_admin)],
+)
+def list_platform_tenants(service: Service, request: Request) -> list[TenantRead]:
+    set_audit_context(
+        request,
+        action="identity.platform.tenants.list",
+        detail={"what": {"target": {"scope": "global"}}},
+    )
+    tenants = service.list_all_tenants()
+    set_audit_context(request, detail={"what": {"count": len(tenants)}})
+    return [TenantRead.model_validate(item) for item in tenants]
+
+
+@router.get(
+    "/platform/tenants/{tenant_id}/users",
+    response_model=list[UserRead],
+    dependencies=[Depends(require_platform_super_admin)],
+)
+def list_platform_tenant_users(
+    tenant_id: str,
+    service: Service,
+    request: Request,
+) -> list[UserRead]:
+    set_audit_context(
+        request,
+        action="identity.platform.tenant_users.list",
+        detail={"what": {"target": {"tenant_id": tenant_id}}},
+    )
+    rows = service.list_users(tenant_id)
+    set_audit_context(request, detail={"what": {"count": len(rows)}})
+    return [UserRead.model_validate(item) for item in rows]
 
 
 @router.get(
@@ -430,6 +489,9 @@ def bind_user_org_unit(
             user_id,
             org_unit_id,
             is_primary=body.is_primary,
+            job_title=body.job_title,
+            job_code=body.job_code,
+            is_manager=body.is_manager,
         )
         return UserOrgMembershipLinkRead.model_validate(link)
     except (NotFoundError, ConflictError, AuthError) as exc:
@@ -556,6 +618,136 @@ def upsert_user_data_policy(
                 action="identity.data_policy.upsert",
                 reason=deny_reason,
                 target={"user_id": user_id},
+            )
+        _handle_identity_error(exc)
+        raise
+
+
+@router.get(
+    "/users/{user_id}/data-policy:effective",
+    response_model=DataAccessPolicyEffectiveRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_READ))],
+)
+def get_user_effective_data_policy(
+    user_id: str,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> DataAccessPolicyEffectiveRead:
+    set_audit_context(
+        request,
+        action="identity.data_policy.effective.get",
+        detail={"what": {"target": {"user_id": user_id}}},
+    )
+    try:
+        policy = service.get_effective_user_data_policy(claims["tenant_id"], user_id)
+        set_audit_context(request, detail={"what": {"effective_policy": policy}})
+        return DataAccessPolicyEffectiveRead.model_validate(policy)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.user_exists_any_tenant(user_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.data_policy.effective.get",
+                reason=deny_reason,
+                target={"user_id": user_id},
+            )
+        _handle_identity_error(exc)
+        raise
+
+
+@router.get(
+    "/roles/{role_id}/data-policy",
+    response_model=RoleDataAccessPolicyRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_READ))],
+)
+def get_role_data_policy(
+    role_id: str,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> RoleDataAccessPolicyRead:
+    set_audit_context(
+        request,
+        action="identity.role_data_policy.get",
+        detail={"what": {"target": {"role_id": role_id}}},
+    )
+    try:
+        policy = service.get_role_data_policy(claims["tenant_id"], role_id)
+        set_audit_context(request, detail={"what": {"policy": _policy_snapshot(policy)}})
+        return RoleDataAccessPolicyRead.model_validate(policy)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.role_exists_any_tenant(role_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.role_data_policy.get",
+                reason=deny_reason,
+                target={"role_id": role_id},
+            )
+        _handle_identity_error(exc)
+        raise
+
+
+@router.put(
+    "/roles/{role_id}/data-policy",
+    response_model=RoleDataAccessPolicyRead,
+    dependencies=[Depends(require_perm(PERM_IDENTITY_WRITE))],
+)
+def upsert_role_data_policy(
+    role_id: str,
+    payload: RoleDataAccessPolicyUpdate,
+    claims: Claims,
+    service: Service,
+    request: Request,
+) -> RoleDataAccessPolicyRead:
+    set_audit_context(
+        request,
+        action="identity.role_data_policy.upsert",
+        detail={
+            "what": {
+                "target": {"role_id": role_id},
+                "requested_policy": _policy_snapshot(payload),
+            }
+        },
+    )
+    try:
+        before_policy = service.get_role_data_policy(claims["tenant_id"], role_id)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.role_exists_any_tenant(role_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.role_data_policy.upsert",
+                reason=deny_reason,
+                target={"role_id": role_id},
+            )
+        _handle_identity_error(exc)
+        raise
+    try:
+        policy = service.upsert_role_data_policy(claims["tenant_id"], role_id, payload)
+        before = _policy_snapshot(before_policy)
+        after = _policy_snapshot(policy)
+        changed_fields = sorted([key for key, value in after.items() if before.get(key) != value])
+        set_audit_context(
+            request,
+            detail={
+                "what": {
+                    "policy_before": before,
+                    "policy_after": after,
+                    "changed_fields": changed_fields,
+                }
+            },
+        )
+        return RoleDataAccessPolicyRead.model_validate(policy)
+    except (NotFoundError, ConflictError, AuthError) as exc:
+        if isinstance(exc, NotFoundError):
+            deny_reason = "cross_tenant_boundary" if service.role_exists_any_tenant(role_id) else "resource_not_found"
+            _set_scope_deny_audit(
+                request,
+                action="identity.role_data_policy.upsert",
+                reason=deny_reason,
+                target={"role_id": role_id},
             )
         _handle_identity_error(exc)
         raise

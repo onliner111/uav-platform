@@ -28,6 +28,7 @@ PERM_APPROVAL_READ = "approval.read"
 PERM_APPROVAL_WRITE = "approval.write"
 PERM_REPORTING_READ = "reporting.read"
 PERM_REPORTING_WRITE = "reporting.write"
+PERM_PLATFORM_SUPER_ADMIN = "platform.super_admin"
 
 DEFAULT_PERMISSION_NAMES = [
     PERM_WILDCARD,

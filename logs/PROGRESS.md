@@ -28,8 +28,8 @@
 - [x] phase-14-ai-assistant-evidence-chain.md - ✅ success - phase-14-ai-assistant-evidence-chain.md.report.md
 - [x] phase-15-kpi-open-platform.md - ✅ success - phase-15-kpi-open-platform.md.report.md
 - [x] phase-16-saas-console-ui.md - ✅ success - phase-16-saas-console-ui.md.report.md
-- [ ] phase-17-multi-org-data-perimeter-v2.md - ⏳ pending
-- [ ] phase-18-outcomes-repository-object-storage.md - ⏳ pending
+- [x] phase-17-multi-org-data-perimeter-v2.md - ✅ success - phase-17-multi-org-data-perimeter-v2.md.report.md
+- [ ] phase-18-outcomes-repository-object-storage.md - 🚧 running (`18-WP1` completed; continuing `18-WP2`)
 - [ ] phase-19-real-device-video-integration.md - ⏳ pending
 - [ ] phase-20-task-center-v2-optimization.md - ⏳ pending
 - [ ] phase-21-airspace-compliance-hub-v2.md - ⏳ pending
@@ -42,6 +42,13 @@
 - ✅ success
 - ❌ failed
 - ⏳ pending
+- 🚧 running
+- 2026-02-26T19:10:25Z (UTC): Phase 18 moved to RUNNING and completed `18-WP1`. Added object storage minimal chain (`/api/outcomes/raw/uploads:init`, upload content, complete, download), migration chain `202602260071/072/073`, and regression coverage `tests/test_outcomes.py::test_raw_data_upload_session_complete_and_download`. Fixed upload-session expiry compare for UTC naive/aware mismatch in `OutcomeService`; verification passed (`docker compose ... app-tools pytest -q tests/test_outcomes.py tests/test_reporting.py`, `ruff check` changed files, `mypy app`).
+- 2026-02-26T18:33:13Z (UTC): Phase 17 closed as DONE (`17-WP4`). Full gate chain passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `check_markdown_utf8.py`), report generated at `logs/phase-17-multi-org-data-perimeter-v2.md.report.md`, checkpoint moved to `phase-18-outcomes-repository-object-storage.md` (`READY`).
+- 2026-02-26T18:33:13Z (UTC): Phase 17 completed `P2` (advanced inheritance and conflict resolution). Added role data policy model/API and user effective policy API, introduced explicit deny fields (`denied_*`), and enforced fixed order `explicit_deny > explicit_allow > inherited_allow > default_deny`; landed migration chain `202602260068/069/070`, with regression coverage in `tests/test_identity.py` and `tests/test_data_perimeter.py`.
+- 2026-02-26T17:55:59Z (UTC): Phase 17 completed `17-WP3` (platform super-admin governance + audit enhancement). Added explicit `platform.super_admin` gate and cross-tenant governance endpoints (`/api/identity/platform/tenants`, `/api/identity/platform/tenants/{tenant_id}/users`) with audit actions, plus regression `tests/test_identity.py::test_identity_platform_super_admin_cross_tenant_governance`; targeted gates passed (`ruff`, `mypy`, `python -B -m pytest -q tests/test_identity.py tests/test_data_perimeter.py tests/test_asset.py tests/test_registry.py`, `alembic upgrade head`, `check_markdown_utf8.py`).
+- 2026-02-26T17:39:20Z (UTC): Phase 17 completed `17-WP2` (area/task/resource minimum perimeter loop). Added policy `resource_ids`, integrated perimeter checks into asset/registry services and routers, landed migration chain `202602260065/066/067`, and passed targeted gates (`ruff`, `mypy`, `pytest -q tests/test_identity.py tests/test_data_perimeter.py tests/test_asset.py tests/test_registry.py`, `alembic upgrade head`).
+- 2026-02-26T17:03:17Z (UTC): Phase 17 moved to RUNNING and completed `17-WP1` (org unit type + member position model). Landed migrations `202602260062/063/064`, updated identity org APIs/service, and passed targeted gates (`ruff` changed files, `mypy` identity modules, `pytest -q tests/test_identity.py tests/test_identity_org.py`, `alembic upgrade head`).
 - 2026-02-25T16:54:45Z (UTC): roadmap extended with phase-16..phase-25 blueprints; checkpoint moved to `phase-16-saas-console-ui.md` (`READY`).
 - 2026-02-24T11:23:20Z (UTC): gates passed via Docker Compose (`ruff`, `mypy`, `pytest -q`, `e2e` chain with `demo_e2e` + `verify_smoke`).
 - 2026-02-24T12:07:43Z (UTC): B5 reporting/compliance boundary delivered; gates passed via Docker Compose (`ruff`, `mypy`, `pytest -q`, `alembic upgrade head` to `202602240028`, OpenAPI export, `demo_e2e`, `verify_smoke`).

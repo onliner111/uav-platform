@@ -20,6 +20,8 @@ from app.domain.models import (
     PermissionUpdate,
     Role,
     RoleCreate,
+    RoleDataAccessPolicy,
+    RoleDataAccessPolicyUpdate,
     RolePermission,
     RoleUpdate,
     Tenant,
@@ -183,6 +185,24 @@ class IdentityService:
     def _normalize_scope_values(self, values: list[str]) -> list[str]:
         return sorted({item.strip() for item in values if isinstance(item, str) and item.strip()})
 
+    def _empty_scope_values(self) -> dict[str, list[str]]:
+        return {
+            "org_unit_ids": [],
+            "project_codes": [],
+            "area_codes": [],
+            "task_ids": [],
+            "resource_ids": [],
+        }
+
+    def _empty_deny_scope_values(self) -> dict[str, list[str]]:
+        return {
+            "denied_org_unit_ids": [],
+            "denied_project_codes": [],
+            "denied_area_codes": [],
+            "denied_task_ids": [],
+            "denied_resource_ids": [],
+        }
+
     def user_exists_any_tenant(self, user_id: str) -> bool:
         with self._session() as session:
             statement = select(User.id).where(User.id == user_id)
@@ -209,6 +229,10 @@ class IdentityService:
         with self._session() as session:
             tenant = session.get(Tenant, tenant_id)
             return [tenant] if tenant is not None else []
+
+    def list_all_tenants(self) -> list[Tenant]:
+        with self._session() as session:
+            return list(session.exec(select(Tenant)).all())
 
     def get_tenant(self, tenant_id: str) -> Tenant:
         with self._session() as session:
@@ -451,6 +475,7 @@ class IdentityService:
                 tenant_id=tenant_id,
                 name=payload.name,
                 code=payload.code,
+                unit_type=payload.unit_type,
                 parent_id=payload.parent_id,
                 is_active=payload.is_active,
             )
@@ -487,6 +512,8 @@ class IdentityService:
                 org_unit.name = payload.name
             if "code" in payload.model_fields_set and payload.code is not None:
                 org_unit.code = payload.code
+            if "unit_type" in payload.model_fields_set and payload.unit_type is not None:
+                org_unit.unit_type = payload.unit_type
             if "is_active" in payload.model_fields_set and payload.is_active is not None:
                 org_unit.is_active = payload.is_active
 
@@ -556,6 +583,9 @@ class IdentityService:
         org_unit_id: str,
         *,
         is_primary: bool = False,
+        job_title: str | None = None,
+        job_code: str | None = None,
+        is_manager: bool | None = None,
     ) -> UserOrgMembership:
         with self._session() as session:
             user = self._get_scoped_user(session, tenant_id, user_id)
@@ -570,7 +600,17 @@ class IdentityService:
                     user_id=user_id,
                     org_unit_id=org_unit_id,
                     is_primary=is_primary,
+                    job_title=job_title,
+                    job_code=job_code,
+                    is_manager=bool(is_manager),
                 )
+            else:
+                if job_title is not None:
+                    link.job_title = job_title
+                if job_code is not None:
+                    link.job_code = job_code
+                if is_manager is not None:
+                    link.is_manager = is_manager
 
             if is_primary:
                 all_links = list(
@@ -639,6 +679,12 @@ class IdentityService:
                 project_codes=[],
                 area_codes=[],
                 task_ids=[],
+                resource_ids=[],
+                denied_org_unit_ids=[],
+                denied_project_codes=[],
+                denied_area_codes=[],
+                denied_task_ids=[],
+                denied_resource_ids=[],
             )
 
     def upsert_user_data_policy(
@@ -667,11 +713,166 @@ class IdentityService:
             policy.project_codes = self._normalize_scope_values(payload.project_codes)
             policy.area_codes = self._normalize_scope_values(payload.area_codes)
             policy.task_ids = self._normalize_scope_values(payload.task_ids)
+            policy.resource_ids = self._normalize_scope_values(payload.resource_ids)
+            policy.denied_org_unit_ids = self._normalize_scope_values(payload.denied_org_unit_ids)
+            policy.denied_project_codes = self._normalize_scope_values(payload.denied_project_codes)
+            policy.denied_area_codes = self._normalize_scope_values(payload.denied_area_codes)
+            policy.denied_task_ids = self._normalize_scope_values(payload.denied_task_ids)
+            policy.denied_resource_ids = self._normalize_scope_values(payload.denied_resource_ids)
             policy.updated_at = now_utc()
             session.add(policy)
             session.commit()
             session.refresh(policy)
             return policy
+
+    def get_role_data_policy(self, tenant_id: str, role_id: str) -> RoleDataAccessPolicy:
+        with self._session() as session:
+            role = self._get_scoped_role(session, tenant_id, role_id)
+            if role is None:
+                raise NotFoundError("role not found")
+            policy = session.exec(
+                select(RoleDataAccessPolicy)
+                .where(RoleDataAccessPolicy.tenant_id == tenant_id)
+                .where(RoleDataAccessPolicy.role_id == role_id)
+            ).first()
+            if policy is not None:
+                return policy
+            return RoleDataAccessPolicy(
+                tenant_id=tenant_id,
+                role_id=role_id,
+                scope_mode=DataScopeMode.SCOPED,
+                org_unit_ids=[],
+                project_codes=[],
+                area_codes=[],
+                task_ids=[],
+                resource_ids=[],
+            )
+
+    def upsert_role_data_policy(
+        self,
+        tenant_id: str,
+        role_id: str,
+        payload: RoleDataAccessPolicyUpdate,
+    ) -> RoleDataAccessPolicy:
+        with self._session() as session:
+            role = self._get_scoped_role(session, tenant_id, role_id)
+            if role is None:
+                raise NotFoundError("role not found")
+            policy = session.exec(
+                select(RoleDataAccessPolicy)
+                .where(RoleDataAccessPolicy.tenant_id == tenant_id)
+                .where(RoleDataAccessPolicy.role_id == role_id)
+            ).first()
+            if policy is None:
+                policy = RoleDataAccessPolicy(
+                    tenant_id=tenant_id,
+                    role_id=role_id,
+                )
+
+            policy.scope_mode = payload.scope_mode
+            policy.org_unit_ids = self._normalize_scope_values(payload.org_unit_ids)
+            policy.project_codes = self._normalize_scope_values(payload.project_codes)
+            policy.area_codes = self._normalize_scope_values(payload.area_codes)
+            policy.task_ids = self._normalize_scope_values(payload.task_ids)
+            policy.resource_ids = self._normalize_scope_values(payload.resource_ids)
+            policy.updated_at = now_utc()
+            session.add(policy)
+            session.commit()
+            session.refresh(policy)
+            return policy
+
+    def get_effective_user_data_policy(self, tenant_id: str, user_id: str) -> dict[str, Any]:
+        with self._session() as session:
+            user = self._get_scoped_user(session, tenant_id, user_id)
+            if user is None:
+                raise NotFoundError("user not found")
+
+            user_policy = session.exec(
+                select(DataAccessPolicy)
+                .where(DataAccessPolicy.tenant_id == tenant_id)
+                .where(DataAccessPolicy.user_id == user_id)
+            ).first()
+
+            explicit_allow = self._empty_scope_values()
+            explicit_deny = self._empty_deny_scope_values()
+            mode = DataScopeMode.ALL
+            if user_policy is not None:
+                mode = user_policy.scope_mode
+                explicit_allow["org_unit_ids"] = self._normalize_scope_values(user_policy.org_unit_ids)
+                explicit_allow["project_codes"] = self._normalize_scope_values(user_policy.project_codes)
+                explicit_allow["area_codes"] = self._normalize_scope_values(user_policy.area_codes)
+                explicit_allow["task_ids"] = self._normalize_scope_values(user_policy.task_ids)
+                explicit_allow["resource_ids"] = self._normalize_scope_values(user_policy.resource_ids)
+                explicit_deny["denied_org_unit_ids"] = self._normalize_scope_values(user_policy.denied_org_unit_ids)
+                explicit_deny["denied_project_codes"] = self._normalize_scope_values(
+                    user_policy.denied_project_codes
+                )
+                explicit_deny["denied_area_codes"] = self._normalize_scope_values(user_policy.denied_area_codes)
+                explicit_deny["denied_task_ids"] = self._normalize_scope_values(user_policy.denied_task_ids)
+                explicit_deny["denied_resource_ids"] = self._normalize_scope_values(user_policy.denied_resource_ids)
+
+            inherited_allow = self._empty_scope_values()
+            inherited_allow_all = False
+            role_ids = list(
+                session.exec(
+                    select(UserRole.role_id)
+                    .where(UserRole.tenant_id == tenant_id)
+                    .where(UserRole.user_id == user_id)
+                ).all()
+            )
+            if role_ids:
+                role_policies = list(
+                    session.exec(
+                        select(RoleDataAccessPolicy)
+                        .where(RoleDataAccessPolicy.tenant_id == tenant_id)
+                        .where(col(RoleDataAccessPolicy.role_id).in_(role_ids))
+                    ).all()
+                )
+                inherited_allow_all = any(item.scope_mode == DataScopeMode.ALL for item in role_policies)
+                for policy in role_policies:
+                    if policy.scope_mode != DataScopeMode.SCOPED:
+                        continue
+                    inherited_allow["org_unit_ids"] = self._normalize_scope_values(
+                        inherited_allow["org_unit_ids"] + list(policy.org_unit_ids)
+                    )
+                    inherited_allow["project_codes"] = self._normalize_scope_values(
+                        inherited_allow["project_codes"] + list(policy.project_codes)
+                    )
+                    inherited_allow["area_codes"] = self._normalize_scope_values(
+                        inherited_allow["area_codes"] + list(policy.area_codes)
+                    )
+                    inherited_allow["task_ids"] = self._normalize_scope_values(
+                        inherited_allow["task_ids"] + list(policy.task_ids)
+                    )
+                    inherited_allow["resource_ids"] = self._normalize_scope_values(
+                        inherited_allow["resource_ids"] + list(policy.resource_ids)
+                    )
+
+            return {
+                "scope_mode": mode,
+                "explicit_allow_org_unit_ids": explicit_allow["org_unit_ids"],
+                "explicit_allow_project_codes": explicit_allow["project_codes"],
+                "explicit_allow_area_codes": explicit_allow["area_codes"],
+                "explicit_allow_task_ids": explicit_allow["task_ids"],
+                "explicit_allow_resource_ids": explicit_allow["resource_ids"],
+                "explicit_deny_org_unit_ids": explicit_deny["denied_org_unit_ids"],
+                "explicit_deny_project_codes": explicit_deny["denied_project_codes"],
+                "explicit_deny_area_codes": explicit_deny["denied_area_codes"],
+                "explicit_deny_task_ids": explicit_deny["denied_task_ids"],
+                "explicit_deny_resource_ids": explicit_deny["denied_resource_ids"],
+                "inherited_allow_org_unit_ids": inherited_allow["org_unit_ids"],
+                "inherited_allow_project_codes": inherited_allow["project_codes"],
+                "inherited_allow_area_codes": inherited_allow["area_codes"],
+                "inherited_allow_task_ids": inherited_allow["task_ids"],
+                "inherited_allow_resource_ids": inherited_allow["resource_ids"],
+                "inherited_allow_all": inherited_allow_all,
+                "resolution_order": [
+                    "explicit_deny",
+                    "explicit_allow",
+                    "inherited_allow",
+                    "default_deny",
+                ],
+            }
 
     def create_permission(self, payload: PermissionCreate) -> Permission:
         with self._session() as session:

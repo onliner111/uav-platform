@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from sqlmodel import Session, select
 
@@ -18,10 +20,15 @@ from app.domain.models import (
     RawDataCatalogCreate,
     RawDataCatalogRecord,
     RawDataType,
+    RawUploadInitRequest,
+    RawUploadSession,
+    RawUploadSessionStatus,
+    now_utc,
 )
 from app.infra.db import get_engine
 from app.infra.events import event_bus
 from app.services.data_perimeter_service import DataPerimeterService
+from app.services.object_storage_service import ObjectStorageNotFoundError, ObjectStorageService
 
 
 class OutcomeError(Exception):
@@ -39,6 +46,7 @@ class ConflictError(OutcomeError):
 class OutcomeService:
     def __init__(self) -> None:
         self._data_perimeter = DataPerimeterService()
+        self._storage = ObjectStorageService()
 
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
@@ -88,6 +96,43 @@ class OutcomeService:
             raise NotFoundError("outcome record not found")
         return row
 
+    def _get_scoped_raw(self, session: Session, tenant_id: str, raw_id: str) -> RawDataCatalogRecord:
+        row = session.exec(
+            select(RawDataCatalogRecord)
+            .where(RawDataCatalogRecord.tenant_id == tenant_id)
+            .where(RawDataCatalogRecord.id == raw_id)
+        ).first()
+        if row is None:
+            raise NotFoundError("raw data record not found")
+        return row
+
+    def _get_scoped_raw_upload_session(self, session: Session, tenant_id: str, session_id: str) -> RawUploadSession:
+        row = session.exec(
+            select(RawUploadSession)
+            .where(RawUploadSession.tenant_id == tenant_id)
+            .where(RawUploadSession.id == session_id)
+        ).first()
+        if row is None:
+            raise NotFoundError("raw upload session not found")
+        return row
+
+    def _normalize_checksum(self, checksum: str | None) -> str | None:
+        if checksum is None:
+            return None
+        value = checksum.strip().lower()
+        if not value:
+            return None
+        if value.startswith("sha256:"):
+            return value
+        return f"sha256:{value}"
+
+    def _is_expired(self, expires_at: datetime) -> bool:
+        if expires_at.tzinfo is None:
+            expires_at_utc = expires_at.replace(tzinfo=UTC)
+        else:
+            expires_at_utc = expires_at.astimezone(UTC)
+        return expires_at_utc < now_utc()
+
     def _is_visible(
         self,
         session: Session,
@@ -136,6 +181,188 @@ class OutcomeService:
         )
         return row
 
+    def init_raw_upload_session(
+        self,
+        tenant_id: str,
+        actor_id: str,
+        payload: RawUploadInitRequest,
+    ) -> dict[str, Any]:
+        normalized_checksum = self._normalize_checksum(payload.checksum)
+        with self._session() as session:
+            if payload.task_id is not None:
+                _ = self._get_scoped_task(session, tenant_id, payload.task_id)
+            if payload.mission_id is not None:
+                _ = self._get_scoped_mission(session, tenant_id, payload.mission_id)
+            session_id = str(uuid4())
+            upload_token = str(uuid4())
+            object_key = self._storage.build_raw_object_key(
+                tenant_id=tenant_id,
+                session_id=session_id,
+                file_name=payload.file_name,
+            )
+            row = RawUploadSession(
+                id=session_id,
+                tenant_id=tenant_id,
+                task_id=payload.task_id,
+                mission_id=payload.mission_id,
+                data_type=payload.data_type,
+                file_name=payload.file_name,
+                content_type=payload.content_type,
+                size_bytes=payload.size_bytes,
+                checksum=normalized_checksum,
+                meta=payload.meta,
+                bucket=self._storage.default_bucket,
+                object_key=object_key,
+                storage_class=payload.storage_class,
+                status=RawUploadSessionStatus.INITIATED,
+                upload_token=upload_token,
+                expires_at=now_utc() + timedelta(seconds=self._storage.upload_url_ttl_seconds),
+                created_by=actor_id,
+                updated_at=now_utc(),
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+
+        event_bus.publish_dict(
+            "outcome.raw.upload.initiated",
+            tenant_id,
+            {"session_id": row.id, "object_key": row.object_key, "size_bytes": row.size_bytes},
+        )
+        return {
+            "session_id": row.id,
+            "upload_token": row.upload_token,
+            "upload_url": self._storage.build_upload_url(session_id=row.id),
+            "bucket": row.bucket,
+            "object_key": row.object_key,
+            "expires_at": row.expires_at,
+        }
+
+    def write_raw_upload_content(
+        self,
+        tenant_id: str,
+        session_id: str,
+        upload_token: str,
+        content: bytes,
+    ) -> dict[str, Any]:
+        with self._session() as session:
+            row = self._get_scoped_raw_upload_session(session, tenant_id, session_id)
+            if row.upload_token != upload_token:
+                raise ConflictError("invalid upload token")
+            if row.status == RawUploadSessionStatus.COMPLETED:
+                raise ConflictError("upload session already completed")
+            if row.status == RawUploadSessionStatus.EXPIRED or self._is_expired(row.expires_at):
+                row.status = RawUploadSessionStatus.EXPIRED
+                row.updated_at = now_utc()
+                session.add(row)
+                session.commit()
+                raise ConflictError("upload session expired")
+            if row.size_bytes != len(content):
+                raise ConflictError("uploaded content size mismatch")
+
+            meta = self._storage.put_upload_content(
+                bucket=row.bucket,
+                object_key=row.object_key,
+                content=content,
+                content_type=row.content_type,
+                storage_class=row.storage_class,
+            )
+            if row.checksum is not None and row.checksum != f"sha256:{meta.etag}":
+                raise ConflictError("uploaded content checksum mismatch")
+
+            row.etag = meta.etag
+            row.status = RawUploadSessionStatus.UPLOADED
+            row.updated_at = now_utc()
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+
+        event_bus.publish_dict(
+            "outcome.raw.uploaded",
+            tenant_id,
+            {"session_id": row.id, "etag": row.etag, "size_bytes": row.size_bytes},
+        )
+        return {"session_id": row.id, "status": row.status, "etag": row.etag}
+
+    def complete_raw_upload_session(
+        self,
+        tenant_id: str,
+        actor_id: str,
+        session_id: str,
+        upload_token: str,
+    ) -> RawDataCatalogRecord:
+        with self._session() as session:
+            upload_row = self._get_scoped_raw_upload_session(session, tenant_id, session_id)
+            if upload_row.upload_token != upload_token:
+                raise ConflictError("invalid upload token")
+            if upload_row.completed_raw_id is not None:
+                return self._get_scoped_raw(session, tenant_id, upload_row.completed_raw_id)
+            if upload_row.status == RawUploadSessionStatus.EXPIRED or self._is_expired(upload_row.expires_at):
+                upload_row.status = RawUploadSessionStatus.EXPIRED
+                upload_row.updated_at = now_utc()
+                session.add(upload_row)
+                session.commit()
+                raise ConflictError("upload session expired")
+
+            meta = self._storage.stat_upload_content(
+                bucket=upload_row.bucket,
+                object_key=upload_row.object_key,
+                content_type=upload_row.content_type,
+                storage_class=upload_row.storage_class,
+            )
+            if meta is None:
+                raise ConflictError("uploaded object not found")
+            if meta.size_bytes != upload_row.size_bytes:
+                raise ConflictError("uploaded object size mismatch")
+            if upload_row.checksum is not None and upload_row.checksum != f"sha256:{meta.etag}":
+                raise ConflictError("uploaded object checksum mismatch")
+
+            raw_row = RawDataCatalogRecord(
+                tenant_id=tenant_id,
+                task_id=upload_row.task_id,
+                mission_id=upload_row.mission_id,
+                data_type=upload_row.data_type,
+                source_uri=f"storage://{upload_row.bucket}/{upload_row.object_key}",
+                bucket=upload_row.bucket,
+                object_key=upload_row.object_key,
+                object_version=meta.object_version,
+                size_bytes=meta.size_bytes,
+                content_type=upload_row.content_type,
+                storage_class=upload_row.storage_class,
+                etag=meta.etag,
+                checksum=upload_row.checksum,
+                meta=upload_row.meta,
+                captured_at=now_utc(),
+                created_by=actor_id,
+            )
+            session.add(raw_row)
+            session.commit()
+            session.refresh(raw_row)
+
+            upload_row.status = RawUploadSessionStatus.COMPLETED
+            upload_row.completed_raw_id = raw_row.id
+            upload_row.etag = meta.etag
+            upload_row.updated_at = now_utc()
+            session.add(upload_row)
+            session.commit()
+
+        event_bus.publish_dict(
+            "outcome.raw.upload.completed",
+            tenant_id,
+            {"session_id": session_id, "raw_id": raw_row.id, "object_key": raw_row.object_key},
+        )
+        event_bus.publish_dict(
+            "outcome.raw.created",
+            tenant_id,
+            {
+                "raw_id": raw_row.id,
+                "task_id": raw_row.task_id,
+                "mission_id": raw_row.mission_id,
+                "data_type": raw_row.data_type,
+            },
+        )
+        return raw_row
+
     def list_raw_records(
         self,
         tenant_id: str,
@@ -171,6 +398,30 @@ class OutcomeService:
                     mission_id=item.mission_id,
                 )
             ]
+
+    def get_raw_download_path(
+        self,
+        tenant_id: str,
+        raw_id: str,
+        *,
+        viewer_user_id: str | None,
+    ) -> Path:
+        with self._session() as session:
+            row = self._get_scoped_raw(session, tenant_id, raw_id)
+            if not self._is_visible(
+                session,
+                tenant_id,
+                viewer_user_id,
+                task_id=row.task_id,
+                mission_id=row.mission_id,
+            ):
+                raise NotFoundError("raw data record not found")
+            if not row.bucket or not row.object_key:
+                raise NotFoundError("raw object not found")
+            try:
+                return self._storage.get_download_path(bucket=row.bucket, object_key=row.object_key)
+            except ObjectStorageNotFoundError as exc:
+                raise NotFoundError("raw object not found") from exc
 
     def create_outcome_record(
         self,

@@ -126,6 +126,11 @@ class RolePermission(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
+class OrgUnitType(StrEnum):
+    ORGANIZATION = "ORGANIZATION"
+    DEPARTMENT = "DEPARTMENT"
+
+
 class OrgUnit(SQLModel, table=True):
     __tablename__ = "org_units"
     __table_args__ = (
@@ -144,6 +149,7 @@ class OrgUnit(SQLModel, table=True):
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     name: str = Field(max_length=100, index=True)
     code: str = Field(max_length=100, index=True)
+    unit_type: OrgUnitType = Field(default=OrgUnitType.DEPARTMENT, max_length=30, index=True)
     parent_id: str | None = Field(default=None, index=True)
     level: int = Field(default=0, index=True)
     path: str = Field(default="", max_length=500)
@@ -173,6 +179,9 @@ class UserOrgMembership(SQLModel, table=True):
     user_id: str = Field(primary_key=True)
     org_unit_id: str = Field(primary_key=True)
     is_primary: bool = Field(default=False, index=True)
+    job_title: str | None = Field(default=None, max_length=120)
+    job_code: str | None = Field(default=None, max_length=80, index=True)
+    is_manager: bool = Field(default=False, index=True)
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
@@ -210,6 +219,70 @@ class DataAccessPolicy(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     task_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    resource_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    denied_org_unit_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    denied_project_codes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    denied_area_codes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    denied_task_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    denied_resource_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class RoleDataAccessPolicy(SQLModel, table=True):
+    __tablename__ = "role_data_access_policies"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "role_id", name="uq_role_data_access_policies_tenant_role"),
+        ForeignKeyConstraint(
+            ["tenant_id", "role_id"],
+            ["roles.tenant_id", "roles.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_role_data_access_policies_tenant_role", "tenant_id", "role_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    role_id: str = Field(index=True)
+    scope_mode: DataScopeMode = Field(default=DataScopeMode.SCOPED, index=True)
+    org_unit_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    project_codes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    area_codes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    task_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    resource_ids: list[str] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
@@ -917,6 +990,13 @@ class RawDataType(StrEnum):
     LOG = "LOG"
 
 
+class RawUploadSessionStatus(StrEnum):
+    INITIATED = "INITIATED"
+    UPLOADED = "UPLOADED"
+    COMPLETED = "COMPLETED"
+    EXPIRED = "EXPIRED"
+
+
 class OutcomeSourceType(StrEnum):
     INSPECTION_OBSERVATION = "INSPECTION_OBSERVATION"
     ALERT = "ALERT"
@@ -1128,6 +1208,13 @@ class RawDataCatalogRecord(SQLModel, table=True):
     mission_id: str | None = Field(default=None, foreign_key="missions.id", index=True)
     data_type: RawDataType = Field(index=True)
     source_uri: str
+    bucket: str | None = Field(default=None, max_length=120, index=True)
+    object_key: str | None = Field(default=None, max_length=500)
+    object_version: str | None = Field(default=None, max_length=120)
+    size_bytes: int | None = Field(default=None, ge=0)
+    content_type: str | None = Field(default=None, max_length=120)
+    storage_class: str | None = Field(default=None, max_length=50)
+    etag: str | None = Field(default=None, max_length=200, index=True)
     checksum: str | None = Field(default=None, max_length=200, index=True)
     meta: dict[str, Any] = Field(
         default_factory=dict,
@@ -1136,6 +1223,52 @@ class RawDataCatalogRecord(SQLModel, table=True):
     captured_at: datetime = Field(default_factory=now_utc, index=True)
     created_by: str = Field(index=True)
     created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class RawUploadSession(SQLModel, table=True):
+    __tablename__ = "raw_upload_sessions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_raw_upload_sessions_tenant_id_id"),
+        UniqueConstraint("upload_token", name="uq_raw_upload_sessions_upload_token"),
+        Index("ix_raw_upload_sessions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_raw_upload_sessions_tenant_status", "tenant_id", "status"),
+        Index("ix_raw_upload_sessions_tenant_created_at", "tenant_id", "created_at"),
+        ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["inspection_tasks.tenant_id", "inspection_tasks.id"],
+            ondelete="SET NULL",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "mission_id"],
+            ["missions.tenant_id", "missions.id"],
+            ondelete="SET NULL",
+        ),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    task_id: str | None = Field(default=None, index=True)
+    mission_id: str | None = Field(default=None, index=True)
+    data_type: RawDataType = Field(index=True)
+    file_name: str = Field(max_length=200)
+    content_type: str = Field(max_length=120)
+    size_bytes: int = Field(ge=1)
+    checksum: str | None = Field(default=None, max_length=200, index=True)
+    meta: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    bucket: str = Field(max_length=120, index=True)
+    object_key: str = Field(max_length=500)
+    storage_class: str = Field(default="STANDARD", max_length=50)
+    status: RawUploadSessionStatus = Field(default=RawUploadSessionStatus.INITIATED, index=True)
+    upload_token: str = Field(max_length=120, index=True)
+    etag: str | None = Field(default=None, max_length=200)
+    completed_raw_id: str | None = Field(default=None, foreign_key="raw_data_catalog_records.id", index=True)
+    expires_at: datetime = Field(default_factory=now_utc, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class OutcomeCatalogRecord(SQLModel, table=True):
@@ -1570,6 +1703,7 @@ class UserRoleBatchBindRead(BaseModel):
 class OrgUnitCreate(BaseModel):
     name: str
     code: str
+    unit_type: OrgUnitType = OrgUnitType.DEPARTMENT
     parent_id: str | None = None
     is_active: bool = True
 
@@ -1577,6 +1711,7 @@ class OrgUnitCreate(BaseModel):
 class OrgUnitUpdate(BaseModel):
     name: str | None = None
     code: str | None = None
+    unit_type: OrgUnitType | None = None
     parent_id: str | None = None
     is_active: bool | None = None
 
@@ -1586,6 +1721,7 @@ class OrgUnitRead(ORMReadModel):
     tenant_id: str
     name: str
     code: str
+    unit_type: OrgUnitType
     parent_id: str | None
     level: int
     path: str
@@ -1596,6 +1732,9 @@ class OrgUnitRead(ORMReadModel):
 
 class UserOrgMembershipBindRequest(BaseModel):
     is_primary: bool = False
+    job_title: str | None = None
+    job_code: str | None = None
+    is_manager: bool | None = None
 
 
 class UserOrgMembershipLinkRead(ORMReadModel):
@@ -1603,6 +1742,9 @@ class UserOrgMembershipLinkRead(ORMReadModel):
     user_id: str
     org_unit_id: str
     is_primary: bool
+    job_title: str | None
+    job_code: str | None
+    is_manager: bool
     created_at: datetime
 
 
@@ -1612,6 +1754,21 @@ class DataAccessPolicyUpdate(BaseModel):
     project_codes: list[str] = PydanticField(default_factory=list)
     area_codes: list[str] = PydanticField(default_factory=list)
     task_ids: list[str] = PydanticField(default_factory=list)
+    resource_ids: list[str] = PydanticField(default_factory=list)
+    denied_org_unit_ids: list[str] = PydanticField(default_factory=list)
+    denied_project_codes: list[str] = PydanticField(default_factory=list)
+    denied_area_codes: list[str] = PydanticField(default_factory=list)
+    denied_task_ids: list[str] = PydanticField(default_factory=list)
+    denied_resource_ids: list[str] = PydanticField(default_factory=list)
+
+
+class RoleDataAccessPolicyUpdate(BaseModel):
+    scope_mode: DataScopeMode = DataScopeMode.SCOPED
+    org_unit_ids: list[str] = PydanticField(default_factory=list)
+    project_codes: list[str] = PydanticField(default_factory=list)
+    area_codes: list[str] = PydanticField(default_factory=list)
+    task_ids: list[str] = PydanticField(default_factory=list)
+    resource_ids: list[str] = PydanticField(default_factory=list)
 
 
 class DataAccessPolicyRead(ORMReadModel):
@@ -1623,8 +1780,56 @@ class DataAccessPolicyRead(ORMReadModel):
     project_codes: list[str]
     area_codes: list[str]
     task_ids: list[str]
+    resource_ids: list[str]
+    denied_org_unit_ids: list[str]
+    denied_project_codes: list[str]
+    denied_area_codes: list[str]
+    denied_task_ids: list[str]
+    denied_resource_ids: list[str]
     created_at: datetime
     updated_at: datetime
+
+
+class RoleDataAccessPolicyRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    role_id: str
+    scope_mode: DataScopeMode
+    org_unit_ids: list[str]
+    project_codes: list[str]
+    area_codes: list[str]
+    task_ids: list[str]
+    resource_ids: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class DataAccessPolicyEffectiveRead(BaseModel):
+    scope_mode: DataScopeMode
+    explicit_allow_org_unit_ids: list[str] = PydanticField(default_factory=list)
+    explicit_allow_project_codes: list[str] = PydanticField(default_factory=list)
+    explicit_allow_area_codes: list[str] = PydanticField(default_factory=list)
+    explicit_allow_task_ids: list[str] = PydanticField(default_factory=list)
+    explicit_allow_resource_ids: list[str] = PydanticField(default_factory=list)
+    explicit_deny_org_unit_ids: list[str] = PydanticField(default_factory=list)
+    explicit_deny_project_codes: list[str] = PydanticField(default_factory=list)
+    explicit_deny_area_codes: list[str] = PydanticField(default_factory=list)
+    explicit_deny_task_ids: list[str] = PydanticField(default_factory=list)
+    explicit_deny_resource_ids: list[str] = PydanticField(default_factory=list)
+    inherited_allow_org_unit_ids: list[str] = PydanticField(default_factory=list)
+    inherited_allow_project_codes: list[str] = PydanticField(default_factory=list)
+    inherited_allow_area_codes: list[str] = PydanticField(default_factory=list)
+    inherited_allow_task_ids: list[str] = PydanticField(default_factory=list)
+    inherited_allow_resource_ids: list[str] = PydanticField(default_factory=list)
+    inherited_allow_all: bool = False
+    resolution_order: list[str] = PydanticField(
+        default_factory=lambda: [
+            "explicit_deny",
+            "explicit_allow",
+            "inherited_allow",
+            "default_deny",
+        ]
+    )
 
 
 class PermissionCreate(BaseModel):
@@ -2226,11 +2431,43 @@ class RawDataCatalogRead(ORMReadModel):
     mission_id: str | None
     data_type: RawDataType
     source_uri: str
+    bucket: str | None
+    object_key: str | None
+    object_version: str | None
+    size_bytes: int | None
+    content_type: str | None
+    storage_class: str | None
+    etag: str | None
     checksum: str | None
     meta: dict[str, Any]
     captured_at: datetime
     created_by: str
     created_at: datetime
+
+
+class RawUploadInitRequest(BaseModel):
+    task_id: str | None = None
+    mission_id: str | None = None
+    data_type: RawDataType
+    file_name: str
+    content_type: str = "application/octet-stream"
+    size_bytes: int = PydanticField(ge=1)
+    checksum: str | None = None
+    storage_class: str = "STANDARD"
+    meta: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class RawUploadInitRead(BaseModel):
+    session_id: str
+    upload_token: str
+    upload_url: str
+    bucket: str
+    object_key: str
+    expires_at: datetime
+
+
+class RawUploadCompleteRequest(BaseModel):
+    upload_token: str
 
 
 class OutcomeCatalogCreate(BaseModel):

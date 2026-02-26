@@ -76,6 +76,7 @@ def list_assets(
         availability_status=availability_status,
         health_status=health_status,
         region_code=region_code,
+        viewer_user_id=claims["sub"],
     )
     return [AssetRead.model_validate(item) for item in rows]
 
@@ -101,6 +102,7 @@ def list_resource_pool(
         health_status=health_status,
         region_code=region_code,
         min_health_score=min_health_score,
+        viewer_user_id=claims["sub"],
     )
     return [AssetRead.model_validate(item) for item in rows]
 
@@ -124,6 +126,7 @@ def summarize_resource_pool(
         health_status=health_status,
         region_code=region_code,
         min_health_score=min_health_score,
+        viewer_user_id=claims["sub"],
     )
     return [AssetPoolRegionSummaryRead.model_validate(item) for item in rows]
 
@@ -135,7 +138,7 @@ def summarize_resource_pool(
 )
 def get_asset(asset_id: str, claims: Claims, service: Service) -> AssetRead:
     try:
-        asset = service.get_asset(claims["tenant_id"], asset_id)
+        asset = service.get_asset(claims["tenant_id"], asset_id, viewer_user_id=claims["sub"])
         return AssetRead.model_validate(asset)
     except (NotFoundError, ConflictError) as exc:
         _handle_asset_error(exc)
@@ -149,7 +152,7 @@ def get_asset(asset_id: str, claims: Claims, service: Service) -> AssetRead:
 )
 def bind_asset(asset_id: str, payload: AssetBindRequest, claims: Claims, service: Service) -> AssetRead:
     try:
-        asset = service.bind_asset(claims["tenant_id"], asset_id, payload)
+        asset = service.bind_asset(claims["tenant_id"], asset_id, payload, viewer_user_id=claims["sub"])
         return AssetRead.model_validate(asset)
     except (NotFoundError, ConflictError) as exc:
         _handle_asset_error(exc)
@@ -168,7 +171,7 @@ def update_asset_availability(
     service: Service,
 ) -> AssetRead:
     try:
-        asset = service.update_availability(claims["tenant_id"], asset_id, payload)
+        asset = service.update_availability(claims["tenant_id"], asset_id, payload, viewer_user_id=claims["sub"])
         return AssetRead.model_validate(asset)
     except (NotFoundError, ConflictError) as exc:
         _handle_asset_error(exc)
@@ -187,7 +190,7 @@ def update_asset_health(
     service: Service,
 ) -> AssetRead:
     try:
-        asset = service.update_health(claims["tenant_id"], asset_id, payload)
+        asset = service.update_health(claims["tenant_id"], asset_id, payload, viewer_user_id=claims["sub"])
         return AssetRead.model_validate(asset)
     except (NotFoundError, ConflictError) as exc:
         _handle_asset_error(exc)
@@ -201,7 +204,7 @@ def update_asset_health(
 )
 def retire_asset(asset_id: str, payload: AssetRetireRequest, claims: Claims, service: Service) -> AssetRead:
     try:
-        asset = service.retire_asset(claims["tenant_id"], asset_id, payload)
+        asset = service.retire_asset(claims["tenant_id"], asset_id, payload, viewer_user_id=claims["sub"])
         return AssetRead.model_validate(asset)
     except (NotFoundError, ConflictError) as exc:
         _handle_asset_error(exc)

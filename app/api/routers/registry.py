@@ -49,7 +49,7 @@ def create_drone(payload: DroneCreate, claims: Claims, service: Service) -> Dron
     dependencies=[Depends(require_perm(PERM_REGISTRY_READ))],
 )
 def list_drones(claims: Claims, service: Service) -> list[DroneRead]:
-    drones = service.list_drones(claims["tenant_id"])
+    drones = service.list_drones(claims["tenant_id"], viewer_user_id=claims["sub"])
     return [DroneRead.model_validate(item) for item in drones]
 
 
@@ -60,7 +60,7 @@ def list_drones(claims: Claims, service: Service) -> list[DroneRead]:
 )
 def get_drone(drone_id: str, claims: Claims, service: Service) -> DroneRead:
     try:
-        drone = service.get_drone(claims["tenant_id"], drone_id)
+        drone = service.get_drone(claims["tenant_id"], drone_id, viewer_user_id=claims["sub"])
         return DroneRead.model_validate(drone)
     except (NotFoundError, ConflictError) as exc:
         _handle_registry_error(exc)
@@ -74,7 +74,7 @@ def get_drone(drone_id: str, claims: Claims, service: Service) -> DroneRead:
 )
 def update_drone(drone_id: str, payload: DroneUpdate, claims: Claims, service: Service) -> DroneRead:
     try:
-        drone = service.update_drone(claims["tenant_id"], drone_id, payload)
+        drone = service.update_drone(claims["tenant_id"], drone_id, payload, viewer_user_id=claims["sub"])
         return DroneRead.model_validate(drone)
     except (NotFoundError, ConflictError) as exc:
         _handle_registry_error(exc)
@@ -88,8 +88,7 @@ def update_drone(drone_id: str, payload: DroneUpdate, claims: Claims, service: S
 )
 def delete_drone(drone_id: str, claims: Claims, service: Service) -> Response:
     try:
-        service.delete_drone(claims["tenant_id"], drone_id)
+        service.delete_drone(claims["tenant_id"], drone_id, viewer_user_id=claims["sub"])
     except (NotFoundError, ConflictError) as exc:
         _handle_registry_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
