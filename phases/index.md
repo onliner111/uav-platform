@@ -51,10 +51,15 @@ Codex MUST execute phases sequentially.
 
 - MUST complete one phase fully before starting next.
 - MUST ensure Quality Gate passes before moving forward:
-  - make lint
-  - make typecheck
-  - make test
-  - make e2e (if exists)
+  - `docker compose -f infra/docker-compose.yml run --rm --build app ruff check app tests infra/scripts`
+  - `docker compose -f infra/docker-compose.yml run --rm --build app mypy app`
+  - `docker compose -f infra/docker-compose.yml run --rm --build app pytest -q`
+  - e2e chain (if exists):
+    - `docker compose -f infra/docker-compose.yml up --build -d`
+    - `docker compose -f infra/docker-compose.yml run --rm --build app alembic upgrade head`
+    - `docker compose -f infra/docker-compose.yml run --rm --build app-tools python -m app.infra.openapi_export`
+    - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py`
+    - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py`
 - MUST stop if a phase fails after 3 fix cycles.
 - MUST NOT skip phases.
 - MUST NOT reorder phases.

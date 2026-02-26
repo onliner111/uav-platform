@@ -190,7 +190,7 @@ infra/scripts/demo_inspection_phase1.py
 4. 调用 export
 5. 校验返回成功
 
-必须纳入 make e2e。
+必须纳入 Docker Compose e2e 链路（`demo_e2e.py` + `verify_smoke.py`）。
 
 ---
 
@@ -198,10 +198,10 @@ infra/scripts/demo_inspection_phase1.py
 
 阶段完成必须满足：
 
-- make lint 通过
-- make typecheck 通过
-- make test 通过
-- make e2e 通过
+- `docker compose -f infra/docker-compose.yml run --rm --build app ruff check app tests infra/scripts` 通过
+- `docker compose -f infra/docker-compose.yml run --rm --build app mypy app` 通过
+- `docker compose -f infra/docker-compose.yml run --rm --build app pytest -q` 通过
+- Docker Compose e2e 链路通过（`up --build -d` + `alembic upgrade head` + OpenAPI 导出 + `demo_e2e.py` + `verify_smoke.py`）
 - UI 可访问
 - 地图显示点位
 - 导出成功

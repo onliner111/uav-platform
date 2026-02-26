@@ -193,7 +193,6 @@
 - M2/M3/M4 里程碑分组与执行顺序
 
 执行建议：
-- 从 `phases/state.md -> current_phase` 启动（当前为 `phase-16-saas-console-ui.md`）
+- 从 `phases/state.md -> current_phase` 启动（当前为 `phase-17-multi-org-data-perimeter-v2.md`）
 - 按 `phases/index.md` 顺序推进至 `phase-25-observability-reliability.md`
 - 每阶段执行时继续遵循 `phases/reporting.md` 与 `governance/AGENTS.md`
-

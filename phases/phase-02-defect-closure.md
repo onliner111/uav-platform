@@ -97,6 +97,6 @@ demo_defect_phase2.py
 
 # Acceptance
 
-- make test 通过
+- `docker compose -f infra/docker-compose.yml run --rm --build app pytest -q` 通过
 - 问题可流转
 - stats API 正确

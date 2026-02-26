@@ -51,10 +51,15 @@
 ## Quality Gate (Hard Requirement)
 Before declaring success, MUST pass:
 
-- make lint
-- make typecheck
-- make test
-- make e2e (if exists)
+- `docker compose -f infra/docker-compose.yml run --rm --build app ruff check app tests infra/scripts`
+- `docker compose -f infra/docker-compose.yml run --rm --build app mypy app`
+- `docker compose -f infra/docker-compose.yml run --rm --build app pytest -q`
+- e2e chain (if exists):
+  - `docker compose -f infra/docker-compose.yml up --build -d`
+  - `docker compose -f infra/docker-compose.yml run --rm --build app alembic upgrade head`
+  - `docker compose -f infra/docker-compose.yml run --rm --build app-tools python -m app.infra.openapi_export`
+  - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py`
+  - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py`
 
 If any fails:
 - Auto-fix within scope.
@@ -190,4 +195,3 @@ Delivery > Refactor
     - last_error (short excerpt)
     - updated_at
   - STOP.
-

@@ -10,7 +10,7 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 6. `governance/03_PHASE_LIFECYCLE.md`
 7. `governance/04_CHAT_INTERACTION_PROTOCOL.md`
 8. `governance/ROADMAP.md`
-9. `椤圭洰鏈€缁堢洰鏍?md`
+9. `项目最终目标.md`
 10. `phases/state.md`
 11. `docs/PROJECT_STATUS.md`
 12. `phases/index.md`
@@ -40,6 +40,21 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 
 Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
+
+## File Read Encoding Rule (Mandatory)
+- When reading local text/markdown files in PowerShell, always use UTF-8 explicitly:
+- `Get-Content <file> -Encoding utf8`
+- Do not rely on default encoding for `Get-Content`.
+- This rule is persistent and must be applied on every restarted session.
+
+## File Write Encoding Rule (Mandatory)
+- When writing local text/markdown files in PowerShell, always use UTF-8 explicitly:
+- `Set-Content <file> -Encoding utf8`
+- `Out-File <file> -Encoding utf8`
+- `Add-Content <file> -Encoding utf8`
+- Do not use `>` or `>>` redirection to write markdown/text files.
+- In markdown documentation command examples, avoid `>` / `>>` write patterns; prefer `Out-File -Encoding utf8`.
+- This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
 - updated_at_utc: `2026-02-26T16:01:54Z`
@@ -76,4 +91,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`鍏堣鍙?phases/resume.md 鍜?phases/state.md銆傚綋鍓?status=READY锛宑urrent_phase=phase-17-multi-org-data-perimeter-v2.md锛涙寜 P0 -> P1 -> P2 -> WP4 鎵ц骞堕€氳繃鍏ㄩ噺闂ㄧ銆傚綋鍓?Phase 瀹屾垚鍚庡仠姝紝绛夊緟涓嬩竴姝ュ懡浠ゃ€俙
+`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-17-multi-org-data-perimeter-v2.md；按 P0 -> P1 -> P2 -> WP4 执行并通过全量门禁。当前 Phase 完成后停止，等待下一步命令。`

@@ -166,10 +166,10 @@
 
 ## Quality gate checklist
 
-- `make lint` passes.
-- `make typecheck` passes.
-- `make test` passes, including new tenant-boundary tests.
-- `make e2e` passes with no phase 1-6 regression.
+- `docker compose -f infra/docker-compose.yml run --rm --build app ruff check app tests infra/scripts` passes.
+- `docker compose -f infra/docker-compose.yml run --rm --build app mypy app` passes.
+- `docker compose -f infra/docker-compose.yml run --rm --build app pytest -q` passes, including new tenant-boundary tests.
+- Docker Compose e2e chain passes with no phase 1-6 regression (`up --build -d` + `alembic upgrade head` + OpenAPI export + `demo_e2e.py` + `verify_smoke.py`).
 - Alembic upgrade and downgrade succeed for Phase 07 revision in a clean DB.
 - No cross-tenant write path remains in service code for 07A tenant-owned entities.
 - Cross-tenant API access consistently returns not-found semantics for 07A scope.
