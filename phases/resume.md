@@ -76,4 +76,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-16-saas-console-ui.md；按 P0 -> P1 -> P2 -> WP4 执行并通过全量门禁后再推进下一阶段。`
+`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-16-saas-console-ui.md；按 P0 -> P1 -> P2 -> WP4 执行并通过全量门禁。当前 Phase 完成后停止，等待下一步命令。`

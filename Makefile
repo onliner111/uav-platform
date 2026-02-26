@@ -10,7 +10,7 @@ export DB_PORT
 export REDIS_PORT
 export APP_PORT
 
-.PHONY: up down logs lint typecheck test migrate openapi openapi-smoke e2e verify-phase0
+.PHONY: up down logs lint typecheck test migrate openapi openapi-smoke e2e verify-phase0 check-md-utf8
 
 up:
 	$(COMPOSE) up --build -d
@@ -20,6 +20,9 @@ down:
 
 logs:
 	$(COMPOSE) logs -f app db redis
+
+check-md-utf8:
+	$(COMPOSE) run --rm app python infra/scripts/check_markdown_utf8.py
 
 lint:
 	$(COMPOSE) run --rm app ruff check app tests infra/scripts

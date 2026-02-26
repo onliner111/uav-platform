@@ -62,6 +62,8 @@ Codex MUST execute phases sequentially.
 - MUST execute intra-phase small stages sequentially and auto-continue:
   - if a small stage passes checks, immediately proceed to the next small stage
   - continue until the whole phase is DONE or blocked by hard failure policy
+- MUST NOT auto-start the next phase after current phase completion.
+- MUST stop after current phase closeout and wait for an explicit next command.
 
 ---
 
@@ -85,8 +87,8 @@ Codex should:
 3. Read phases/state.md
 4. Execute from current_phase
 5. Verify
-6. If success → automatically continue to next phase
-7. Repeat until all phases complete
+6. If success → complete current phase closeout (state/report sync)
+7. Stop and wait for explicit next command before starting next phase
 
 ---
 
