@@ -1185,6 +1185,13 @@ class ReportExportStatus(StrEnum):
     FAILED = "FAILED"
 
 
+class AiModelVersionStatus(StrEnum):
+    DRAFT = "DRAFT"
+    CANARY = "CANARY"
+    STABLE = "STABLE"
+    DEPRECATED = "DEPRECATED"
+
+
 class AiJobType(StrEnum):
     SUMMARY = "SUMMARY"
     SUGGESTION = "SUGGESTION"
@@ -1253,6 +1260,31 @@ class OpenWebhookDeliveryStatus(StrEnum):
 class OpenAdapterIngressStatus(StrEnum):
     ACCEPTED = "ACCEPTED"
     REJECTED = "REJECTED"
+
+
+class BillingCycle(StrEnum):
+    MONTHLY = "MONTHLY"
+    QUARTERLY = "QUARTERLY"
+    YEARLY = "YEARLY"
+
+
+class BillingSubscriptionStatus(StrEnum):
+    TRIAL = "TRIAL"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    EXPIRED = "EXPIRED"
+
+
+class BillingQuotaEnforcementMode(StrEnum):
+    HARD_LIMIT = "HARD_LIMIT"
+    SOFT_LIMIT = "SOFT_LIMIT"
+
+
+class BillingInvoiceStatus(StrEnum):
+    DRAFT = "DRAFT"
+    ISSUED = "ISSUED"
+    CLOSED = "CLOSED"
+    VOID = "VOID"
 
 
 class AlertStatus(StrEnum):
@@ -1638,16 +1670,127 @@ class OutcomeCatalogVersion(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
+class AiModelCatalog(SQLModel, table=True):
+    __tablename__ = "ai_model_catalogs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_model_catalogs_tenant_id_id"),
+        UniqueConstraint("tenant_id", "model_key", name="uq_ai_model_catalogs_tenant_model_key"),
+        Index("ix_ai_model_catalogs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_model_catalogs_tenant_model_key", "tenant_id", "model_key"),
+        Index("ix_ai_model_catalogs_tenant_provider", "tenant_id", "provider"),
+        Index("ix_ai_model_catalogs_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    model_key: str = Field(max_length=200, index=True)
+    provider: str = Field(max_length=80, index=True)
+    display_name: str = Field(max_length=120, index=True)
+    description: str | None = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AiModelVersion(SQLModel, table=True):
+    __tablename__ = "ai_model_versions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_model_versions_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "model_id",
+            "version",
+            name="uq_ai_model_versions_tenant_model_version",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "model_id"],
+            ["ai_model_catalogs.tenant_id", "ai_model_catalogs.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_ai_model_versions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_model_versions_tenant_model", "tenant_id", "model_id"),
+        Index("ix_ai_model_versions_tenant_status", "tenant_id", "status"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    model_id: str = Field(index=True)
+    version: str = Field(max_length=120, index=True)
+    status: AiModelVersionStatus = Field(default=AiModelVersionStatus.DRAFT, index=True)
+    artifact_ref: str | None = Field(default=None, max_length=500)
+    threshold_defaults: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    promoted_at: datetime | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AiModelRolloutPolicy(SQLModel, table=True):
+    __tablename__ = "ai_model_rollout_policies"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_ai_model_rollout_policies_tenant_id_id"),
+        UniqueConstraint("tenant_id", "model_id", name="uq_ai_model_rollout_policies_tenant_model"),
+        ForeignKeyConstraint(
+            ["tenant_id", "model_id"],
+            ["ai_model_catalogs.tenant_id", "ai_model_catalogs.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "default_version_id"],
+            ["ai_model_versions.tenant_id", "ai_model_versions.id"],
+            ondelete="SET NULL",
+        ),
+        Index("ix_ai_model_rollout_policies_tenant_id_id", "tenant_id", "id"),
+        Index("ix_ai_model_rollout_policies_tenant_model", "tenant_id", "model_id"),
+        Index("ix_ai_model_rollout_policies_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    model_id: str = Field(index=True)
+    default_version_id: str | None = Field(default=None, index=True)
+    traffic_allocation: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    threshold_overrides: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    is_active: bool = Field(default=True, index=True)
+    updated_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
 class AiAnalysisJob(SQLModel, table=True):
     __tablename__ = "ai_analysis_jobs"
     __table_args__ = (
         UniqueConstraint("tenant_id", "id", name="uq_ai_analysis_jobs_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "model_version_id"],
+            ["ai_model_versions.tenant_id", "ai_model_versions.id"],
+            ondelete="RESTRICT",
+        ),
         Index("ix_ai_analysis_jobs_tenant_id_id", "tenant_id", "id"),
         Index("ix_ai_analysis_jobs_tenant_task", "tenant_id", "task_id"),
         Index("ix_ai_analysis_jobs_tenant_mission", "tenant_id", "mission_id"),
         Index("ix_ai_analysis_jobs_tenant_topic", "tenant_id", "topic"),
         Index("ix_ai_analysis_jobs_tenant_type", "tenant_id", "job_type"),
         Index("ix_ai_analysis_jobs_tenant_status", "tenant_id", "status"),
+        Index("ix_ai_analysis_jobs_tenant_model_version", "tenant_id", "model_version_id"),
     )
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
@@ -1658,6 +1801,7 @@ class AiAnalysisJob(SQLModel, table=True):
     job_type: AiJobType = Field(default=AiJobType.SUMMARY, index=True)
     trigger_mode: AiTriggerMode = Field(default=AiTriggerMode.MANUAL, index=True)
     status: AiJobStatus = Field(default=AiJobStatus.ACTIVE, index=True)
+    model_version_id: str | None = Field(default=None, index=True)
     model_provider: str = Field(default="builtin", max_length=80)
     model_name: str = Field(default="uav-assistant-lite", max_length=120)
     model_version: str = Field(default="phase14.v1", max_length=120)
@@ -1922,6 +2066,246 @@ class OpenAdapterIngressEvent(SQLModel, table=True):
     )
     signature_valid: bool = Field(default=False, index=True)
     status: OpenAdapterIngressStatus = Field(default=OpenAdapterIngressStatus.ACCEPTED, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class BillingPlanCatalog(SQLModel, table=True):
+    __tablename__ = "billing_plan_catalogs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_billing_plan_catalogs_tenant_id_id"),
+        UniqueConstraint("tenant_id", "plan_code", name="uq_billing_plan_catalogs_tenant_plan_code"),
+        Index("ix_billing_plan_catalogs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_billing_plan_catalogs_tenant_plan_code", "tenant_id", "plan_code"),
+        Index("ix_billing_plan_catalogs_tenant_cycle", "tenant_id", "billing_cycle"),
+        Index("ix_billing_plan_catalogs_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    plan_code: str = Field(max_length=80, index=True)
+    display_name: str = Field(max_length=120, index=True)
+    description: str | None = Field(default=None, max_length=500)
+    billing_cycle: BillingCycle = Field(default=BillingCycle.MONTHLY, index=True)
+    price_cents: int = Field(default=0, ge=0)
+    currency: str = Field(default="CNY", max_length=20, index=True)
+    is_active: bool = Field(default=True, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class BillingPlanQuota(SQLModel, table=True):
+    __tablename__ = "billing_plan_quotas"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_billing_plan_quotas_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "plan_id",
+            "quota_key",
+            name="uq_billing_plan_quotas_tenant_plan_key",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "plan_id"],
+            ["billing_plan_catalogs.tenant_id", "billing_plan_catalogs.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_billing_plan_quotas_tenant_id_id", "tenant_id", "id"),
+        Index("ix_billing_plan_quotas_tenant_plan", "tenant_id", "plan_id"),
+        Index("ix_billing_plan_quotas_tenant_key", "tenant_id", "quota_key"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    plan_id: str = Field(index=True)
+    quota_key: str = Field(max_length=120, index=True)
+    quota_limit: int = Field(default=0, ge=0)
+    enforcement_mode: BillingQuotaEnforcementMode = Field(
+        default=BillingQuotaEnforcementMode.HARD_LIMIT,
+        index=True,
+    )
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class TenantSubscription(SQLModel, table=True):
+    __tablename__ = "tenant_subscriptions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_tenant_subscriptions_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "plan_id"],
+            ["billing_plan_catalogs.tenant_id", "billing_plan_catalogs.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_tenant_subscriptions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_tenant_subscriptions_tenant_plan", "tenant_id", "plan_id"),
+        Index("ix_tenant_subscriptions_tenant_status", "tenant_id", "status"),
+        Index("ix_tenant_subscriptions_tenant_start", "tenant_id", "start_at"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    plan_id: str = Field(index=True)
+    status: BillingSubscriptionStatus = Field(default=BillingSubscriptionStatus.ACTIVE, index=True)
+    start_at: datetime = Field(default_factory=now_utc, index=True)
+    end_at: datetime | None = Field(default=None, index=True)
+    auto_renew: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class TenantQuotaOverride(SQLModel, table=True):
+    __tablename__ = "tenant_quota_overrides"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_tenant_quota_overrides_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "quota_key",
+            name="uq_tenant_quota_overrides_tenant_quota_key",
+        ),
+        Index("ix_tenant_quota_overrides_tenant_id_id", "tenant_id", "id"),
+        Index("ix_tenant_quota_overrides_tenant_key", "tenant_id", "quota_key"),
+        Index("ix_tenant_quota_overrides_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    quota_key: str = Field(max_length=120, index=True)
+    override_limit: int = Field(default=0, ge=0)
+    enforcement_mode: BillingQuotaEnforcementMode = Field(
+        default=BillingQuotaEnforcementMode.HARD_LIMIT,
+        index=True,
+    )
+    reason: str | None = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    updated_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class BillingUsageEvent(SQLModel, table=True):
+    __tablename__ = "billing_usage_events"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_billing_usage_events_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "meter_key",
+            "source_event_id",
+            name="uq_billing_usage_events_tenant_meter_source",
+        ),
+        Index("ix_billing_usage_events_tenant_id_id", "tenant_id", "id"),
+        Index("ix_billing_usage_events_tenant_meter", "tenant_id", "meter_key"),
+        Index("ix_billing_usage_events_tenant_occurred", "tenant_id", "occurred_at"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    meter_key: str = Field(max_length=120, index=True)
+    quantity: int = Field(default=1, ge=1)
+    occurred_at: datetime = Field(default_factory=now_utc, index=True)
+    source_event_id: str = Field(max_length=200, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class BillingUsageAggregateDaily(SQLModel, table=True):
+    __tablename__ = "billing_usage_aggregate_daily"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_billing_usage_aggregate_daily_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "meter_key",
+            "usage_date",
+            name="uq_billing_usage_aggregate_daily_tenant_meter_date",
+        ),
+        Index("ix_billing_usage_aggregate_daily_tenant_id_id", "tenant_id", "id"),
+        Index("ix_billing_usage_aggregate_daily_tenant_meter", "tenant_id", "meter_key"),
+        Index("ix_billing_usage_aggregate_daily_tenant_date", "tenant_id", "usage_date"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    meter_key: str = Field(max_length=120, index=True)
+    usage_date: datetime = Field(index=True)
+    total_quantity: int = Field(default=0, ge=0)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class BillingInvoice(SQLModel, table=True):
+    __tablename__ = "billing_invoices"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_billing_invoices_tenant_id_id"),
+        Index("ix_billing_invoices_tenant_id_id", "tenant_id", "id"),
+        Index("ix_billing_invoices_tenant_period", "tenant_id", "period_start", "period_end"),
+        Index("ix_billing_invoices_tenant_status", "tenant_id", "status"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    subscription_id: str = Field(index=True)
+    plan_id: str = Field(index=True)
+    period_start: datetime = Field(index=True)
+    period_end: datetime = Field(index=True)
+    status: BillingInvoiceStatus = Field(default=BillingInvoiceStatus.DRAFT, index=True)
+    currency: str = Field(default="CNY", max_length=20, index=True)
+    subtotal_cents: int = Field(default=0)
+    adjustments_cents: int = Field(default=0)
+    total_amount_cents: int = Field(default=0)
+    issued_at: datetime | None = Field(default=None, index=True)
+    closed_at: datetime | None = Field(default=None, index=True)
+    voided_at: datetime | None = Field(default=None, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class BillingInvoiceLine(SQLModel, table=True):
+    __tablename__ = "billing_invoice_lines"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_billing_invoice_lines_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "invoice_id"],
+            ["billing_invoices.tenant_id", "billing_invoices.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_billing_invoice_lines_tenant_id_id", "tenant_id", "id"),
+        Index("ix_billing_invoice_lines_tenant_invoice", "tenant_id", "invoice_id"),
+        Index("ix_billing_invoice_lines_tenant_type", "tenant_id", "line_type"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    invoice_id: str = Field(index=True)
+    line_type: str = Field(max_length=50, index=True)
+    meter_key: str | None = Field(default=None, max_length=120, index=True)
+    description: str = Field(max_length=500)
+    quantity: int = Field(default=1, ge=0)
+    unit_price_cents: int = Field(default=0)
+    amount_cents: int = Field(default=0)
     detail: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSON, nullable=False),
@@ -3097,12 +3481,84 @@ class OutcomeCatalogVersionRead(ORMReadModel):
     created_at: datetime
 
 
+class AiModelCatalogCreate(BaseModel):
+    model_key: str
+    provider: str = "builtin"
+    display_name: str
+    description: str | None = None
+    is_active: bool = True
+
+
+class AiModelCatalogRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    model_key: str
+    provider: str
+    display_name: str
+    description: str | None
+    is_active: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiModelVersionCreate(BaseModel):
+    version: str
+    status: AiModelVersionStatus = AiModelVersionStatus.DRAFT
+    artifact_ref: str | None = None
+    threshold_defaults: dict[str, Any] = PydanticField(default_factory=dict)
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AiModelVersionRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    model_id: str
+    version: str
+    status: AiModelVersionStatus
+    artifact_ref: str | None
+    threshold_defaults: dict[str, Any]
+    detail: dict[str, Any]
+    created_by: str
+    promoted_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiModelVersionPromoteRequest(BaseModel):
+    target_status: AiModelVersionStatus = AiModelVersionStatus.STABLE
+    note: str | None = None
+
+
+class AiModelRolloutPolicyUpsertRequest(BaseModel):
+    default_version_id: str | None = None
+    traffic_allocation: list[dict[str, Any]] = PydanticField(default_factory=list)
+    threshold_overrides: dict[str, Any] = PydanticField(default_factory=dict)
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+    is_active: bool = True
+
+
+class AiModelRolloutPolicyRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    model_id: str
+    default_version_id: str | None
+    traffic_allocation: list[dict[str, Any]]
+    threshold_overrides: dict[str, Any]
+    detail: dict[str, Any]
+    is_active: bool
+    updated_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class AiAnalysisJobCreate(BaseModel):
     task_id: str | None = None
     mission_id: str | None = None
     topic: str | None = None
     job_type: AiJobType = AiJobType.SUMMARY
     trigger_mode: AiTriggerMode = AiTriggerMode.MANUAL
+    model_version_id: str | None = None
     model_provider: str = "builtin"
     model_name: str = "uav-assistant-lite"
     model_version: str = "phase14.v1"
@@ -3119,6 +3575,7 @@ class AiAnalysisJobRead(ORMReadModel):
     job_type: AiJobType
     trigger_mode: AiTriggerMode
     status: AiJobStatus
+    model_version_id: str | None
     model_provider: str
     model_name: str
     model_version: str
@@ -3132,6 +3589,8 @@ class AiAnalysisJobRead(ORMReadModel):
 class AiAnalysisRunTriggerRequest(BaseModel):
     force_fail: bool = False
     trigger_mode: AiTriggerMode | None = None
+    force_model_version_id: str | None = None
+    force_threshold_config: dict[str, Any] = PydanticField(default_factory=dict)
     context: dict[str, Any] = PydanticField(default_factory=dict)
 
 
@@ -3211,6 +3670,273 @@ class AiOutputReviewRead(BaseModel):
     output: AiAnalysisOutputRead
     actions: list[AiOutputReviewActionRead]
     evidences: list[AiEvidenceRecordRead]
+
+
+class AiAnalysisJobBindModelVersionRequest(BaseModel):
+    model_version_id: str
+
+
+class AiEvaluationRecomputeRequest(BaseModel):
+    model_id: str | None = None
+    job_id: str | None = None
+    from_ts: datetime | None = None
+    to_ts: datetime | None = None
+
+
+class AiEvaluationSummaryRead(BaseModel):
+    model_version_id: str
+    total_runs: int
+    succeeded_runs: int
+    success_rate: float
+    review_override_rate: float
+    p95_latency_ms: int | None
+
+
+class AiEvaluationCompareRead(BaseModel):
+    left: AiEvaluationSummaryRead
+    right: AiEvaluationSummaryRead
+    delta_success_rate: float
+    delta_review_override_rate: float
+    delta_p95_latency_ms: int | None
+
+
+class AiModelRolloutRollbackRequest(BaseModel):
+    target_version_id: str
+    reason: str | None = None
+
+
+class AiScheduleTickRequest(BaseModel):
+    window_key: str
+    job_ids: list[str] = PydanticField(default_factory=list)
+    max_jobs: int = PydanticField(default=100, ge=1, le=1000)
+    context: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AiScheduleTickRead(BaseModel):
+    window_key: str
+    scanned_jobs: int
+    triggered_jobs: int
+    skipped_jobs: int
+    run_ids: list[str]
+
+
+class BillingPlanQuotaInput(BaseModel):
+    quota_key: str
+    quota_limit: int = PydanticField(default=0, ge=0)
+    enforcement_mode: BillingQuotaEnforcementMode = BillingQuotaEnforcementMode.HARD_LIMIT
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class BillingPlanCreate(BaseModel):
+    plan_code: str
+    display_name: str
+    description: str | None = None
+    billing_cycle: BillingCycle = BillingCycle.MONTHLY
+    price_cents: int = PydanticField(default=0, ge=0)
+    currency: str = "CNY"
+    is_active: bool = True
+    quotas: list[BillingPlanQuotaInput] = PydanticField(default_factory=list)
+
+
+class BillingPlanQuotaRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    plan_id: str
+    quota_key: str
+    quota_limit: int
+    enforcement_mode: BillingQuotaEnforcementMode
+    detail: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class BillingPlanRead(BaseModel):
+    id: str
+    tenant_id: str
+    plan_code: str
+    display_name: str
+    description: str | None
+    billing_cycle: BillingCycle
+    price_cents: int
+    currency: str
+    is_active: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    quotas: list[BillingPlanQuotaRead] = PydanticField(default_factory=list)
+
+
+class BillingSubscriptionCreate(BaseModel):
+    plan_id: str
+    status: BillingSubscriptionStatus = BillingSubscriptionStatus.ACTIVE
+    start_at: datetime = PydanticField(default_factory=now_utc)
+    end_at: datetime | None = None
+    auto_renew: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class BillingSubscriptionRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    plan_id: str
+    status: BillingSubscriptionStatus
+    start_at: datetime
+    end_at: datetime | None
+    auto_renew: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class BillingQuotaOverrideInput(BaseModel):
+    quota_key: str
+    override_limit: int = PydanticField(default=0, ge=0)
+    enforcement_mode: BillingQuotaEnforcementMode = BillingQuotaEnforcementMode.HARD_LIMIT
+    reason: str | None = None
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class BillingQuotaOverrideUpsertRequest(BaseModel):
+    overrides: list[BillingQuotaOverrideInput] = PydanticField(default_factory=list, min_length=1)
+
+
+class BillingQuotaOverrideRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    quota_key: str
+    override_limit: int
+    enforcement_mode: BillingQuotaEnforcementMode
+    reason: str | None
+    is_active: bool
+    detail: dict[str, Any]
+    updated_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class BillingEffectiveQuotaRead(BaseModel):
+    quota_key: str
+    quota_limit: int
+    enforcement_mode: BillingQuotaEnforcementMode
+    source: str
+
+
+class BillingTenantQuotaSnapshotRead(BaseModel):
+    tenant_id: str
+    subscription_id: str | None
+    plan_id: str | None
+    plan_code: str | None
+    quotas: list[BillingEffectiveQuotaRead] = PydanticField(default_factory=list)
+    computed_at: datetime = PydanticField(default_factory=now_utc)
+
+
+class BillingUsageIngestRequest(BaseModel):
+    meter_key: str
+    quantity: int = PydanticField(default=1, ge=1)
+    occurred_at: datetime = PydanticField(default_factory=now_utc)
+    source_event_id: str
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class BillingUsageEventRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    meter_key: str
+    quantity: int
+    occurred_at: datetime
+    source_event_id: str
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+
+
+class BillingUsageIngestRead(BaseModel):
+    event: BillingUsageEventRead
+    deduplicated: bool
+
+
+class BillingUsageSummaryRead(BaseModel):
+    meter_key: str
+    total_quantity: int
+    from_date: datetime | None
+    to_date: datetime | None
+
+
+class BillingQuotaCheckRequest(BaseModel):
+    meter_key: str
+    quantity: int = PydanticField(default=1, ge=1)
+    as_of: datetime = PydanticField(default_factory=now_utc)
+
+
+class BillingQuotaCheckRead(BaseModel):
+    meter_key: str
+    quota_limit: int | None
+    enforcement_mode: BillingQuotaEnforcementMode | None
+    used_quantity: int
+    request_quantity: int
+    projected_quantity: int
+    allowed: bool
+    source: str
+    reason: str
+
+
+class BillingInvoiceGenerateRequest(BaseModel):
+    tenant_id: str
+    period_start: datetime
+    period_end: datetime
+    adjustments_cents: int = 0
+    force_recompute: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class BillingInvoiceLineRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    invoice_id: str
+    line_type: str
+    meter_key: str | None
+    description: str
+    quantity: int
+    unit_price_cents: int
+    amount_cents: int
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class BillingInvoiceRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    subscription_id: str
+    plan_id: str
+    period_start: datetime
+    period_end: datetime
+    status: BillingInvoiceStatus
+    currency: str
+    subtotal_cents: int
+    adjustments_cents: int
+    total_amount_cents: int
+    issued_at: datetime | None
+    closed_at: datetime | None
+    voided_at: datetime | None
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class BillingInvoiceDetailRead(BaseModel):
+    invoice: BillingInvoiceRead
+    lines: list[BillingInvoiceLineRead]
+
+
+class BillingInvoiceCloseRequest(BaseModel):
+    note: str | None = None
+
+
+class BillingInvoiceVoidRequest(BaseModel):
+    reason: str | None = None
 
 
 class KpiSnapshotRecomputeRequest(BaseModel):

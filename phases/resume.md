@@ -56,14 +56,14 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-27T15:12:07Z`
-- current_phase: `phase-23-ai-model-governance-v2.md`
+- updated_at_utc: `2026-02-27T17:51:44Z`
+- current_phase: `phase-25-observability-reliability.md`
 - phase_status: `READY`
-- last_success_phase: `phase-22-alert-oncall-notification-v2.md`
-- current_focus: `Phase 22 is DONE (22-WP1..22-WP4 closed with full gates); next phase is Phase 23 and awaits start`
+- last_success_phase: `phase-24-billing-quota-system.md`
+- current_focus: `Phase 24 is DONE with full closeout gates; next phase is 25-WP1 when explicitly started`
 
 ## Next TODO (Execution Target)
-1. Start Phase 23 from P0 and execute in order `P0 -> P1 -> P2 -> 23-WP4`, keeping full gate pass as closeout condition.
+1. Start Phase 25 from `25-WP1`, then execute `25-WP2 -> 25-WP3 -> P2 -> 25-WP4`.
 2. Keep Docker Compose baseline gate commands below as regression checklist for each new phase.
 3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> phase-defined closeout WP`) for all future phases.
 
@@ -77,6 +77,7 @@ Use Docker Compose commands directly in this environment:
 - `docker compose -f infra/docker-compose.yml run --rm --build app-tools python -m app.infra.openapi_export`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py`
+- `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_phase08_integration.py`
 
 ## Docker Permission Rule (Mandatory)
 - For all Docker-related quality-gate commands in this environment, run with escalated permissions by default.
@@ -90,4 +91,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-23-ai-model-governance-v2.md；启动并执行 Phase 23（P0 -> P1 -> P2 -> 23-WP4），通过全量门禁后关账并停止。`
+`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-25-observability-reliability.md；开始执行 Phase 25（从 25-WP1 开始，随后 25-WP2 -> 25-WP3 -> P2 -> 25-WP4），通过全量门禁后关账并停止。`

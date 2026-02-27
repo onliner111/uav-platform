@@ -28,6 +28,10 @@ PERM_APPROVAL_READ = "approval.read"
 PERM_APPROVAL_WRITE = "approval.write"
 PERM_REPORTING_READ = "reporting.read"
 PERM_REPORTING_WRITE = "reporting.write"
+PERM_AI_READ = "ai.read"
+PERM_AI_WRITE = "ai.write"
+PERM_BILLING_READ = "billing.read"
+PERM_BILLING_WRITE = "billing.write"
 PERM_PLATFORM_SUPER_ADMIN = "platform.super_admin"
 
 DEFAULT_PERMISSION_NAMES = [
@@ -57,6 +61,10 @@ DEFAULT_PERMISSION_NAMES = [
     PERM_APPROVAL_WRITE,
     PERM_REPORTING_READ,
     PERM_REPORTING_WRITE,
+    PERM_AI_READ,
+    PERM_AI_WRITE,
+    PERM_BILLING_READ,
+    PERM_BILLING_WRITE,
 ]
 
 

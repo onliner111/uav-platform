@@ -237,3 +237,325 @@ def test_ai_retry_and_tenant_boundary(ai_client: TestClient) -> None:
 
     denied_resp = ai_client.get(f"/api/ai/outputs/{output_id}", headers=_auth_header(token_b))
     assert denied_resp.status_code == 404
+
+
+def test_ai_model_governance_wp1_minimal_chain(ai_client: TestClient) -> None:
+    tenant_id = _create_tenant(ai_client, "phase23-ai-governance")
+    _bootstrap_admin(ai_client, tenant_id, "admin-gov", "admin-pass")
+    token = _login(ai_client, tenant_id, "admin-gov", "admin-pass")
+
+    create_model_resp = ai_client.post(
+        "/api/ai/models",
+        json={
+            "model_key": "builtin:uav-assistant-lite",
+            "provider": "builtin",
+            "display_name": "uav-assistant-lite",
+            "description": "phase23 governance model",
+            "is_active": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert create_model_resp.status_code == 201
+    model_id = create_model_resp.json()["id"]
+
+    create_version_resp = ai_client.post(
+        f"/api/ai/models/{model_id}/versions",
+        json={
+            "version": "phase23.v1",
+            "status": "DRAFT",
+            "threshold_defaults": {"confidence_min": 0.8},
+        },
+        headers=_auth_header(token),
+    )
+    assert create_version_resp.status_code == 201
+    version_id = create_version_resp.json()["id"]
+    assert create_version_resp.json()["status"] == "DRAFT"
+
+    promote_resp = ai_client.post(
+        f"/api/ai/models/{model_id}/versions/{version_id}:promote",
+        json={"target_status": "STABLE"},
+        headers=_auth_header(token),
+    )
+    assert promote_resp.status_code == 200
+    assert promote_resp.json()["status"] == "STABLE"
+
+    versions_resp = ai_client.get(
+        f"/api/ai/models/{model_id}/versions?status_filter=STABLE",
+        headers=_auth_header(token),
+    )
+    assert versions_resp.status_code == 200
+    versions = versions_resp.json()
+    assert len(versions) == 1
+    assert versions[0]["id"] == version_id
+
+    job_resp = ai_client.post(
+        "/api/ai/jobs",
+        json={
+            "job_type": "SUMMARY",
+            "trigger_mode": "MANUAL",
+            "model_version_id": version_id,
+        },
+        headers=_auth_header(token),
+    )
+    assert job_resp.status_code == 201
+    body = job_resp.json()
+    assert body["model_version_id"] == version_id
+    assert body["model_provider"] == "builtin"
+    assert body["model_name"] == "uav-assistant-lite"
+    assert body["model_version"] == "phase23.v1"
+
+
+def test_ai_rollout_policy_and_run_selection_priority(ai_client: TestClient) -> None:
+    tenant_id = _create_tenant(ai_client, "phase23-ai-rollout")
+    _bootstrap_admin(ai_client, tenant_id, "admin-rollout", "admin-pass")
+    token = _login(ai_client, tenant_id, "admin-rollout", "admin-pass")
+
+    model_resp = ai_client.post(
+        "/api/ai/models",
+        json={
+            "model_key": "builtin:uav-assistant-lite",
+            "provider": "builtin",
+            "display_name": "uav-assistant-lite",
+            "is_active": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert model_resp.status_code == 201
+    model_id = model_resp.json()["id"]
+
+    stable_resp = ai_client.post(
+        f"/api/ai/models/{model_id}/versions",
+        json={
+            "version": "phase23.rollout.v1",
+            "status": "STABLE",
+            "threshold_defaults": {"confidence_min": 0.8},
+        },
+        headers=_auth_header(token),
+    )
+    assert stable_resp.status_code == 201
+    stable_id = stable_resp.json()["id"]
+
+    canary_resp = ai_client.post(
+        f"/api/ai/models/{model_id}/versions",
+        json={
+            "version": "phase23.rollout.v2",
+            "status": "CANARY",
+            "threshold_defaults": {"confidence_min": 0.7},
+        },
+        headers=_auth_header(token),
+    )
+    assert canary_resp.status_code == 201
+    canary_id = canary_resp.json()["id"]
+
+    policy_resp = ai_client.put(
+        f"/api/ai/models/{model_id}/rollout-policy",
+        json={
+            "default_version_id": stable_id,
+            "traffic_allocation": [
+                {"version_id": stable_id, "weight": 90},
+                {"version_id": canary_id, "weight": 10},
+            ],
+            "threshold_overrides": {"confidence_min": 0.75},
+            "is_active": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert policy_resp.status_code == 200
+    policy_id = policy_resp.json()["id"]
+    assert policy_resp.json()["default_version_id"] == stable_id
+
+    policy_get_resp = ai_client.get(
+        f"/api/ai/models/{model_id}/rollout-policy",
+        headers=_auth_header(token),
+    )
+    assert policy_get_resp.status_code == 200
+    policy_body = policy_get_resp.json()
+    assert sum(int(item["weight"]) for item in policy_body["traffic_allocation"]) == 100
+
+    job_resp = ai_client.post(
+        "/api/ai/jobs",
+        json={
+            "job_type": "SUMMARY",
+            "trigger_mode": "MANUAL",
+            "model_version_id": stable_id,
+        },
+        headers=_auth_header(token),
+    )
+    assert job_resp.status_code == 201
+    job_id = job_resp.json()["id"]
+
+    forced_run_resp = ai_client.post(
+        f"/api/ai/jobs/{job_id}/runs",
+        json={
+            "force_model_version_id": canary_id,
+            "force_threshold_config": {"confidence_min": 0.72},
+            "context": {"case": "manual-force"},
+        },
+        headers=_auth_header(token),
+    )
+    assert forced_run_resp.status_code == 201
+    forced_run = forced_run_resp.json()
+    assert forced_run["status"] == "SUCCEEDED"
+    assert forced_run["metrics"]["selection_source"] == "MANUAL_FORCE"
+    assert forced_run["metrics"]["model_version_id"] == canary_id
+    assert forced_run["metrics"]["threshold_snapshot"]["confidence_min"] == 0.72
+
+    outputs_resp = ai_client.get(
+        f"/api/ai/outputs?run_id={forced_run['id']}",
+        headers=_auth_header(token),
+    )
+    assert outputs_resp.status_code == 200
+    outputs = outputs_resp.json()
+    assert len(outputs) == 1
+    output_id = outputs[0]["id"]
+    assert outputs[0]["payload"]["model_selection"]["model_version_id"] == canary_id
+    assert outputs[0]["payload"]["model_selection"]["policy_snapshot"]["policy_id"] == policy_id
+    assert outputs[0]["payload"]["model_selection"]["threshold_snapshot"]["confidence_min"] == 0.72
+
+    review_resp = ai_client.get(f"/api/ai/outputs/{output_id}/review", headers=_auth_header(token))
+    assert review_resp.status_code == 200
+    model_evidence = next(
+        item for item in review_resp.json()["evidences"] if item["evidence_type"] == "MODEL_CONFIG"
+    )
+    assert model_evidence["payload"]["model_version_id"] == canary_id
+    assert model_evidence["payload"]["policy_snapshot"]["policy_id"] == policy_id
+    assert model_evidence["payload"]["threshold_config"]["confidence_min"] == 0.72
+
+    bind_resp = ai_client.post(
+        f"/api/ai/jobs/{job_id}:bind-model-version",
+        json={"model_version_id": canary_id},
+        headers=_auth_header(token),
+    )
+    assert bind_resp.status_code == 200
+    assert bind_resp.json()["model_version_id"] == canary_id
+
+    bound_run_resp = ai_client.post(
+        f"/api/ai/jobs/{job_id}/runs",
+        json={"context": {"case": "job-binding"}},
+        headers=_auth_header(token),
+    )
+    assert bound_run_resp.status_code == 201
+    bound_run = bound_run_resp.json()
+    assert bound_run["status"] == "SUCCEEDED"
+    assert bound_run["metrics"]["selection_source"] == "JOB_BINDING"
+    assert bound_run["metrics"]["model_version_id"] == canary_id
+    assert bound_run["metrics"]["threshold_snapshot"]["confidence_min"] == 0.8
+
+
+def test_ai_evaluation_rollback_and_schedule_tick(ai_client: TestClient) -> None:
+    tenant_id = _create_tenant(ai_client, "phase23-ai-eval")
+    _bootstrap_admin(ai_client, tenant_id, "admin-eval", "admin-pass")
+    token = _login(ai_client, tenant_id, "admin-eval", "admin-pass")
+
+    model_resp = ai_client.post(
+        "/api/ai/models",
+        json={
+            "model_key": "builtin:uav-assistant-lite",
+            "provider": "builtin",
+            "display_name": "uav-assistant-lite",
+        },
+        headers=_auth_header(token),
+    )
+    assert model_resp.status_code == 201
+    model_id = model_resp.json()["id"]
+
+    stable_resp = ai_client.post(
+        f"/api/ai/models/{model_id}/versions",
+        json={"version": "phase23.eval.v1", "status": "STABLE", "threshold_defaults": {"confidence_min": 0.8}},
+        headers=_auth_header(token),
+    )
+    assert stable_resp.status_code == 201
+    stable_id = stable_resp.json()["id"]
+
+    canary_resp = ai_client.post(
+        f"/api/ai/models/{model_id}/versions",
+        json={"version": "phase23.eval.v2", "status": "CANARY", "threshold_defaults": {"confidence_min": 0.7}},
+        headers=_auth_header(token),
+    )
+    assert canary_resp.status_code == 201
+    canary_id = canary_resp.json()["id"]
+
+    set_policy_resp = ai_client.put(
+        f"/api/ai/models/{model_id}/rollout-policy",
+        json={
+            "default_version_id": canary_id,
+            "traffic_allocation": [
+                {"version_id": stable_id, "weight": 40},
+                {"version_id": canary_id, "weight": 60},
+            ],
+            "threshold_overrides": {"confidence_min": 0.75},
+            "is_active": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert set_policy_resp.status_code == 200
+
+    job_resp = ai_client.post(
+        "/api/ai/jobs",
+        json={
+            "job_type": "SUMMARY",
+            "trigger_mode": "NEAR_REALTIME",
+            "model_version_id": canary_id,
+        },
+        headers=_auth_header(token),
+    )
+    assert job_resp.status_code == 201
+    job_id = job_resp.json()["id"]
+
+    tick_first = ai_client.post(
+        "/api/ai/jobs:schedule-tick",
+        json={"window_key": "2026-02-27T16:00Z", "job_ids": [job_id], "max_jobs": 10},
+        headers=_auth_header(token),
+    )
+    assert tick_first.status_code == 200
+    first_body = tick_first.json()
+    assert first_body["triggered_jobs"] == 1
+    assert first_body["skipped_jobs"] == 0
+
+    tick_second = ai_client.post(
+        "/api/ai/jobs:schedule-tick",
+        json={"window_key": "2026-02-27T16:00Z", "job_ids": [job_id], "max_jobs": 10},
+        headers=_auth_header(token),
+    )
+    assert tick_second.status_code == 200
+    second_body = tick_second.json()
+    assert second_body["triggered_jobs"] == 0
+    assert second_body["skipped_jobs"] == 1
+
+    force_run_resp = ai_client.post(
+        f"/api/ai/jobs/{job_id}/runs",
+        json={"force_model_version_id": stable_id, "context": {"case": "eval-compare"}},
+        headers=_auth_header(token),
+    )
+    assert force_run_resp.status_code == 201
+    assert force_run_resp.json()["status"] == "SUCCEEDED"
+
+    recompute_resp = ai_client.post(
+        "/api/ai/evaluations:recompute",
+        json={"job_id": job_id},
+        headers=_auth_header(token),
+    )
+    assert recompute_resp.status_code == 200
+    summaries = recompute_resp.json()
+    assert len(summaries) >= 2
+    summary_by_version = {item["model_version_id"]: item for item in summaries}
+    assert stable_id in summary_by_version
+    assert canary_id in summary_by_version
+
+    compare_resp = ai_client.get(
+        f"/api/ai/evaluations/compare?left_version_id={stable_id}&right_version_id={canary_id}&job_id={job_id}",
+        headers=_auth_header(token),
+    )
+    assert compare_resp.status_code == 200
+    compare_body = compare_resp.json()
+    assert compare_body["left"]["model_version_id"] == stable_id
+    assert compare_body["right"]["model_version_id"] == canary_id
+
+    rollback_resp = ai_client.post(
+        f"/api/ai/models/{model_id}/rollout-policy:rollback",
+        json={"target_version_id": stable_id, "reason": "canary quality drop"},
+        headers=_auth_header(token),
+    )
+    assert rollback_resp.status_code == 200
+    assert rollback_resp.json()["default_version_id"] == stable_id
+    assert rollback_resp.json()["traffic_allocation"] == [{"version_id": stable_id, "weight": 100}]
