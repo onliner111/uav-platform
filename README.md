@@ -7,7 +7,7 @@ codex --dangerously-bypass-approvals-and-sandbox
 codex -a never -s workspace-write
 
 
-重启先读取 `phases/resume.md`，并按其中 Next TODO 继续执行。
+重启先读取 `phases/resume.md`，及其相关文件，了解项目情况。
 
 Key directories:
 - `app/`

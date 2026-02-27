@@ -32,12 +32,6 @@
   const alertCardNode = document.getElementById("card-alert");
   const videoSlotsNode = document.getElementById("video-slots");
 
-  const videoSlots = [
-    { slot: "A1", protocol: "RTSP", endpoint: null },
-    { slot: "A2", protocol: "WebRTC", endpoint: null },
-    { slot: "B1", protocol: "RTSP", endpoint: null },
-  ];
-
   function authHeaders() {
     return {
       Authorization: `Bearer ${token}`,
@@ -186,20 +180,61 @@
     });
   }
 
-  function renderVideoSlots() {
+  function formatLinkedTelemetry(point) {
+    if (!point || typeof point.lat !== "number" || typeof point.lon !== "number") {
+      return "No telemetry linked";
+    }
+    return `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}`;
+  }
+
+  function renderVideoSlots(streams, errorText = null) {
     if (!videoSlotsNode) {
       return;
     }
     videoSlotsNode.innerHTML = "";
-    videoSlots.forEach((slot) => {
+    if (errorText) {
+      videoSlotsNode.innerHTML = `<div class="hint">${errorText}</div>`;
+      return;
+    }
+    if (!Array.isArray(streams) || streams.length === 0) {
+      videoSlotsNode.innerHTML = '<div class="hint">No configured streams.</div>';
+      return;
+    }
+    streams.slice(0, 6).forEach((stream) => {
+      const status = String(stream.status || "STANDBY").toUpperCase();
+      const protocol = String(stream.protocol || "-");
+      const label = stream.label || stream.stream_key || stream.stream_id || "stream";
+      const detail = stream.detail || {};
       const container = document.createElement("div");
       container.className = "video-slot";
       container.innerHTML = `
-        <div class="title"><span>Slot ${slot.slot}</span><span class="status-pill">Placeholder</span></div>
-        <div class="meta">${slot.protocol} gateway ready; endpoint pending integration.</div>
+        <div class="title"><span>${label}</span><span class="status-pill">${status}</span></div>
+        <div class="meta">${protocol} · ${status} · ${stream.endpoint || "-"}</div>
+        <div class="meta">Drone: ${stream.drone_id || "-"}</div>
+        <div class="meta">Linked: ${formatLinkedTelemetry(stream.linked_telemetry)}</div>
+        <div class="meta">Enabled: ${stream.enabled ? "yes" : "no"}${detail.last_error ? ` · Error: ${detail.last_error}` : ""}</div>
       `;
       videoSlotsNode.appendChild(container);
     });
+  }
+
+  async function fetchVideoStreams() {
+    const response = await fetch("/api/integration/video-streams", {
+      headers: authHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`video streams failed: ${response.status}`);
+    }
+    return response.json();
+  }
+
+  async function refreshVideoSlots() {
+    try {
+      const rows = await fetchVideoStreams();
+      renderVideoSlots(rows);
+    } catch (err) {
+      renderVideoSlots([], `Video refresh failed: ${String(err)}`);
+    }
   }
 
   function updateDashboardStats(payload) {
@@ -326,9 +361,12 @@
     });
   }
 
-  renderVideoSlots();
+  refreshVideoSlots();
   refreshMapLayers();
-  setInterval(refreshMapLayers, 15000);
+  setInterval(() => {
+    refreshMapLayers();
+    refreshVideoSlots();
+  }, 15000);
 
   const scheme = window.location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${scheme}://${window.location.host}/ws/dashboard?token=${encodeURIComponent(token)}`);

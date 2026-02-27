@@ -18,6 +18,7 @@ from app.api.routers import (
     identity,
     incident,
     inspection,
+    integration,
     kpi,
     map_router,
     mission,
@@ -70,6 +71,7 @@ app.include_router(reporting.router, prefix="/api/reporting", tags=["reporting"]
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(kpi.router, prefix="/api/kpi", tags=["kpi"])
 app.include_router(open_platform.router, prefix="/api/open-platform", tags=["open-platform"])
+app.include_router(integration.router, prefix="/api/integration", tags=["integration"])
 app.include_router(tenant_export.router, prefix="/api", tags=["tenant-export"])
 app.include_router(tenant_purge.router, prefix="/api", tags=["tenant-purge"])
 app.include_router(ui.router, tags=["ui"])

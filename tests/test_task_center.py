@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -498,3 +499,137 @@ def test_task_center_auto_dispatch_and_enhancement_workflow(task_center_client: 
     assert "task_center.task.risk_checklist.update" in audit_actions
     assert "task_center.task.attachment.add" in audit_actions
     assert "task_center.task.comment.add" in audit_actions
+
+
+def test_task_center_v2_template_conflict_and_batch(task_center_client: TestClient) -> None:
+    tenant_id = _create_tenant(task_center_client, "task-center-v2")
+    _bootstrap_admin(task_center_client, tenant_id, "admin", "admin-pass")
+    admin_token = _login(task_center_client, tenant_id, "admin", "admin-pass")
+
+    org_unit_id = _create_org_unit(task_center_client, admin_token, "v2-ops", "V2-OPS")
+    user_a_id, _ = _create_user_with_permissions(
+        task_center_client,
+        admin_token,
+        tenant_id,
+        "v2-user-a",
+        "v2-pass-a",
+        ["mission.read", "mission.write", "identity.read"],
+    )
+    user_b_id, _ = _create_user_with_permissions(
+        task_center_client,
+        admin_token,
+        tenant_id,
+        "v2-user-b",
+        "v2-pass-b",
+        ["mission.read", "mission.write", "identity.read"],
+    )
+    _bind_user_org_unit(task_center_client, admin_token, user_a_id, org_unit_id)
+    _create_asset_with_region(task_center_client, admin_token, "V2-UAV-01", "AREA-V2")
+
+    task_type_resp = task_center_client.post(
+        "/api/task-center/types",
+        json={"code": "V2-INSPECT", "name": "v2-inspect"},
+        headers=_auth_header(admin_token),
+    )
+    assert task_type_resp.status_code == 201
+    task_type_id = task_type_resp.json()["id"]
+
+    template_resp = task_center_client.post(
+        "/api/task-center/templates",
+        json={
+            "task_type_id": task_type_id,
+            "template_key": "v2-template-base",
+            "name": "v2-template",
+            "requires_approval": False,
+            "default_priority": 6,
+            "default_risk_level": 3,
+            "route_template": {"mode": "grid", "waypoints": 12},
+            "payload_template": {"camera": "4k", "gimbal": "stabilized"},
+            "default_payload": {"biz_tag": "phase20"},
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert template_resp.status_code == 201
+    template_payload = template_resp.json()
+    template_id = template_payload["id"]
+    assert template_payload["template_version"] == "v2"
+    assert template_payload["route_template"]["mode"] == "grid"
+    assert template_payload["payload_template"]["camera"] == "4k"
+
+    clone_resp = task_center_client.post(
+        f"/api/task-center/templates/{template_id}:clone",
+        json={"template_key": "v2-template-clone", "name": "v2-template-clone"},
+        headers=_auth_header(admin_token),
+    )
+    assert clone_resp.status_code == 201
+    assert clone_resp.json()["template_key"] == "v2-template-clone"
+    assert clone_resp.json()["route_template"]["mode"] == "grid"
+
+    start_at = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=1)
+    end_at = start_at + timedelta(hours=2)
+
+    batch_resp = task_center_client.post(
+        "/api/task-center/tasks:batch-create",
+        json={
+            "tasks": [
+                {
+                    "task_type_id": task_type_id,
+                    "template_id": template_id,
+                    "name": "v2-task-a",
+                    "org_unit_id": org_unit_id,
+                    "area_code": "AREA-V2",
+                    "planned_start_at": start_at.isoformat(),
+                    "planned_end_at": end_at.isoformat(),
+                },
+                {
+                    "task_type_id": task_type_id,
+                    "template_id": template_id,
+                    "name": "v2-task-b",
+                    "org_unit_id": org_unit_id,
+                    "area_code": "AREA-V2",
+                    "planned_start_at": (start_at + timedelta(minutes=30)).isoformat(),
+                    "planned_end_at": (end_at + timedelta(minutes=30)).isoformat(),
+                    "route_template": {"mode": "point", "waypoints": 4},
+                },
+            ]
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert batch_resp.status_code == 201
+    batch_payload = batch_resp.json()
+    assert batch_payload["total"] == 2
+    task_a = batch_payload["tasks"][0]["id"]
+    task_b = batch_payload["tasks"][1]["id"]
+    assert batch_payload["tasks"][1]["context_data"]["route_template"]["mode"] == "point"
+
+    dispatch_a = task_center_client.post(
+        f"/api/task-center/tasks/{task_a}/dispatch",
+        json={"assigned_to": user_a_id},
+        headers=_auth_header(admin_token),
+    )
+    assert dispatch_a.status_code == 200
+
+    dispatch_b_conflict = task_center_client.post(
+        f"/api/task-center/tasks/{task_b}/dispatch",
+        json={"assigned_to": user_a_id},
+        headers=_auth_header(admin_token),
+    )
+    assert dispatch_b_conflict.status_code == 409
+    assert "overlapping assignment" in dispatch_b_conflict.json()["detail"]
+
+    auto_dispatch_b = task_center_client.post(
+        f"/api/task-center/tasks/{task_b}/auto-dispatch",
+        json={"candidate_user_ids": [user_a_id, user_b_id]},
+        headers=_auth_header(admin_token),
+    )
+    assert auto_dispatch_b.status_code == 200
+    auto_payload = auto_dispatch_b.json()
+    assert auto_payload["selected_user_id"] == user_b_id
+    assert auto_payload["resource_snapshot"]["score_strategy"]["version"] == "v2.0"
+    assert any("overlap_conflicts=" in reason for reason in auto_payload["scores"][0]["reasons"])
+
+    with Session(db.engine) as session:
+        audit_rows = list(session.exec(select(AuditLog).where(AuditLog.tenant_id == tenant_id)).all())
+    audit_actions = {row.action for row in audit_rows}
+    assert "task_center.template.clone" in audit_actions
+    assert "task_center.task.batch_create" in audit_actions

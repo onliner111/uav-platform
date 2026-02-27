@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -20,12 +20,14 @@ from app.domain.models import (
     TaskCenterTask,
     TaskCenterTaskApproveRequest,
     TaskCenterTaskAutoDispatchRequest,
+    TaskCenterTaskBatchCreateRequest,
     TaskCenterTaskCreate,
     TaskCenterTaskDispatchRequest,
     TaskCenterTaskHistory,
     TaskCenterTaskSubmitApprovalRequest,
     TaskCenterTaskTransitionRequest,
     TaskTemplate,
+    TaskTemplateCloneRequest,
     TaskTemplateCreate,
     TaskTypeCatalog,
     TaskTypeCatalogCreate,
@@ -51,11 +53,50 @@ class ConflictError(TaskCenterError):
 
 
 class TaskCenterService:
+    _ACTIVE_ASSIGNMENT_STATES: ClassVar[set[TaskCenterState]] = {
+        TaskCenterState.DISPATCHED,
+        TaskCenterState.IN_PROGRESS,
+        TaskCenterState.APPROVAL_PENDING,
+        TaskCenterState.APPROVED,
+    }
+    _SCORE_STRATEGY_VERSION: ClassVar[str] = "v2.0"
+
     def __init__(self) -> None:
         self._data_perimeter = DataPerimeterService()
 
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
+
+    @staticmethod
+    def _ensure_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
+
+    def _task_schedule_window(self, task: TaskCenterTask) -> tuple[datetime | None, datetime | None]:
+        schedule = task.context_data.get("schedule", {})
+        if not isinstance(schedule, dict):
+            return None, None
+        start_raw = schedule.get("planned_start_at")
+        end_raw = schedule.get("planned_end_at")
+        try:
+            start = self._ensure_utc(datetime.fromisoformat(start_raw)) if isinstance(start_raw, str) else None
+        except ValueError:
+            start = None
+        try:
+            end = self._ensure_utc(datetime.fromisoformat(end_raw)) if isinstance(end_raw, str) else None
+        except ValueError:
+            end = None
+        return start, end
+
+    @staticmethod
+    def _windows_overlap(
+        start_a: datetime,
+        end_a: datetime,
+        start_b: datetime,
+        end_b: datetime,
+    ) -> bool:
+        return max(start_a, start_b) < min(end_a, end_b)
 
     def _get_scoped_task_type(self, session: Session, tenant_id: str, task_type_id: str) -> TaskTypeCatalog:
         row = session.exec(
@@ -151,13 +192,7 @@ class TaskCenterService:
                 .where(TaskCenterTask.assigned_to == user_id)
             ).all()
         )
-        active_states = {
-            TaskCenterState.DISPATCHED,
-            TaskCenterState.IN_PROGRESS,
-            TaskCenterState.APPROVAL_PENDING,
-            TaskCenterState.APPROVED,
-        }
-        return sum(1 for item in rows if item.state in active_states)
+        return sum(1 for item in rows if item.state in self._ACTIVE_ASSIGNMENT_STATES)
 
     def _candidate_in_org_unit(
         self,
@@ -193,6 +228,38 @@ class TaskCenterService:
             "available_assets": len(available),
         }
 
+    def _candidate_conflict_count(
+        self,
+        session: Session,
+        *,
+        tenant_id: str,
+        user_id: str,
+        planned_start_at: datetime | None,
+        planned_end_at: datetime | None,
+        exclude_task_id: str | None = None,
+    ) -> int:
+        if planned_start_at is None or planned_end_at is None:
+            return 0
+        rows = list(
+            session.exec(
+                select(TaskCenterTask)
+                .where(TaskCenterTask.tenant_id == tenant_id)
+                .where(TaskCenterTask.assigned_to == user_id)
+            ).all()
+        )
+        count = 0
+        for row in rows:
+            if exclude_task_id is not None and row.id == exclude_task_id:
+                continue
+            if row.state not in self._ACTIVE_ASSIGNMENT_STATES:
+                continue
+            other_start, other_end = self._task_schedule_window(row)
+            if other_start is None or other_end is None:
+                continue
+            if self._windows_overlap(planned_start_at, planned_end_at, other_start, other_end):
+                count += 1
+        return count
+
     def _score_candidates(
         self,
         session: Session,
@@ -200,26 +267,68 @@ class TaskCenterService:
         task: TaskCenterTask,
         candidates: list[User],
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        planned_start_at, planned_end_at = self._task_schedule_window(task)
+        schedule_enabled = planned_start_at is not None and planned_end_at is not None
+
         resource_snapshot = self._resource_snapshot(session, tenant_id, task.area_code)
         resource_available = int(resource_snapshot["available_assets"])
-        resource_score = float(min(30, resource_available * 10))
+        resource_score = float(min(24, resource_available * 8))
         if resource_available == 0:
-            resource_score = 5.0
+            resource_score = 4.0
+
+        priority_score = float(task.priority * 1.2)
+        risk_score = float(max(0, 6 - task.risk_level) * 1.5)
+        strategy_weights = {
+            "base": 16.0,
+            "workload": 32.0,
+            "org_match": 24.0,
+            "resource": 24.0,
+            "priority": priority_score,
+            "risk": risk_score,
+            "conflict_penalty_per_overlap": 35.0,
+        }
+        resource_snapshot["score_strategy"] = {
+            "version": self._SCORE_STRATEGY_VERSION,
+            "schedule_enabled": schedule_enabled,
+            "weights": strategy_weights,
+        }
 
         scored: list[dict[str, Any]] = []
         for candidate in candidates:
             workload = self._candidate_workload(session, tenant_id, candidate.id)
-            workload_score = float(max(5, 40 - workload * 10))
+            workload_score = float(max(6, 32 - workload * 8))
             org_match = self._candidate_in_org_unit(session, tenant_id, candidate.id, task.org_unit_id)
-            org_score = 30.0 if org_match else 0.0
-            base_score = 20.0
-            total = base_score + workload_score + org_score + resource_score
+            org_score = 24.0 if org_match else 0.0
+            base_score = 16.0
+            conflict_count = self._candidate_conflict_count(
+                session,
+                tenant_id=tenant_id,
+                user_id=candidate.id,
+                planned_start_at=planned_start_at,
+                planned_end_at=planned_end_at,
+                exclude_task_id=task.id,
+            )
+            conflict_penalty = float(conflict_count * strategy_weights["conflict_penalty_per_overlap"])
+            total = (
+                base_score
+                + workload_score
+                + org_score
+                + resource_score
+                + priority_score
+                + risk_score
+                - conflict_penalty
+            )
             reasons = [
+                f"strategy={self._SCORE_STRATEGY_VERSION}",
                 f"base={base_score}",
                 f"workload={workload}=>{workload_score}",
                 f"org_match={org_match}=>{org_score}",
                 f"available_assets={resource_available}=>{resource_score}",
+                f"priority={task.priority}=>{priority_score}",
+                f"risk_level={task.risk_level}=>{risk_score}",
             ]
+            if schedule_enabled:
+                reasons.append(f"overlap_conflicts={conflict_count}=>-{conflict_penalty}")
             scored.append(
                 {
                     "user_id": candidate.id,
@@ -229,12 +338,23 @@ class TaskCenterService:
                         "workload": workload_score,
                         "org_match": org_score,
                         "resource_availability": resource_score,
+                        "priority": priority_score,
+                        "risk": risk_score,
+                        "conflict_penalty": conflict_penalty,
                     },
                     "reasons": reasons,
                     "workload_count": workload,
+                    "conflict_count": conflict_count,
                 }
             )
-        scored.sort(key=lambda item: (-float(item["total_score"]), int(item["workload_count"]), str(item["user_id"])))
+        scored.sort(
+            key=lambda item: (
+                -float(item["total_score"]),
+                int(item["conflict_count"]),
+                int(item["workload_count"]),
+                str(item["user_id"]),
+            )
+        )
         for item in scored:
             item.pop("workload_count", None)
         return scored, resource_snapshot
@@ -290,6 +410,17 @@ class TaskCenterService:
         if not can_task_center_transition(row.state, TaskCenterState.DISPATCHED):
             raise ConflictError(f"illegal transition: {row.state} -> {TaskCenterState.DISPATCHED}")
         self._ensure_scoped_user(session, tenant_id, assigned_to)
+        planned_start_at, planned_end_at = self._task_schedule_window(row)
+        overlap_count = self._candidate_conflict_count(
+            session,
+            tenant_id=tenant_id,
+            user_id=assigned_to,
+            planned_start_at=planned_start_at,
+            planned_end_at=planned_end_at,
+            exclude_task_id=row.id,
+        )
+        if overlap_count > 0:
+            raise ConflictError("dispatch conflict: overlapping assignment exists for selected user")
 
         source = row.state
         now = datetime.now(UTC)
@@ -300,7 +431,12 @@ class TaskCenterService:
         row.dispatched_at = now
         row.updated_at = now
         session.add(row)
-        event_detail = {"assigned_to": assigned_to, "dispatch_mode": dispatch_mode}
+        event_detail: dict[str, Any] = {"assigned_to": assigned_to, "dispatch_mode": dispatch_mode}
+        if planned_start_at is not None and planned_end_at is not None:
+            event_detail["schedule"] = {
+                "planned_start_at": planned_start_at.isoformat(),
+                "planned_end_at": planned_end_at.isoformat(),
+            }
         if detail is not None:
             event_detail.update(detail)
         self._record_history(
@@ -344,6 +480,10 @@ class TaskCenterService:
     def create_template(self, tenant_id: str, actor_id: str, payload: TaskTemplateCreate) -> TaskTemplate:
         with self._session() as session:
             _ = self._get_scoped_task_type(session, tenant_id, payload.task_type_id)
+            default_payload = dict(payload.default_payload)
+            default_payload["template_version"] = payload.template_version
+            default_payload["route_template"] = dict(payload.route_template)
+            default_payload["payload_template"] = dict(payload.payload_template)
             row = TaskTemplate(
                 tenant_id=tenant_id,
                 task_type_id=payload.task_type_id,
@@ -354,7 +494,7 @@ class TaskCenterService:
                 default_priority=payload.default_priority,
                 default_risk_level=payload.default_risk_level,
                 default_checklist=payload.default_checklist,
-                default_payload=payload.default_payload,
+                default_payload=default_payload,
                 is_active=payload.is_active,
                 created_by=actor_id,
             )
@@ -382,6 +522,155 @@ class TaskCenterService:
                 statement = statement.where(TaskTemplate.is_active == is_active)
             return list(session.exec(statement).all())
 
+    def clone_template(
+        self,
+        tenant_id: str,
+        template_id: str,
+        actor_id: str,
+        payload: TaskTemplateCloneRequest,
+    ) -> TaskTemplate:
+        with self._session() as session:
+            source = self._get_scoped_template(session, tenant_id, template_id)
+            row = TaskTemplate(
+                tenant_id=tenant_id,
+                task_type_id=source.task_type_id,
+                template_key=payload.template_key,
+                name=payload.name,
+                description=payload.description if payload.description is not None else source.description,
+                requires_approval=source.requires_approval,
+                default_priority=source.default_priority,
+                default_risk_level=source.default_risk_level,
+                default_checklist=list(source.default_checklist),
+                default_payload=dict(source.default_payload),
+                is_active=payload.is_active,
+                created_by=actor_id,
+            )
+            session.add(row)
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise ConflictError("task template clone conflict") from exc
+            session.refresh(row)
+            return row
+
+    def _build_task_row(
+        self,
+        session: Session,
+        *,
+        tenant_id: str,
+        actor_id: str,
+        payload: TaskCenterTaskCreate,
+    ) -> TaskCenterTask:
+        task_type = self._get_scoped_task_type(session, tenant_id, payload.task_type_id)
+        if not task_type.is_active:
+            raise ConflictError("task type is inactive")
+
+        template: TaskTemplate | None = None
+        if payload.template_id is not None:
+            template = self._get_scoped_template(session, tenant_id, payload.template_id)
+            if template.task_type_id != payload.task_type_id:
+                raise ConflictError("template does not match task type")
+            if not template.is_active:
+                raise ConflictError("task template is inactive")
+
+        if payload.org_unit_id is not None:
+            self._ensure_scoped_org_unit(session, tenant_id, payload.org_unit_id)
+        if payload.mission_id is not None:
+            self._ensure_scoped_mission(session, tenant_id, payload.mission_id)
+
+        requires_approval = (
+            payload.requires_approval
+            if payload.requires_approval is not None
+            else (template.requires_approval if template is not None else False)
+        )
+        priority = payload.priority if payload.priority is not None else (
+            template.default_priority if template is not None else 5
+        )
+        risk_level = payload.risk_level if payload.risk_level is not None else (
+            template.default_risk_level if template is not None else 3
+        )
+
+        if not (1 <= priority <= 10):
+            raise ConflictError("priority out of range")
+        if not (1 <= risk_level <= 5):
+            raise ConflictError("risk level out of range")
+
+        checklist = (
+            payload.checklist
+            if "checklist" in payload.model_fields_set
+            else (template.default_checklist if template is not None else [])
+        )
+        template_context = dict(template.default_payload) if template is not None else {}
+        if "context_data" in payload.model_fields_set:
+            context_data = {**template_context, **payload.context_data}
+        else:
+            context_data = template_context
+
+        default_route_template = template_context.get("route_template", {})
+        default_payload_template = template_context.get("payload_template", {})
+        route_template = (
+            payload.route_template
+            if "route_template" in payload.model_fields_set
+            else default_route_template
+        )
+        payload_template = (
+            payload.payload_template
+            if "payload_template" in payload.model_fields_set
+            else default_payload_template
+        )
+
+        schedule_start = payload.planned_start_at
+        schedule_end = payload.planned_end_at
+        if schedule_start is not None:
+            schedule_start = self._ensure_utc(schedule_start)
+        if schedule_end is not None:
+            schedule_end = self._ensure_utc(schedule_end)
+        if schedule_start is not None and schedule_end is not None and schedule_end <= schedule_start:
+            raise ConflictError("planned_end_at must be later than planned_start_at")
+
+        context_data["route_template"] = route_template if isinstance(route_template, dict) else {}
+        context_data["payload_template"] = payload_template if isinstance(payload_template, dict) else {}
+        context_data["template_version"] = template_context.get("template_version", "v2")
+        context_data["schedule"] = {
+            "planned_start_at": schedule_start.isoformat() if schedule_start is not None else None,
+            "planned_end_at": schedule_end.isoformat() if schedule_end is not None else None,
+        }
+
+        row = TaskCenterTask(
+            tenant_id=tenant_id,
+            task_type_id=payload.task_type_id,
+            template_id=payload.template_id,
+            mission_id=payload.mission_id,
+            name=payload.name,
+            description=payload.description,
+            state=TaskCenterState.DRAFT,
+            requires_approval=requires_approval,
+            priority=priority,
+            risk_level=risk_level,
+            org_unit_id=payload.org_unit_id,
+            project_code=payload.project_code,
+            area_code=payload.area_code,
+            area_geom=payload.area_geom,
+            checklist=checklist,
+            attachments=payload.attachments,
+            context_data=context_data,
+            created_by=actor_id,
+        )
+        session.add(row)
+        self._record_history(
+            session,
+            tenant_id=tenant_id,
+            task_id=row.id,
+            action="created",
+            from_state=None,
+            to_state=TaskCenterState.DRAFT,
+            actor_id=actor_id,
+            note=None,
+            detail={"task_type_id": row.task_type_id, "template_id": row.template_id},
+        )
+        return row
+
     def create_task(
         self,
         tenant_id: str,
@@ -389,82 +678,11 @@ class TaskCenterService:
         payload: TaskCenterTaskCreate,
     ) -> TaskCenterTask:
         with self._session() as session:
-            task_type = self._get_scoped_task_type(session, tenant_id, payload.task_type_id)
-            if not task_type.is_active:
-                raise ConflictError("task type is inactive")
-
-            template: TaskTemplate | None = None
-            if payload.template_id is not None:
-                template = self._get_scoped_template(session, tenant_id, payload.template_id)
-                if template.task_type_id != payload.task_type_id:
-                    raise ConflictError("template does not match task type")
-                if not template.is_active:
-                    raise ConflictError("task template is inactive")
-
-            if payload.org_unit_id is not None:
-                self._ensure_scoped_org_unit(session, tenant_id, payload.org_unit_id)
-            if payload.mission_id is not None:
-                self._ensure_scoped_mission(session, tenant_id, payload.mission_id)
-
-            requires_approval = (
-                payload.requires_approval
-                if payload.requires_approval is not None
-                else (template.requires_approval if template is not None else False)
-            )
-            priority = payload.priority if payload.priority is not None else (
-                template.default_priority if template is not None else 5
-            )
-            risk_level = payload.risk_level if payload.risk_level is not None else (
-                template.default_risk_level if template is not None else 3
-            )
-
-            if not (1 <= priority <= 10):
-                raise ConflictError("priority out of range")
-            if not (1 <= risk_level <= 5):
-                raise ConflictError("risk level out of range")
-
-            checklist = (
-                payload.checklist
-                if "checklist" in payload.model_fields_set
-                else (template.default_checklist if template is not None else [])
-            )
-            template_context = dict(template.default_payload) if template is not None else {}
-            if "context_data" in payload.model_fields_set:
-                context_data = {**template_context, **payload.context_data}
-            else:
-                context_data = template_context
-
-            row = TaskCenterTask(
-                tenant_id=tenant_id,
-                task_type_id=payload.task_type_id,
-                template_id=payload.template_id,
-                mission_id=payload.mission_id,
-                name=payload.name,
-                description=payload.description,
-                state=TaskCenterState.DRAFT,
-                requires_approval=requires_approval,
-                priority=priority,
-                risk_level=risk_level,
-                org_unit_id=payload.org_unit_id,
-                project_code=payload.project_code,
-                area_code=payload.area_code,
-                area_geom=payload.area_geom,
-                checklist=checklist,
-                attachments=payload.attachments,
-                context_data=context_data,
-                created_by=actor_id,
-            )
-            session.add(row)
-            self._record_history(
+            row = self._build_task_row(
                 session,
                 tenant_id=tenant_id,
-                task_id=row.id,
-                action="created",
-                from_state=None,
-                to_state=TaskCenterState.DRAFT,
                 actor_id=actor_id,
-                note=None,
-                detail={"task_type_id": row.task_type_id, "template_id": row.template_id},
+                payload=payload,
             )
             try:
                 session.commit()
@@ -479,6 +697,38 @@ class TaskCenterService:
             {"task_id": row.id, "state": row.state, "task_type_id": row.task_type_id},
         )
         return row
+
+    def create_tasks_batch(
+        self,
+        tenant_id: str,
+        actor_id: str,
+        payload: TaskCenterTaskBatchCreateRequest,
+    ) -> list[TaskCenterTask]:
+        rows: list[TaskCenterTask] = []
+        with self._session() as session:
+            for task_payload in payload.tasks:
+                row = self._build_task_row(
+                    session,
+                    tenant_id=tenant_id,
+                    actor_id=actor_id,
+                    payload=task_payload,
+                )
+                rows.append(row)
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise ConflictError("task batch create conflict") from exc
+            for row in rows:
+                session.refresh(row)
+
+        for row in rows:
+            event_bus.publish_dict(
+                "task_center.task.created",
+                tenant_id,
+                {"task_id": row.id, "state": row.state, "task_type_id": row.task_type_id},
+            )
+        return rows
 
     def list_tasks(
         self,
@@ -645,7 +895,12 @@ class TaskCenterService:
             if not candidates:
                 raise ConflictError("no available candidates for auto dispatch")
             scores, resource_snapshot = self._score_candidates(session, tenant_id, row, candidates)
-            selected_user_id = str(scores[0]["user_id"])
+            conflict_free = [item for item in scores if int(item.get("conflict_count", 0)) == 0]
+            if not conflict_free:
+                raise ConflictError("no conflict-free candidates for auto dispatch")
+            selected_user_id = str(conflict_free[0]["user_id"])
+            for item in scores:
+                item.pop("conflict_count", None)
 
             self._dispatch_task_internal(
                 session,

@@ -6,15 +6,15 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-19-real-device-video-integration.md (READY; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 18 closed as DONE (`18-WP1`..`18-WP6`)
-- Next Target: start phase-19 and execute `P0 -> P1 -> P2 -> 19-WP6` with full gate closeout
+- Current Phase: phase-21-airspace-compliance-hub-v2.md (READY; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 20 closed as DONE (`20-WP1`..`20-WP4`)
+- Next Target: start phase-21 and execute `P0 -> P1 -> P2 -> 21-WP4` with full gate closeout
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-26T19:51:06Z
+> Last verified at (UTC): 2026-02-27T13:46:23Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> WIP note (2026-02-26T19:51:06Z): Phase 18 fully closed after completing `18-WP1`..`18-WP6` with full closeout chain pass (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`).
+> WIP note (2026-02-27T13:46:23Z): Phase 20 fully closed after completing `20-WP1`..`20-WP4` with full closeout chain pass (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase20_task_center_v2`).
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
 - mypy: PASS (72 source files)
@@ -72,6 +72,8 @@
 - phase-16-saas-console-ui.md: DONE
 - phase-17-multi-org-data-perimeter-v2.md: DONE
 - phase-18-outcomes-repository-object-storage.md: DONE
+- phase-19-real-device-video-integration.md: DONE
+- phase-20-task-center-v2-optimization.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -102,10 +104,14 @@
 - 18-WP3 artifacts are present: outcome report template/export model chain (`OutcomeReportTemplate`, `OutcomeReportExport`), reporting APIs (`POST/GET /api/reporting/outcome-report-templates`, `POST /api/reporting/outcome-report-exports`, `GET /api/reporting/outcome-report-exports/{export_id}`), PDF/Word minimal rendering pipeline (`_write_minimal_pdf`, `_write_minimal_docx`), migration chain `202602260077/078/079`, and regression coverage (`tests/test_reporting.py::test_outcome_report_template_and_export_pdf_word`).
 - 18-WP4 artifacts are present: lifecycle retention execution for report artifacts (`POST /api/reporting/outcome-report-exports:retention`, dry-run + execute), file cleanup + metadata backfill (`detail.lifecycle`), and explicit audit action linkage (`reporting.outcome_report.*`) with regression coverage (`tests/test_reporting.py::test_outcome_report_retention_lifecycle_and_audit`).
 - 18-WP5 artifacts are present: storage region/tier model extension for raw data (`storage_region`, `access_tier`, `RawDataAccessTier`), transition API (`PATCH /api/outcomes/raw/{raw_id}/storage`) with transition history in `meta.storage_transitions`, migration chain `202602260080/081/082`, and regression coverage (`tests/test_outcomes.py::test_raw_data_upload_session_complete_and_download`).
+- 19-WP1/19-WP2/19-WP3 artifacts are present: integration service-router chain (`app/services/integration_service.py`, `app/api/routers/integration.py`) with device session runtime (`/api/integration/device-sessions/*`) and video stream management (`/api/integration/video-streams/*`), integration DTO/enums (`app/domain/models.py`), command-center video slot live integration (`app/web/static/command_center.js`, `app/web/templates/command_center.html`), regression coverage (`tests/test_integration.py`), and phase demo (`infra/scripts/demo_phase19_real_device_video_integration.py`).
+- 20-WP1/20-WP2/20-WP3 artifacts are present: task-template v2 payload model and API extension (`template_version`, `route_template`, `payload_template`), template clone endpoint (`POST /api/task-center/templates/{template_id}:clone`), batch create endpoint (`POST /api/task-center/tasks:batch-create`), schedule overlap conflict guard and auto-dispatch explainability v2 in `app/services/task_center_service.py`, regression coverage (`tests/test_task_center.py::test_task_center_v2_template_conflict_and_batch`), and phase demo (`infra/scripts/demo_phase20_task_center_v2.py`).
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-27T13:46:23Z (UTC): Phase 20 closed as DONE (`20-WP1`..`20-WP4`). Delivered task-center v2 enhancements including template structured payloads (`template_version`/`route_template`/`payload_template`), template clone API (`/api/task-center/templates/{template_id}:clone`), batch task create API (`/api/task-center/tasks:batch-create`), dispatch overlap-conflict guard based on planned schedule windows, and explainable auto-dispatch strategy v2 with conflict penalty and score metadata. Added demo `infra/scripts/demo_phase20_task_center_v2.py` and regression coverage in `tests/test_task_center.py`; completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, phase20 demo), generated report `logs/phase-20-task-center-v2-optimization.md.report.md`, and advanced checkpoint to `phase-21-airspace-compliance-hub-v2.md` (`READY`).
+- 2026-02-27T13:25:36Z (UTC): Phase 19 closed as DONE (`19-WP1`..`19-WP4`). Delivered integration APIs for device sessions/video streams, adapter-driven telemetry session runtime (`FAKE`/`MAVLINK`/`DJI`), command-center video slot live integration, regression coverage (`tests/test_integration.py`), and phase demo (`infra/scripts/demo_phase19_real_device_video_integration.py`); completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, phase19 demo), generated report `logs/phase-19-real-device-video-integration.md.report.md`, and advanced checkpoint to `phase-20-task-center-v2-optimization.md` (`READY`).
 - 2026-02-26T19:51:06Z (UTC): Phase 18 closed as DONE (`18-WP1`..`18-WP6`). Added WP5 storage region/tier optimization (`RawDataAccessTier`, `/api/outcomes/raw/{raw_id}/storage`, migration chain `202602260080/081/082`), completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`), generated report `logs/phase-18-outcomes-repository-object-storage.md.report.md`, and advanced checkpoint to `phase-19-real-device-video-integration.md` (`READY`).
 - 2026-02-26T19:39:00Z (UTC): Phase 18 advanced through `18-WP2`..`18-WP4`. Delivered outcome version chain with scoped write-access guard (`202602260074/075/076`), outcome-report template/export pipeline with PDF/Word render (`202602260077/078/079`), and retention lifecycle + explicit audit actions for report artifacts (`reporting.outcome_report.retention.run`). Verification passed via Docker Compose (`app-tools python -m pytest -q tests/test_outcomes.py tests/test_reporting.py`, `app-tools ruff check` changed files, `app-tools mypy app`, `app-tools alembic upgrade head`).
 - 2026-02-26T19:10:25Z (UTC): Phase 18 moved to RUNNING with `18-WP1` completed. Delivered local object-storage minimal chain (upload-init/upload-content/complete/download), migration chain `202602260071/072/073`, and fixed upload-session expiry datetime compare (naive vs aware UTC) in `OutcomeService`. Verification passed via Docker Compose (`app-tools pytest -q tests/test_outcomes.py tests/test_reporting.py`, `app-tools ruff check` on changed files, `app-tools mypy app`).

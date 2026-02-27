@@ -16,12 +16,15 @@ from app.domain.models import (
     TaskCenterTaskApproveRequest,
     TaskCenterTaskAutoDispatchRead,
     TaskCenterTaskAutoDispatchRequest,
+    TaskCenterTaskBatchCreateRead,
+    TaskCenterTaskBatchCreateRequest,
     TaskCenterTaskCreate,
     TaskCenterTaskDispatchRequest,
     TaskCenterTaskHistoryRead,
     TaskCenterTaskRead,
     TaskCenterTaskSubmitApprovalRequest,
     TaskCenterTaskTransitionRequest,
+    TaskTemplateCloneRequest,
     TaskTemplateCreate,
     TaskTemplateRead,
     TaskTypeCatalogCreate,
@@ -40,6 +43,17 @@ def get_task_center_service() -> TaskCenterService:
 
 Claims = Annotated[dict[str, Any], Depends(get_current_claims)]
 Service = Annotated[TaskCenterService, Depends(get_task_center_service)]
+
+
+def _template_read(row: Any) -> TaskTemplateRead:
+    payload = row.model_dump()
+    default_payload = payload.get("default_payload", {})
+    if not isinstance(default_payload, dict):
+        default_payload = {}
+    payload["template_version"] = str(default_payload.get("template_version", "v2"))
+    payload["route_template"] = default_payload.get("route_template", {})
+    payload["payload_template"] = default_payload.get("payload_template", {})
+    return TaskTemplateRead.model_validate(payload)
 
 
 def _handle_error(exc: Exception) -> None:
@@ -108,7 +122,7 @@ def create_template(
     )
     try:
         row = service.create_template(claims["tenant_id"], claims["sub"], payload)
-        return TaskTemplateRead.model_validate(row)
+        return _template_read(row)
     except (NotFoundError, ConflictError) as exc:
         _handle_error(exc)
         raise
@@ -130,7 +144,33 @@ def list_templates(
         task_type_id=task_type_id,
         is_active=is_active,
     )
-    return [TaskTemplateRead.model_validate(item) for item in rows]
+    return [_template_read(item) for item in rows]
+
+
+@router.post(
+    "/templates/{template_id}:clone",
+    response_model=TaskTemplateRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm(PERM_MISSION_WRITE))],
+)
+def clone_template(
+    template_id: str,
+    payload: TaskTemplateCloneRequest,
+    request: Request,
+    claims: Claims,
+    service: Service,
+) -> TaskTemplateRead:
+    set_audit_context(
+        request,
+        action="task_center.template.clone",
+        detail={"what": {"template_id": template_id, "template_key": payload.template_key}},
+    )
+    try:
+        row = service.clone_template(claims["tenant_id"], template_id, claims["sub"], payload)
+        return _template_read(row)
+    except (NotFoundError, ConflictError) as exc:
+        _handle_error(exc)
+        raise
 
 
 @router.post(
@@ -159,6 +199,34 @@ def create_task(
     try:
         row = service.create_task(claims["tenant_id"], claims["sub"], payload)
         return TaskCenterTaskRead.model_validate(row)
+    except (NotFoundError, ConflictError) as exc:
+        _handle_error(exc)
+        raise
+
+
+@router.post(
+    "/tasks:batch-create",
+    response_model=TaskCenterTaskBatchCreateRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm(PERM_MISSION_WRITE))],
+)
+def create_tasks_batch(
+    payload: TaskCenterTaskBatchCreateRequest,
+    request: Request,
+    claims: Claims,
+    service: Service,
+) -> TaskCenterTaskBatchCreateRead:
+    set_audit_context(
+        request,
+        action="task_center.task.batch_create",
+        detail={"what": {"count": len(payload.tasks)}},
+    )
+    try:
+        rows = service.create_tasks_batch(claims["tenant_id"], claims["sub"], payload)
+        return TaskCenterTaskBatchCreateRead(
+            total=len(rows),
+            tasks=[TaskCenterTaskRead.model_validate(item) for item in rows],
+        )
     except (NotFoundError, ConflictError) as exc:
         _handle_error(exc)
         raise

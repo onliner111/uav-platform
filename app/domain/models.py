@@ -890,6 +890,25 @@ class CommandStatus(StrEnum):
     TIMEOUT = "TIMEOUT"
 
 
+class DeviceIntegrationSessionStatus(StrEnum):
+    RUNNING = "RUNNING"
+    STOPPED = "STOPPED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class VideoStreamProtocol(StrEnum):
+    RTSP = "RTSP"
+    WEBRTC = "WEBRTC"
+
+
+class VideoStreamStatus(StrEnum):
+    LIVE = "LIVE"
+    STANDBY = "STANDBY"
+    DISABLED = "DISABLED"
+    ERROR = "ERROR"
+
+
 class CommandRequestRecord(SQLModel, table=True):
     __tablename__ = "command_requests"
     __table_args__ = (
@@ -2206,11 +2225,21 @@ class TaskTemplateCreate(BaseModel):
     template_key: str
     name: str
     description: str | None = None
+    template_version: str = "v2"
     requires_approval: bool = False
     default_priority: int = PydanticField(default=5, ge=1, le=10)
     default_risk_level: int = PydanticField(default=3, ge=1, le=5)
     default_checklist: list[dict[str, Any]] = PydanticField(default_factory=list)
+    route_template: dict[str, Any] = PydanticField(default_factory=dict)
+    payload_template: dict[str, Any] = PydanticField(default_factory=dict)
     default_payload: dict[str, Any] = PydanticField(default_factory=dict)
+    is_active: bool = True
+
+
+class TaskTemplateCloneRequest(BaseModel):
+    template_key: str
+    name: str
+    description: str | None = None
     is_active: bool = True
 
 
@@ -2221,10 +2250,13 @@ class TaskTemplateRead(ORMReadModel):
     template_key: str
     name: str
     description: str | None
+    template_version: str = "v2"
     requires_approval: bool
     default_priority: int
     default_risk_level: int
     default_checklist: list[dict[str, Any]]
+    route_template: dict[str, Any] = PydanticField(default_factory=dict)
+    payload_template: dict[str, Any] = PydanticField(default_factory=dict)
     default_payload: dict[str, Any]
     is_active: bool
     created_by: str
@@ -2247,6 +2279,10 @@ class TaskCenterTaskCreate(BaseModel):
     area_geom: str = ""
     checklist: list[dict[str, Any]] = PydanticField(default_factory=list)
     attachments: list[dict[str, Any]] = PydanticField(default_factory=list)
+    route_template: dict[str, Any] = PydanticField(default_factory=dict)
+    payload_template: dict[str, Any] = PydanticField(default_factory=dict)
+    planned_start_at: datetime | None = None
+    planned_end_at: datetime | None = None
     context_data: dict[str, Any] = PydanticField(default_factory=dict)
 
 
@@ -2301,6 +2337,10 @@ class TaskCenterTaskAutoDispatchRequest(BaseModel):
     note: str | None = None
 
 
+class TaskCenterTaskBatchCreateRequest(BaseModel):
+    tasks: list[TaskCenterTaskCreate] = PydanticField(default_factory=list, min_length=1)
+
+
 class TaskCenterCandidateScoreRead(BaseModel):
     user_id: str
     total_score: float
@@ -2314,6 +2354,11 @@ class TaskCenterTaskAutoDispatchRead(BaseModel):
     dispatch_mode: TaskCenterDispatchMode
     scores: list[TaskCenterCandidateScoreRead]
     resource_snapshot: dict[str, Any]
+
+
+class TaskCenterTaskBatchCreateRead(BaseModel):
+    total: int
+    tasks: list[TaskCenterTaskRead]
 
 
 class TaskCenterTaskTransitionRequest(BaseModel):
@@ -2384,6 +2429,61 @@ class CommandRead(ORMReadModel):
     attempts: int
     issued_by: str | None
     issued_at: datetime
+    updated_at: datetime
+
+
+class DeviceIntegrationStartRequest(BaseModel):
+    drone_id: str
+    adapter_vendor: DroneVendor | None = None
+    simulation_mode: bool = True
+    telemetry_interval_seconds: float = PydanticField(default=1.0, ge=0.0, le=30.0)
+    max_samples: int | None = PydanticField(default=None, ge=1, le=100000)
+
+
+class DeviceIntegrationSessionRead(BaseModel):
+    session_id: str
+    tenant_id: str
+    drone_id: str
+    adapter_vendor: DroneVendor
+    simulation_mode: bool
+    telemetry_interval_seconds: float
+    max_samples: int | None
+    status: DeviceIntegrationSessionStatus
+    samples_ingested: int
+    started_at: datetime
+    stopped_at: datetime | None = None
+    last_error: str | None = None
+
+
+class VideoStreamCreateRequest(BaseModel):
+    stream_key: str = PydanticField(min_length=1, max_length=128)
+    protocol: VideoStreamProtocol = VideoStreamProtocol.RTSP
+    endpoint: str = PydanticField(min_length=1, max_length=1024)
+    label: str | None = PydanticField(default=None, max_length=128)
+    drone_id: str | None = None
+    enabled: bool = True
+
+
+class VideoStreamUpdateRequest(BaseModel):
+    protocol: VideoStreamProtocol | None = None
+    endpoint: str | None = PydanticField(default=None, min_length=1, max_length=1024)
+    label: str | None = PydanticField(default=None, max_length=128)
+    drone_id: str | None = None
+    enabled: bool | None = None
+
+
+class VideoStreamRead(BaseModel):
+    stream_id: str
+    stream_key: str
+    protocol: VideoStreamProtocol
+    endpoint: str
+    label: str | None = None
+    drone_id: str | None = None
+    enabled: bool
+    status: VideoStreamStatus
+    linked_telemetry: MapPointRead | None = None
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+    created_at: datetime
     updated_at: datetime
 
 
