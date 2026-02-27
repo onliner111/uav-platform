@@ -6,15 +6,15 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-18-outcomes-repository-object-storage.md (RUNNING; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 18 `18-WP1` completed (object storage minimal loop: init upload session, upload content, complete to raw catalog, download)
-- Next Target: continue P0 by implementing `18-WP2` (outcome version model + access control), then proceed `P1 -> P2 -> 18-WP6`
+- Current Phase: phase-19-real-device-video-integration.md (READY; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 18 closed as DONE (`18-WP1`..`18-WP6`)
+- Next Target: start phase-19 and execute `P0 -> P1 -> P2 -> 19-WP6` with full gate closeout
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-26T19:10:25Z
+> Last verified at (UTC): 2026-02-26T19:51:06Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> WIP note (2026-02-26T19:10:25Z): Phase 18 is RUNNING and `18-WP1` is complete. Current iteration verification passed in live source context: `ruff` (changed files), `mypy app` (72 source files), and targeted pytest (`tests/test_outcomes.py` + `tests/test_reporting.py`).
+> WIP note (2026-02-26T19:51:06Z): Phase 18 fully closed after completing `18-WP1`..`18-WP6` with full closeout chain pass (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`).
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
 - mypy: PASS (72 source files)
@@ -71,6 +71,7 @@
 - phase-15-kpi-open-platform.md: DONE
 - phase-16-saas-console-ui.md: DONE
 - phase-17-multi-org-data-perimeter-v2.md: DONE
+- phase-18-outcomes-repository-object-storage.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -97,10 +98,16 @@
 - 17-WP3 artifacts are present: platform super-admin permission constant (`app/domain/permissions.py`), cross-tenant governance APIs (`GET /api/identity/platform/tenants`, `GET /api/identity/platform/tenants/{tenant_id}/users`) and explicit gate/audit actions (`app/api/routers/identity.py`), tenant-wide list service (`app/services/identity_service.py`), and regression coverage (`tests/test_identity.py::test_identity_platform_super_admin_cross_tenant_governance`).
 - 17-P2 artifacts are present: role data-policy model/API (`RoleDataAccessPolicy`, `GET/PUT /api/identity/roles/{role_id}/data-policy`), user effective policy API (`GET /api/identity/users/{user_id}/data-policy:effective`), explicit deny fields in user policy (`denied_*`), conflict-resolution perimeter engine (`app/services/data_perimeter_service.py`), migration chain `202602260068/069/070`, and regression coverage (`tests/test_identity.py`, `tests/test_data_perimeter.py`).
 - 18-WP1 artifacts are present: object storage adapter/service (`app/services/object_storage_service.py`), raw upload session APIs (`POST /api/outcomes/raw/uploads:init`, `PUT /api/outcomes/raw/uploads/{session_id}/content`, `POST /api/outcomes/raw/uploads/{session_id}:complete`, `GET /api/outcomes/raw/{raw_id}/download`), domain/migration chain (`RawUploadSession`, `202602260071/072/073`), and regression coverage (`tests/test_outcomes.py::test_raw_data_upload_session_complete_and_download`).
+- 18-WP2 artifacts are present: outcome version model/API (`OutcomeCatalogVersion`, `GET /api/outcomes/records/{outcome_id}/versions`), version snapshot chaining for create/materialize/status-update (`INIT_SNAPSHOT/AUTO_MATERIALIZE/STATUS_UPDATE`), scoped write-access hardening for outcomes/raw upload sessions (`404` on out-of-scope), migration chain `202602260074/075/076`, and regression coverage (`tests/test_outcomes.py::test_outcome_versions_and_scope_guard`).
+- 18-WP3 artifacts are present: outcome report template/export model chain (`OutcomeReportTemplate`, `OutcomeReportExport`), reporting APIs (`POST/GET /api/reporting/outcome-report-templates`, `POST /api/reporting/outcome-report-exports`, `GET /api/reporting/outcome-report-exports/{export_id}`), PDF/Word minimal rendering pipeline (`_write_minimal_pdf`, `_write_minimal_docx`), migration chain `202602260077/078/079`, and regression coverage (`tests/test_reporting.py::test_outcome_report_template_and_export_pdf_word`).
+- 18-WP4 artifacts are present: lifecycle retention execution for report artifacts (`POST /api/reporting/outcome-report-exports:retention`, dry-run + execute), file cleanup + metadata backfill (`detail.lifecycle`), and explicit audit action linkage (`reporting.outcome_report.*`) with regression coverage (`tests/test_reporting.py::test_outcome_report_retention_lifecycle_and_audit`).
+- 18-WP5 artifacts are present: storage region/tier model extension for raw data (`storage_region`, `access_tier`, `RawDataAccessTier`), transition API (`PATCH /api/outcomes/raw/{raw_id}/storage`) with transition history in `meta.storage_transitions`, migration chain `202602260080/081/082`, and regression coverage (`tests/test_outcomes.py::test_raw_data_upload_session_complete_and_download`).
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-26T19:51:06Z (UTC): Phase 18 closed as DONE (`18-WP1`..`18-WP6`). Added WP5 storage region/tier optimization (`RawDataAccessTier`, `/api/outcomes/raw/{raw_id}/storage`, migration chain `202602260080/081/082`), completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`), generated report `logs/phase-18-outcomes-repository-object-storage.md.report.md`, and advanced checkpoint to `phase-19-real-device-video-integration.md` (`READY`).
+- 2026-02-26T19:39:00Z (UTC): Phase 18 advanced through `18-WP2`..`18-WP4`. Delivered outcome version chain with scoped write-access guard (`202602260074/075/076`), outcome-report template/export pipeline with PDF/Word render (`202602260077/078/079`), and retention lifecycle + explicit audit actions for report artifacts (`reporting.outcome_report.retention.run`). Verification passed via Docker Compose (`app-tools python -m pytest -q tests/test_outcomes.py tests/test_reporting.py`, `app-tools ruff check` changed files, `app-tools mypy app`, `app-tools alembic upgrade head`).
 - 2026-02-26T19:10:25Z (UTC): Phase 18 moved to RUNNING with `18-WP1` completed. Delivered local object-storage minimal chain (upload-init/upload-content/complete/download), migration chain `202602260071/072/073`, and fixed upload-session expiry datetime compare (naive vs aware UTC) in `OutcomeService`. Verification passed via Docker Compose (`app-tools pytest -q tests/test_outcomes.py tests/test_reporting.py`, `app-tools ruff check` on changed files, `app-tools mypy app`).
 - 2026-02-26T18:33:13Z (UTC): Phase 17 closed as DONE (`17-WP4`). Full gate chain passed via Docker Compose (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`) and migration head advanced to `202602260070`. Checkpoint moved to `phase-18-outcomes-repository-object-storage.md` with `READY`.
 - 2026-02-26T18:33:13Z (UTC): Phase 17 `P2` completed. Added role-inherited data policies + user explicit deny fields, exposed role/effective policy APIs, and enforced fixed resolution order `explicit_deny > explicit_allow > inherited_allow > default_deny` in perimeter scope evaluation. Verification passed (`ruff`, `mypy`, `python -B -m pytest -q tests/test_identity.py tests/test_data_perimeter.py tests/test_asset.py tests/test_registry.py`, `alembic upgrade head`, markdown UTF-8 check).

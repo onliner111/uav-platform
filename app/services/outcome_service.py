@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.domain.models import (
     InspectionObservation,
@@ -14,11 +14,15 @@ from app.domain.models import (
     OutcomeCatalogCreate,
     OutcomeCatalogRecord,
     OutcomeCatalogStatusUpdateRequest,
+    OutcomeCatalogVersion,
     OutcomeSourceType,
     OutcomeStatus,
     OutcomeType,
+    OutcomeVersionChangeType,
+    RawDataAccessTier,
     RawDataCatalogCreate,
     RawDataCatalogRecord,
+    RawDataStorageTransitionRequest,
     RawDataType,
     RawUploadInitRequest,
     RawUploadSession,
@@ -126,12 +130,83 @@ class OutcomeService:
             return value
         return f"sha256:{value}"
 
+    def _resolve_access_tier(self, storage_class: str | None) -> RawDataAccessTier:
+        if storage_class is None:
+            return RawDataAccessTier.HOT
+        normalized = storage_class.strip().upper()
+        if normalized in {"ARCHIVE", "GLACIER", "DEEP_ARCHIVE"}:
+            return RawDataAccessTier.COLD
+        if normalized in {"STANDARD_IA", "INFREQUENT_ACCESS", "NEARLINE"}:
+            return RawDataAccessTier.WARM
+        return RawDataAccessTier.HOT
+
     def _is_expired(self, expires_at: datetime) -> bool:
         if expires_at.tzinfo is None:
             expires_at_utc = expires_at.replace(tzinfo=UTC)
         else:
             expires_at_utc = expires_at.astimezone(UTC)
         return expires_at_utc < now_utc()
+
+    def _ensure_visible(
+        self,
+        session: Session,
+        tenant_id: str,
+        viewer_user_id: str | None,
+        *,
+        task_id: str | None,
+        mission_id: str | None,
+        not_found_detail: str,
+    ) -> None:
+        if self._is_visible(
+            session,
+            tenant_id,
+            viewer_user_id,
+            task_id=task_id,
+            mission_id=mission_id,
+        ):
+            return
+        raise NotFoundError(not_found_detail)
+
+    def _next_outcome_version_no(self, session: Session, tenant_id: str, outcome_id: str) -> int:
+        latest = session.exec(
+            select(OutcomeCatalogVersion.version_no)
+            .where(OutcomeCatalogVersion.tenant_id == tenant_id)
+            .where(OutcomeCatalogVersion.outcome_id == outcome_id)
+            .order_by(col(OutcomeCatalogVersion.version_no).desc())
+        ).first()
+        if latest is None:
+            return 1
+        return int(latest) + 1
+
+    def _append_outcome_version(
+        self,
+        session: Session,
+        row: OutcomeCatalogRecord,
+        *,
+        actor_id: str,
+        change_type: OutcomeVersionChangeType,
+        change_note: str | None = None,
+    ) -> OutcomeCatalogVersion:
+        version = OutcomeCatalogVersion(
+            tenant_id=row.tenant_id,
+            outcome_id=row.id,
+            version_no=self._next_outcome_version_no(session, row.tenant_id, row.id),
+            outcome_type=row.outcome_type,
+            status=row.status,
+            point_lat=row.point_lat,
+            point_lon=row.point_lon,
+            alt_m=row.alt_m,
+            confidence=row.confidence,
+            payload=row.payload,
+            change_type=change_type,
+            change_note=change_note,
+            created_by=actor_id,
+            created_at=now_utc(),
+        )
+        session.add(version)
+        session.commit()
+        session.refresh(version)
+        return version
 
     def _is_visible(
         self,
@@ -159,12 +234,21 @@ class OutcomeService:
                 _ = self._get_scoped_task(session, tenant_id, payload.task_id)
             if payload.mission_id is not None:
                 _ = self._get_scoped_mission(session, tenant_id, payload.mission_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                actor_id,
+                task_id=payload.task_id,
+                mission_id=payload.mission_id,
+                not_found_detail="raw data record not found",
+            )
             row = RawDataCatalogRecord(
                 tenant_id=tenant_id,
                 task_id=payload.task_id,
                 mission_id=payload.mission_id,
                 data_type=payload.data_type,
                 source_uri=payload.source_uri,
+                access_tier=RawDataAccessTier.HOT,
                 checksum=payload.checksum,
                 meta=payload.meta,
                 captured_at=payload.captured_at,
@@ -193,6 +277,14 @@ class OutcomeService:
                 _ = self._get_scoped_task(session, tenant_id, payload.task_id)
             if payload.mission_id is not None:
                 _ = self._get_scoped_mission(session, tenant_id, payload.mission_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                actor_id,
+                task_id=payload.task_id,
+                mission_id=payload.mission_id,
+                not_found_detail="raw upload session not found",
+            )
             session_id = str(uuid4())
             upload_token = str(uuid4())
             object_key = self._storage.build_raw_object_key(
@@ -214,6 +306,7 @@ class OutcomeService:
                 bucket=self._storage.default_bucket,
                 object_key=object_key,
                 storage_class=payload.storage_class,
+                storage_region=payload.storage_region,
                 status=RawUploadSessionStatus.INITIATED,
                 upload_token=upload_token,
                 expires_at=now_utc() + timedelta(seconds=self._storage.upload_url_ttl_seconds),
@@ -244,9 +337,19 @@ class OutcomeService:
         session_id: str,
         upload_token: str,
         content: bytes,
+        *,
+        viewer_user_id: str | None,
     ) -> dict[str, Any]:
         with self._session() as session:
             row = self._get_scoped_raw_upload_session(session, tenant_id, session_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                viewer_user_id,
+                task_id=row.task_id,
+                mission_id=row.mission_id,
+                not_found_detail="raw upload session not found",
+            )
             if row.upload_token != upload_token:
                 raise ConflictError("invalid upload token")
             if row.status == RawUploadSessionStatus.COMPLETED:
@@ -293,6 +396,14 @@ class OutcomeService:
     ) -> RawDataCatalogRecord:
         with self._session() as session:
             upload_row = self._get_scoped_raw_upload_session(session, tenant_id, session_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                actor_id,
+                task_id=upload_row.task_id,
+                mission_id=upload_row.mission_id,
+                not_found_detail="raw upload session not found",
+            )
             if upload_row.upload_token != upload_token:
                 raise ConflictError("invalid upload token")
             if upload_row.completed_raw_id is not None:
@@ -329,6 +440,8 @@ class OutcomeService:
                 size_bytes=meta.size_bytes,
                 content_type=upload_row.content_type,
                 storage_class=upload_row.storage_class,
+                storage_region=upload_row.storage_region,
+                access_tier=self._resolve_access_tier(upload_row.storage_class),
                 etag=meta.etag,
                 checksum=upload_row.checksum,
                 meta=upload_row.meta,
@@ -430,12 +543,22 @@ class OutcomeService:
         payload: OutcomeCatalogCreate,
     ) -> OutcomeCatalogRecord:
         with self._session() as session:
+            observation: InspectionObservation | None = None
             if payload.task_id is not None:
                 _ = self._get_scoped_task(session, tenant_id, payload.task_id)
             if payload.mission_id is not None:
                 _ = self._get_scoped_mission(session, tenant_id, payload.mission_id)
             if payload.source_type == OutcomeSourceType.INSPECTION_OBSERVATION:
-                _ = self._get_scoped_observation(session, tenant_id, payload.source_id)
+                observation = self._get_scoped_observation(session, tenant_id, payload.source_id)
+
+            self._ensure_visible(
+                session,
+                tenant_id,
+                actor_id,
+                task_id=payload.task_id if payload.task_id is not None else (observation.task_id if observation else None),
+                mission_id=payload.mission_id,
+                not_found_detail="outcome record not found",
+            )
 
             row = OutcomeCatalogRecord(
                 tenant_id=tenant_id,
@@ -455,6 +578,12 @@ class OutcomeService:
             session.add(row)
             session.commit()
             session.refresh(row)
+            _ = self._append_outcome_version(
+                session,
+                row,
+                actor_id=actor_id,
+                change_type=OutcomeVersionChangeType.INIT_SNAPSHOT,
+            )
 
         event_bus.publish_dict(
             "outcome.record.created",
@@ -470,6 +599,73 @@ class OutcomeService:
         )
         return row
 
+    def transition_raw_storage(
+        self,
+        tenant_id: str,
+        raw_id: str,
+        actor_id: str,
+        payload: RawDataStorageTransitionRequest,
+        *,
+        viewer_user_id: str | None,
+    ) -> RawDataCatalogRecord:
+        with self._session() as session:
+            row = self._get_scoped_raw(session, tenant_id, raw_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                viewer_user_id,
+                task_id=row.task_id,
+                mission_id=row.mission_id,
+                not_found_detail="raw data record not found",
+            )
+            row.access_tier = payload.access_tier
+            if payload.storage_region is not None:
+                value = payload.storage_region.strip()
+                row.storage_region = value if value else None
+
+            if row.access_tier == RawDataAccessTier.COLD and (row.storage_class or "").upper() == "STANDARD":
+                row.storage_class = "ARCHIVE"
+            if row.access_tier == RawDataAccessTier.HOT and (row.storage_class or "").upper() in {
+                "ARCHIVE",
+                "GLACIER",
+                "DEEP_ARCHIVE",
+            }:
+                row.storage_class = "STANDARD"
+
+            detail: dict[str, Any] = dict(row.meta)
+            history_raw = detail.get("storage_transitions")
+            history: list[dict[str, Any]]
+            if isinstance(history_raw, list):
+                history = [item for item in history_raw if isinstance(item, dict)]
+            else:
+                history = []
+            history.append(
+                {
+                    "ts": now_utc().isoformat(),
+                    "actor_id": actor_id,
+                    "access_tier": row.access_tier.value,
+                    "storage_region": row.storage_region,
+                    "storage_class": row.storage_class,
+                }
+            )
+            detail["storage_transitions"] = history
+            row.meta = detail
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+
+        event_bus.publish_dict(
+            "outcome.raw.storage.transitioned",
+            tenant_id,
+            {
+                "raw_id": row.id,
+                "access_tier": row.access_tier,
+                "storage_region": row.storage_region,
+                "storage_class": row.storage_class,
+            },
+        )
+        return row
+
     def materialize_outcome_from_observation(
         self,
         tenant_id: str,
@@ -478,6 +674,14 @@ class OutcomeService:
     ) -> OutcomeCatalogRecord:
         with self._session() as session:
             observation = self._get_scoped_observation(session, tenant_id, observation_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                actor_id,
+                task_id=observation.task_id,
+                mission_id=None,
+                not_found_detail="outcome record not found",
+            )
             existing = session.exec(
                 select(OutcomeCatalogRecord)
                 .where(OutcomeCatalogRecord.tenant_id == tenant_id)
@@ -511,6 +715,13 @@ class OutcomeService:
             session.add(row)
             session.commit()
             session.refresh(row)
+            _ = self._append_outcome_version(
+                session,
+                row,
+                actor_id=actor_id,
+                change_type=OutcomeVersionChangeType.AUTO_MATERIALIZE,
+                change_note=f"materialized from observation {observation_id}",
+            )
 
         event_bus.publish_dict(
             "outcome.record.materialized",
@@ -570,6 +781,14 @@ class OutcomeService:
     ) -> OutcomeCatalogRecord:
         with self._session() as session:
             row = self._get_scoped_outcome(session, tenant_id, outcome_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                actor_id,
+                task_id=row.task_id,
+                mission_id=row.mission_id,
+                not_found_detail="outcome record not found",
+            )
             row.status = payload.status
             row.reviewed_by = actor_id
             row.reviewed_at = datetime.now(UTC)
@@ -581,6 +800,13 @@ class OutcomeService:
             session.add(row)
             session.commit()
             session.refresh(row)
+            _ = self._append_outcome_version(
+                session,
+                row,
+                actor_id=actor_id,
+                change_type=OutcomeVersionChangeType.STATUS_UPDATE,
+                change_note=payload.note,
+            )
 
         event_bus.publish_dict(
             "outcome.record.status_changed",
@@ -588,3 +814,28 @@ class OutcomeService:
             {"outcome_id": row.id, "status": row.status, "reviewed_by": row.reviewed_by},
         )
         return row
+
+    def list_outcome_versions(
+        self,
+        tenant_id: str,
+        outcome_id: str,
+        *,
+        viewer_user_id: str | None,
+    ) -> list[OutcomeCatalogVersion]:
+        with self._session() as session:
+            row = self._get_scoped_outcome(session, tenant_id, outcome_id)
+            self._ensure_visible(
+                session,
+                tenant_id,
+                viewer_user_id,
+                task_id=row.task_id,
+                mission_id=row.mission_id,
+                not_found_detail="outcome record not found",
+            )
+            statement = (
+                select(OutcomeCatalogVersion)
+                .where(OutcomeCatalogVersion.tenant_id == tenant_id)
+                .where(OutcomeCatalogVersion.outcome_id == outcome_id)
+                .order_by(col(OutcomeCatalogVersion.version_no))
+            )
+            return list(session.exec(statement).all())

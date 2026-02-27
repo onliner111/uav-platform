@@ -997,6 +997,12 @@ class RawUploadSessionStatus(StrEnum):
     EXPIRED = "EXPIRED"
 
 
+class RawDataAccessTier(StrEnum):
+    HOT = "HOT"
+    WARM = "WARM"
+    COLD = "COLD"
+
+
 class OutcomeSourceType(StrEnum):
     INSPECTION_OBSERVATION = "INSPECTION_OBSERVATION"
     ALERT = "ALERT"
@@ -1015,6 +1021,23 @@ class OutcomeStatus(StrEnum):
     IN_REVIEW = "IN_REVIEW"
     VERIFIED = "VERIFIED"
     ARCHIVED = "ARCHIVED"
+
+
+class OutcomeVersionChangeType(StrEnum):
+    INIT_SNAPSHOT = "INIT_SNAPSHOT"
+    AUTO_MATERIALIZE = "AUTO_MATERIALIZE"
+    STATUS_UPDATE = "STATUS_UPDATE"
+
+
+class ReportFileFormat(StrEnum):
+    PDF = "PDF"
+    WORD = "WORD"
+
+
+class ReportExportStatus(StrEnum):
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
 
 
 class AiJobType(StrEnum):
@@ -1214,6 +1237,8 @@ class RawDataCatalogRecord(SQLModel, table=True):
     size_bytes: int | None = Field(default=None, ge=0)
     content_type: str | None = Field(default=None, max_length=120)
     storage_class: str | None = Field(default=None, max_length=50)
+    storage_region: str | None = Field(default=None, max_length=50, index=True)
+    access_tier: RawDataAccessTier = Field(default=RawDataAccessTier.HOT, index=True)
     etag: str | None = Field(default=None, max_length=200, index=True)
     checksum: str | None = Field(default=None, max_length=200, index=True)
     meta: dict[str, Any] = Field(
@@ -1261,6 +1286,7 @@ class RawUploadSession(SQLModel, table=True):
     bucket: str = Field(max_length=120, index=True)
     object_key: str = Field(max_length=500)
     storage_class: str = Field(default="STANDARD", max_length=50)
+    storage_region: str = Field(default="local", max_length=50)
     status: RawUploadSessionStatus = Field(default=RawUploadSessionStatus.INITIATED, index=True)
     upload_token: str = Field(max_length=120, index=True)
     etag: str | None = Field(default=None, max_length=200)
@@ -1304,6 +1330,36 @@ class OutcomeCatalogRecord(SQLModel, table=True):
     created_by: str = Field(index=True)
     created_at: datetime = Field(default_factory=now_utc, index=True)
     updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OutcomeCatalogVersion(SQLModel, table=True):
+    __tablename__ = "outcome_catalog_versions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_outcome_catalog_versions_tenant_id_id"),
+        UniqueConstraint("tenant_id", "outcome_id", "version_no", name="uq_outcome_catalog_versions_outcome_version"),
+        Index("ix_outcome_catalog_versions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_outcome_catalog_versions_tenant_outcome", "tenant_id", "outcome_id"),
+        Index("ix_outcome_catalog_versions_tenant_outcome_version", "tenant_id", "outcome_id", "version_no"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    outcome_id: str = Field(foreign_key="outcome_catalog_records.id", index=True)
+    version_no: int = Field(default=1, ge=1)
+    outcome_type: OutcomeType = Field(index=True)
+    status: OutcomeStatus = Field(index=True)
+    point_lat: float | None = Field(default=None)
+    point_lon: float | None = Field(default=None)
+    alt_m: float | None = Field(default=None)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    change_type: OutcomeVersionChangeType = Field(index=True)
+    change_note: str | None = Field(default=None, max_length=500)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class AiAnalysisJob(SQLModel, table=True):
@@ -2437,6 +2493,8 @@ class RawDataCatalogRead(ORMReadModel):
     size_bytes: int | None
     content_type: str | None
     storage_class: str | None
+    storage_region: str | None
+    access_tier: RawDataAccessTier
     etag: str | None
     checksum: str | None
     meta: dict[str, Any]
@@ -2454,6 +2512,7 @@ class RawUploadInitRequest(BaseModel):
     size_bytes: int = PydanticField(ge=1)
     checksum: str | None = None
     storage_class: str = "STANDARD"
+    storage_region: str = "local"
     meta: dict[str, Any] = PydanticField(default_factory=dict)
 
 
@@ -2468,6 +2527,11 @@ class RawUploadInitRead(BaseModel):
 
 class RawUploadCompleteRequest(BaseModel):
     upload_token: str
+
+
+class RawDataStorageTransitionRequest(BaseModel):
+    access_tier: RawDataAccessTier
+    storage_region: str | None = None
 
 
 class OutcomeCatalogCreate(BaseModel):
@@ -2508,6 +2572,24 @@ class OutcomeCatalogRead(ORMReadModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+
+
+class OutcomeCatalogVersionRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    outcome_id: str
+    version_no: int
+    outcome_type: OutcomeType
+    status: OutcomeStatus
+    point_lat: float | None
+    point_lon: float | None
+    alt_m: float | None
+    confidence: float | None
+    payload: dict[str, Any]
+    change_type: OutcomeVersionChangeType
+    change_note: str | None
+    created_by: str
+    created_at: datetime
 
 
 class AiAnalysisJobCreate(BaseModel):
@@ -2871,6 +2953,56 @@ class InspectionExport(SQLModel, table=True):
     format: str = Field(max_length=10, index=True)
     file_path: str
     created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OutcomeReportTemplate(SQLModel, table=True):
+    __tablename__ = "outcome_report_templates"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_outcome_report_templates_tenant_id_id"),
+        UniqueConstraint("tenant_id", "name", name="uq_outcome_report_templates_tenant_name"),
+        Index("ix_outcome_report_templates_tenant_id_id", "tenant_id", "id"),
+        Index("ix_outcome_report_templates_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=120, index=True)
+    format_default: ReportFileFormat = Field(default=ReportFileFormat.PDF, index=True)
+    title_template: str = Field(default="Outcome Report")
+    body_template: str = Field(default="")
+    is_active: bool = Field(default=True, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class OutcomeReportExport(SQLModel, table=True):
+    __tablename__ = "outcome_report_exports"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_outcome_report_exports_tenant_id_id"),
+        Index("ix_outcome_report_exports_tenant_id_id", "tenant_id", "id"),
+        Index("ix_outcome_report_exports_tenant_template", "tenant_id", "template_id"),
+        Index("ix_outcome_report_exports_tenant_status", "tenant_id", "status"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    template_id: str = Field(foreign_key="outcome_report_templates.id", index=True)
+    report_format: ReportFileFormat = Field(default=ReportFileFormat.PDF, index=True)
+    status: ReportExportStatus = Field(default=ReportExportStatus.RUNNING, index=True)
+    task_id: str | None = Field(default=None, foreign_key="inspection_tasks.id", index=True)
+    from_ts: datetime | None = Field(default=None, index=True)
+    to_ts: datetime | None = Field(default=None, index=True)
+    topic: str | None = Field(default=None, max_length=120, index=True)
+    file_path: str | None = Field(default=None)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    requested_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+    completed_at: datetime | None = Field(default=None, index=True)
 
 
 class Defect(SQLModel, table=True):
@@ -3271,3 +3403,63 @@ class ReportingExportRequest(BaseModel):
     from_ts: datetime | None = None
     to_ts: datetime | None = None
     topic: str | None = None
+
+
+class OutcomeReportTemplateCreate(BaseModel):
+    name: str
+    format_default: ReportFileFormat = ReportFileFormat.PDF
+    title_template: str = "Outcome Report"
+    body_template: str = ""
+    is_active: bool = True
+
+
+class OutcomeReportTemplateRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    format_default: ReportFileFormat
+    title_template: str
+    body_template: str
+    is_active: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class OutcomeReportExportCreateRequest(BaseModel):
+    template_id: str
+    report_format: ReportFileFormat | None = None
+    task_id: str | None = None
+    from_ts: datetime | None = None
+    to_ts: datetime | None = None
+    topic: str | None = None
+
+
+class OutcomeReportExportRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    template_id: str
+    report_format: ReportFileFormat
+    status: ReportExportStatus
+    task_id: str | None
+    from_ts: datetime | None
+    to_ts: datetime | None
+    topic: str | None
+    file_path: str | None
+    detail: dict[str, Any]
+    requested_by: str
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+
+
+class OutcomeReportRetentionRunRequest(BaseModel):
+    retention_days: int = PydanticField(default=30, ge=1)
+    dry_run: bool = True
+
+
+class OutcomeReportRetentionRunRead(BaseModel):
+    scanned_count: int
+    expired_count: int
+    deleted_files: int
+    skipped_files: int

@@ -11,11 +11,13 @@ from app.domain.models import (
     OutcomeCatalogCreate,
     OutcomeCatalogRead,
     OutcomeCatalogStatusUpdateRequest,
+    OutcomeCatalogVersionRead,
     OutcomeSourceType,
     OutcomeStatus,
     OutcomeType,
     RawDataCatalogCreate,
     RawDataCatalogRead,
+    RawDataStorageTransitionRequest,
     RawDataType,
     RawUploadCompleteRequest,
     RawUploadInitRead,
@@ -90,7 +92,13 @@ async def upload_raw_content(
 ) -> dict[str, Any]:
     try:
         content = await request.body()
-        return service.write_raw_upload_content(claims["tenant_id"], session_id, upload_token, content)
+        return service.write_raw_upload_content(
+            claims["tenant_id"],
+            session_id,
+            upload_token,
+            content,
+            viewer_user_id=claims["sub"],
+        )
     except (NotFoundError, ConflictError) as exc:
         _handle_outcome_error(exc)
         raise
@@ -144,6 +152,31 @@ def list_raw_data(
         viewer_user_id=claims["sub"],
     )
     return [RawDataCatalogRead.model_validate(item) for item in rows]
+
+
+@router.patch(
+    "/raw/{raw_id}/storage",
+    response_model=RawDataCatalogRead,
+    dependencies=[Depends(require_perm(PERM_INSPECTION_WRITE))],
+)
+def transition_raw_storage(
+    raw_id: str,
+    payload: RawDataStorageTransitionRequest,
+    claims: Claims,
+    service: Service,
+) -> RawDataCatalogRead:
+    try:
+        row = service.transition_raw_storage(
+            claims["tenant_id"],
+            raw_id,
+            claims["sub"],
+            payload,
+            viewer_user_id=claims["sub"],
+        )
+        return RawDataCatalogRead.model_validate(row)
+    except (NotFoundError, ConflictError) as exc:
+        _handle_outcome_error(exc)
+        raise
 
 
 @router.get(
@@ -228,6 +261,28 @@ def list_outcome_records(
         viewer_user_id=claims["sub"],
     )
     return [OutcomeCatalogRead.model_validate(item) for item in rows]
+
+
+@router.get(
+    "/records/{outcome_id}/versions",
+    response_model=list[OutcomeCatalogVersionRead],
+    dependencies=[Depends(require_perm(PERM_INSPECTION_READ))],
+)
+def list_outcome_versions(
+    outcome_id: str,
+    claims: Claims,
+    service: Service,
+) -> list[OutcomeCatalogVersionRead]:
+    try:
+        rows = service.list_outcome_versions(
+            claims["tenant_id"],
+            outcome_id,
+            viewer_user_id=claims["sub"],
+        )
+        return [OutcomeCatalogVersionRead.model_validate(item) for item in rows]
+    except (NotFoundError, ConflictError) as exc:
+        _handle_outcome_error(exc)
+        raise
 
 
 @router.patch(

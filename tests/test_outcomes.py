@@ -109,6 +109,15 @@ def _create_mission(client: TestClient, token: str, name: str) -> str:
     return response.json()["id"]
 
 
+def _get_user_id_by_username(client: TestClient, token: str, username: str) -> str:
+    response = client.get("/api/identity/users", headers=_auth_header(token))
+    assert response.status_code == 200
+    for item in response.json():
+        if item["username"] == username:
+            return item["id"]
+    raise AssertionError(f"user not found: {username}")
+
+
 def test_observation_auto_materializes_outcome_and_status_update(outcomes_client: TestClient) -> None:
     tenant_id = _create_tenant(outcomes_client, "phase13-outcome-auto")
     _bootstrap_admin(outcomes_client, tenant_id, "admin", "admin-pass")
@@ -214,6 +223,7 @@ def test_raw_data_upload_session_complete_and_download(outcomes_client: TestClie
             "content_type": "text/plain",
             "size_bytes": len(content),
             "checksum": checksum,
+            "storage_region": "cn-east-1",
             "meta": {"topic": "phase18"},
         },
         headers=_auth_header(token_a),
@@ -247,6 +257,18 @@ def test_raw_data_upload_session_complete_and_download(outcomes_client: TestClie
     assert complete_resp.json()["size_bytes"] == len(content)
     assert complete_resp.json()["content_type"] == "text/plain"
     assert complete_resp.json()["checksum"] == checksum
+    assert complete_resp.json()["storage_region"] == "cn-east-1"
+    assert complete_resp.json()["access_tier"] == "HOT"
+
+    transition_resp = outcomes_client.patch(
+        f"/api/outcomes/raw/{raw_id}/storage",
+        json={"access_tier": "COLD", "storage_region": "us-west-2"},
+        headers=_auth_header(token_a),
+    )
+    assert transition_resp.status_code == 200
+    assert transition_resp.json()["access_tier"] == "COLD"
+    assert transition_resp.json()["storage_region"] == "us-west-2"
+    assert transition_resp.json()["storage_class"] in {"ARCHIVE", "GLACIER", "DEEP_ARCHIVE", "STANDARD"}
 
     download_resp = outcomes_client.get(
         f"/api/outcomes/raw/{raw_id}/download",
@@ -260,6 +282,93 @@ def test_raw_data_upload_session_complete_and_download(outcomes_client: TestClie
         headers=_auth_header(token_b),
     )
     assert cross_tenant_download.status_code == 404
+    cross_tenant_transition = outcomes_client.patch(
+        f"/api/outcomes/raw/{raw_id}/storage",
+        json={"access_tier": "HOT"},
+        headers=_auth_header(token_b),
+    )
+    assert cross_tenant_transition.status_code == 404
+
+
+def test_outcome_versions_and_scope_guard(outcomes_client: TestClient) -> None:
+    tenant_id = _create_tenant(outcomes_client, "phase18-outcome-version-scope")
+    _bootstrap_admin(outcomes_client, tenant_id, "admin", "admin-pass")
+    token = _login(outcomes_client, tenant_id, "admin", "admin-pass")
+
+    template_id = _create_template(outcomes_client, token, "phase18-template-version")
+    task_id = _create_task(outcomes_client, token, template_id, "phase18-task-version")
+
+    create_resp = outcomes_client.post(
+        "/api/outcomes/records",
+        json={
+            "task_id": task_id,
+            "source_type": "MANUAL",
+            "source_id": "phase18-manual-source-1",
+            "outcome_type": "DEFECT",
+            "payload": {"title": "phase18 defect"},
+        },
+        headers=_auth_header(token),
+    )
+    assert create_resp.status_code == 201
+    outcome_id = create_resp.json()["id"]
+
+    versions_resp = outcomes_client.get(
+        f"/api/outcomes/records/{outcome_id}/versions",
+        headers=_auth_header(token),
+    )
+    assert versions_resp.status_code == 200
+    versions = versions_resp.json()
+    assert len(versions) == 1
+    assert versions[0]["version_no"] == 1
+    assert versions[0]["change_type"] == "INIT_SNAPSHOT"
+    assert versions[0]["status"] == "NEW"
+
+    status_review_resp = outcomes_client.patch(
+        f"/api/outcomes/records/{outcome_id}/status",
+        json={"status": "IN_REVIEW", "note": "triaged"},
+        headers=_auth_header(token),
+    )
+    assert status_review_resp.status_code == 200
+    status_verified_resp = outcomes_client.patch(
+        f"/api/outcomes/records/{outcome_id}/status",
+        json={"status": "VERIFIED", "note": "verified"},
+        headers=_auth_header(token),
+    )
+    assert status_verified_resp.status_code == 200
+
+    versions_after = outcomes_client.get(
+        f"/api/outcomes/records/{outcome_id}/versions",
+        headers=_auth_header(token),
+    )
+    assert versions_after.status_code == 200
+    version_rows = versions_after.json()
+    assert [item["version_no"] for item in version_rows] == [1, 2, 3]
+    assert [item["status"] for item in version_rows] == ["NEW", "IN_REVIEW", "VERIFIED"]
+    assert [item["change_type"] for item in version_rows] == [
+        "INIT_SNAPSHOT",
+        "STATUS_UPDATE",
+        "STATUS_UPDATE",
+    ]
+
+    admin_user_id = _get_user_id_by_username(outcomes_client, token, "admin")
+    policy_resp = outcomes_client.put(
+        f"/api/identity/users/{admin_user_id}/data-policy",
+        json={"scope_mode": "SCOPED"},
+        headers=_auth_header(token),
+    )
+    assert policy_resp.status_code == 200
+
+    denied_versions = outcomes_client.get(
+        f"/api/outcomes/records/{outcome_id}/versions",
+        headers=_auth_header(token),
+    )
+    assert denied_versions.status_code == 404
+    denied_status_update = outcomes_client.patch(
+        f"/api/outcomes/records/{outcome_id}/status",
+        json={"status": "ARCHIVED", "note": "deny-check"},
+        headers=_auth_header(token),
+    )
+    assert denied_status_update.status_code == 404
 
 
 def test_alert_priority_and_routing_rules(outcomes_client: TestClient) -> None:

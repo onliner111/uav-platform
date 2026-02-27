@@ -29,7 +29,7 @@
 - [x] phase-15-kpi-open-platform.md - ✅ success - phase-15-kpi-open-platform.md.report.md
 - [x] phase-16-saas-console-ui.md - ✅ success - phase-16-saas-console-ui.md.report.md
 - [x] phase-17-multi-org-data-perimeter-v2.md - ✅ success - phase-17-multi-org-data-perimeter-v2.md.report.md
-- [ ] phase-18-outcomes-repository-object-storage.md - 🚧 running (`18-WP1` completed; continuing `18-WP2`)
+- [x] phase-18-outcomes-repository-object-storage.md - ✅ success - phase-18-outcomes-repository-object-storage.md.report.md
 - [ ] phase-19-real-device-video-integration.md - ⏳ pending
 - [ ] phase-20-task-center-v2-optimization.md - ⏳ pending
 - [ ] phase-21-airspace-compliance-hub-v2.md - ⏳ pending
@@ -43,6 +43,8 @@
 - ❌ failed
 - ⏳ pending
 - 🚧 running
+- 2026-02-26T19:51:06Z (UTC): Phase 18 closed as DONE (`18-WP1`..`18-WP6`). Delivered object storage minimal loop, outcome version lineage + scoped access guard, outcome report template/export (PDF/Word) and retention lifecycle audit linkage, plus storage region/tier transition optimization; migration head advanced to `202602260082`. Full closeout chain passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`), report generated at `logs/phase-18-outcomes-repository-object-storage.md.report.md`, checkpoint moved to `phase-19-real-device-video-integration.md` (`READY`).
+- 2026-02-26T19:39:00Z (UTC): Phase 18 advanced through `18-WP2`..`18-WP4`. Added outcome version lineage + scoped write guard (`/api/outcomes/records/{outcome_id}/versions`, migration chain `202602260074/075/076`), outcome report template/export pipeline with PDF/Word (`/api/reporting/outcome-report-templates*`, `/api/reporting/outcome-report-exports*`, migration chain `202602260077/078/079`), and retention lifecycle + audit linkage (`POST /api/reporting/outcome-report-exports:retention`, audit action `reporting.outcome_report.retention.run`). Verification passed (`docker compose ... app-tools python -m pytest -q tests/test_outcomes.py tests/test_reporting.py`, `ruff` changed files, `mypy app`, `alembic upgrade head`).
 - 2026-02-26T19:10:25Z (UTC): Phase 18 moved to RUNNING and completed `18-WP1`. Added object storage minimal chain (`/api/outcomes/raw/uploads:init`, upload content, complete, download), migration chain `202602260071/072/073`, and regression coverage `tests/test_outcomes.py::test_raw_data_upload_session_complete_and_download`. Fixed upload-session expiry compare for UTC naive/aware mismatch in `OutcomeService`; verification passed (`docker compose ... app-tools pytest -q tests/test_outcomes.py tests/test_reporting.py`, `ruff check` changed files, `mypy app`).
 - 2026-02-26T18:33:13Z (UTC): Phase 17 closed as DONE (`17-WP4`). Full gate chain passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `check_markdown_utf8.py`), report generated at `logs/phase-17-multi-org-data-perimeter-v2.md.report.md`, checkpoint moved to `phase-18-outcomes-repository-object-storage.md` (`READY`).
 - 2026-02-26T18:33:13Z (UTC): Phase 17 completed `P2` (advanced inheritance and conflict resolution). Added role data policy model/API and user effective policy API, introduced explicit deny fields (`denied_*`), and enforced fixed order `explicit_deny > explicit_allow > inherited_allow > default_deny`; landed migration chain `202602260068/069/070`, with regression coverage in `tests/test_identity.py` and `tests/test_data_perimeter.py`.
