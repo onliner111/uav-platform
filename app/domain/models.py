@@ -1115,9 +1115,16 @@ class AlertRouteDeliveryStatus(StrEnum):
 class AlertHandlingActionType(StrEnum):
     ACK = "ACK"
     DISPATCH = "DISPATCH"
+    ESCALATE = "ESCALATE"
     VERIFY = "VERIFY"
     REVIEW = "REVIEW"
     CLOSE = "CLOSE"
+
+
+class AlertEscalationReason(StrEnum):
+    ACK_TIMEOUT = "ACK_TIMEOUT"
+    REPEAT_TRIGGER = "REPEAT_TRIGGER"
+    SHIFT_HANDOVER = "SHIFT_HANDOVER"
 
 
 class RawDataType(StrEnum):
@@ -1351,6 +1358,137 @@ class AlertHandlingAction(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AlertOncallShift(SQLModel, table=True):
+    __tablename__ = "alert_oncall_shifts"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_oncall_shifts_tenant_id_id"),
+        Index("ix_alert_oncall_shifts_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_oncall_shifts_tenant_window", "tenant_id", "starts_at", "ends_at"),
+        Index("ix_alert_oncall_shifts_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    shift_name: str = Field(default="default", max_length=100)
+    target: str = Field(max_length=200, index=True)
+    starts_at: datetime = Field(index=True)
+    ends_at: datetime = Field(index=True)
+    timezone: str = Field(default="UTC", max_length=64)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AlertEscalationPolicy(SQLModel, table=True):
+    __tablename__ = "alert_escalation_policies"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_escalation_policies_tenant_id_id"),
+        UniqueConstraint("tenant_id", "priority_level", name="uq_alert_escalation_policies_tenant_priority"),
+        Index("ix_alert_escalation_policies_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_escalation_policies_tenant_priority", "tenant_id", "priority_level"),
+        Index("ix_alert_escalation_policies_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    priority_level: AlertPriority = Field(index=True)
+    ack_timeout_seconds: int = Field(default=1800, ge=30)
+    repeat_threshold: int = Field(default=3, ge=2)
+    max_escalation_level: int = Field(default=1, ge=1)
+    escalation_channel: AlertRouteChannel = Field(default=AlertRouteChannel.IN_APP, index=True)
+    escalation_target: str = Field(default="oncall://active", max_length=200)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AlertEscalationExecution(SQLModel, table=True):
+    __tablename__ = "alert_escalation_executions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_escalation_executions_tenant_id_id"),
+        Index("ix_alert_escalation_executions_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_escalation_executions_tenant_alert", "tenant_id", "alert_id"),
+        Index("ix_alert_escalation_executions_tenant_reason", "tenant_id", "reason"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    alert_id: str = Field(foreign_key="alerts.id", index=True)
+    reason: AlertEscalationReason = Field(index=True)
+    escalation_level: int = Field(ge=1)
+    channel: AlertRouteChannel = Field(default=AlertRouteChannel.IN_APP, index=True)
+    from_target: str | None = Field(default=None, max_length=200)
+    to_target: str = Field(max_length=200)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AlertSilenceRule(SQLModel, table=True):
+    __tablename__ = "alert_silence_rules"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_silence_rules_tenant_id_id"),
+        Index("ix_alert_silence_rules_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_silence_rules_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=120)
+    alert_type: AlertType | None = Field(default=None, index=True)
+    drone_id: str | None = Field(default=None, index=True)
+    starts_at: datetime | None = Field(default=None, index=True)
+    ends_at: datetime | None = Field(default=None, index=True)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class AlertAggregationRule(SQLModel, table=True):
+    __tablename__ = "alert_aggregation_rules"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_alert_aggregation_rules_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "name",
+            name="uq_alert_aggregation_rules_tenant_name",
+        ),
+        Index("ix_alert_aggregation_rules_tenant_id_id", "tenant_id", "id"),
+        Index("ix_alert_aggregation_rules_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=120, index=True)
+    alert_type: AlertType | None = Field(default=None, index=True)
+    window_seconds: int = Field(default=300, ge=10)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class RawDataCatalogRecord(SQLModel, table=True):
@@ -2698,6 +2836,143 @@ class AlertRouteLogRead(ORMReadModel):
     delivery_status: AlertRouteDeliveryStatus
     detail: dict[str, Any]
     created_at: datetime
+
+
+class AlertRouteReceiptRequest(BaseModel):
+    delivery_status: AlertRouteDeliveryStatus
+    receipt_id: str | None = None
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AlertOncallShiftCreate(BaseModel):
+    shift_name: str = "default"
+    target: str
+    starts_at: datetime
+    ends_at: datetime
+    timezone: str = "UTC"
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AlertOncallShiftRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    shift_name: str
+    target: str
+    starts_at: datetime
+    ends_at: datetime
+    timezone: str
+    is_active: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AlertEscalationPolicyCreate(BaseModel):
+    priority_level: AlertPriority
+    ack_timeout_seconds: int = PydanticField(default=1800, ge=30)
+    repeat_threshold: int = PydanticField(default=3, ge=2)
+    max_escalation_level: int = PydanticField(default=1, ge=1)
+    escalation_channel: AlertRouteChannel = AlertRouteChannel.IN_APP
+    escalation_target: str = "oncall://active"
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AlertEscalationPolicyRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    priority_level: AlertPriority
+    ack_timeout_seconds: int
+    repeat_threshold: int
+    max_escalation_level: int
+    escalation_channel: AlertRouteChannel
+    escalation_target: str
+    is_active: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AlertEscalationRunRequest(BaseModel):
+    dry_run: bool = False
+    limit: int = PydanticField(default=200, ge=1, le=1000)
+
+
+class AlertEscalationRunItemRead(BaseModel):
+    alert_id: str
+    reason: AlertEscalationReason
+    channel: AlertRouteChannel
+    from_target: str | None
+    to_target: str
+    escalation_level: int
+
+
+class AlertEscalationRunRead(BaseModel):
+    scanned_count: int
+    escalated_count: int
+    dry_run: bool
+    items: list[AlertEscalationRunItemRead]
+
+
+class AlertSilenceRuleCreate(BaseModel):
+    name: str
+    alert_type: AlertType | None = None
+    drone_id: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AlertSilenceRuleRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    alert_type: AlertType | None
+    drone_id: str | None
+    starts_at: datetime | None
+    ends_at: datetime | None
+    is_active: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AlertAggregationRuleCreate(BaseModel):
+    name: str
+    alert_type: AlertType | None = None
+    window_seconds: int = PydanticField(default=300, ge=10)
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class AlertAggregationRuleRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    alert_type: AlertType | None
+    window_seconds: int
+    is_active: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AlertSlaOverviewRead(BaseModel):
+    from_ts: datetime | None
+    to_ts: datetime | None
+    total_alerts: int
+    acked_alerts: int
+    closed_alerts: int
+    timeout_escalated_alerts: int
+    mtta_seconds_avg: float
+    mttr_seconds_avg: float
+    timeout_escalation_rate: float
 
 
 class RawDataCatalogCreate(BaseModel):
