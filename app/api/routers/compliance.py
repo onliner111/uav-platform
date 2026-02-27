@@ -6,9 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.deps import get_current_claims, require_perm
 from app.domain.models import (
+    AirspacePolicyLayer,
     AirspaceZoneCreate,
     AirspaceZoneRead,
     AirspaceZoneType,
+    ComplianceApprovalFlowInstanceActionRequest,
+    ComplianceApprovalFlowInstanceCreate,
+    ComplianceApprovalFlowInstanceRead,
+    ComplianceApprovalFlowTemplateCreate,
+    ComplianceApprovalFlowTemplateRead,
+    ComplianceDecisionRecordRead,
     MissionPreflightChecklistInitRequest,
     MissionPreflightChecklistItemCheckRequest,
     MissionPreflightChecklistRead,
@@ -86,9 +93,17 @@ def list_zones(
     claims: Claims,
     service: Service,
     zone_type: AirspaceZoneType | None = None,
+    policy_layer: AirspacePolicyLayer | None = None,
+    org_unit_id: str | None = None,
     is_active: bool | None = None,
 ) -> list[AirspaceZoneRead]:
-    rows = service.list_airspace_zones(claims["tenant_id"], zone_type=zone_type, is_active=is_active)
+    rows = service.list_airspace_zones(
+        claims["tenant_id"],
+        zone_type=zone_type,
+        policy_layer=policy_layer,
+        org_unit_id=org_unit_id,
+        is_active=is_active,
+    )
     return [AirspaceZoneRead.model_validate(item) for item in rows]
 
 
@@ -104,6 +119,159 @@ def get_zone(zone_id: str, claims: Claims, service: Service) -> AirspaceZoneRead
     except (NotFoundError, ConflictError, ComplianceViolationError) as exc:
         _handle_error(exc)
         raise
+
+
+@router.post(
+    "/approval-flows/templates",
+    response_model=ComplianceApprovalFlowTemplateRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm(PERM_MISSION_WRITE))],
+)
+def create_approval_flow_template(
+    payload: ComplianceApprovalFlowTemplateCreate,
+    request: Request,
+    claims: Claims,
+    service: Service,
+) -> ComplianceApprovalFlowTemplateRead:
+    set_audit_context(
+        request,
+        action="compliance.approval_flow_template.create",
+        detail={"what": {"name": payload.name, "entity_type": payload.entity_type}},
+    )
+    try:
+        row = service.create_approval_flow_template(claims["tenant_id"], claims["sub"], payload)
+        return ComplianceApprovalFlowTemplateRead.model_validate(row)
+    except (NotFoundError, ConflictError, ComplianceViolationError) as exc:
+        _handle_error(exc)
+        raise
+
+
+@router.get(
+    "/approval-flows/templates",
+    response_model=list[ComplianceApprovalFlowTemplateRead],
+    dependencies=[Depends(require_perm(PERM_MISSION_READ))],
+)
+def list_approval_flow_templates(
+    claims: Claims,
+    service: Service,
+    entity_type: str | None = None,
+    is_active: bool | None = None,
+) -> list[ComplianceApprovalFlowTemplateRead]:
+    rows = service.list_approval_flow_templates(
+        claims["tenant_id"],
+        entity_type=entity_type,
+        is_active=is_active,
+    )
+    return [ComplianceApprovalFlowTemplateRead.model_validate(item) for item in rows]
+
+
+@router.post(
+    "/approval-flows/instances",
+    response_model=ComplianceApprovalFlowInstanceRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm(PERM_MISSION_WRITE))],
+)
+def create_approval_flow_instance(
+    payload: ComplianceApprovalFlowInstanceCreate,
+    request: Request,
+    claims: Claims,
+    service: Service,
+) -> ComplianceApprovalFlowInstanceRead:
+    set_audit_context(
+        request,
+        action="compliance.approval_flow_instance.create",
+        detail={"what": {"template_id": payload.template_id, "entity_type": payload.entity_type, "entity_id": payload.entity_id}},
+    )
+    try:
+        row = service.create_approval_flow_instance(claims["tenant_id"], claims["sub"], payload)
+        return ComplianceApprovalFlowInstanceRead.model_validate(row)
+    except (NotFoundError, ConflictError, ComplianceViolationError) as exc:
+        _handle_error(exc)
+        raise
+
+
+@router.get(
+    "/approval-flows/instances/{instance_id}",
+    response_model=ComplianceApprovalFlowInstanceRead,
+    dependencies=[Depends(require_perm(PERM_MISSION_READ))],
+)
+def get_approval_flow_instance(
+    instance_id: str,
+    claims: Claims,
+    service: Service,
+) -> ComplianceApprovalFlowInstanceRead:
+    try:
+        row = service.get_approval_flow_instance(claims["tenant_id"], instance_id)
+        return ComplianceApprovalFlowInstanceRead.model_validate(row)
+    except (NotFoundError, ConflictError, ComplianceViolationError) as exc:
+        _handle_error(exc)
+        raise
+
+
+@router.post(
+    "/approval-flows/instances/{instance_id}/actions",
+    response_model=ComplianceApprovalFlowInstanceRead,
+    dependencies=[Depends(require_perm(PERM_MISSION_WRITE))],
+)
+def act_approval_flow_instance(
+    instance_id: str,
+    payload: ComplianceApprovalFlowInstanceActionRequest,
+    request: Request,
+    claims: Claims,
+    service: Service,
+) -> ComplianceApprovalFlowInstanceRead:
+    set_audit_context(
+        request,
+        action="compliance.approval_flow_instance.act",
+        detail={"what": {"instance_id": instance_id, "action": payload.action}},
+    )
+    try:
+        row = service.act_approval_flow_instance(claims["tenant_id"], instance_id, claims["sub"], payload)
+        return ComplianceApprovalFlowInstanceRead.model_validate(row)
+    except (NotFoundError, ConflictError, ComplianceViolationError) as exc:
+        _handle_error(exc)
+        raise
+
+
+@router.get(
+    "/decision-records",
+    response_model=list[ComplianceDecisionRecordRead],
+    dependencies=[Depends(require_perm(PERM_MISSION_READ))],
+)
+def list_decision_records(
+    claims: Claims,
+    service: Service,
+    source: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+) -> list[ComplianceDecisionRecordRead]:
+    rows = service.list_decision_records(
+        claims["tenant_id"],
+        source=source,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+    return [ComplianceDecisionRecordRead.model_validate(item) for item in rows]
+
+
+@router.get(
+    "/decision-records/export",
+    dependencies=[Depends(require_perm(PERM_MISSION_READ))],
+)
+def export_decision_records(
+    claims: Claims,
+    service: Service,
+    source: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+) -> dict[str, str]:
+    file_path = service.export_decision_records(
+        claims["tenant_id"],
+        source=source,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+    return {"file_path": file_path}
 
 
 @router.post(

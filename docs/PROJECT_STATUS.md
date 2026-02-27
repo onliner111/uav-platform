@@ -6,15 +6,15 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-21-airspace-compliance-hub-v2.md (READY; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 20 closed as DONE (`20-WP1`..`20-WP4`)
-- Next Target: start phase-21 and execute `P0 -> P1 -> P2 -> 21-WP4` with full gate closeout
+- Current Phase: phase-22-alert-oncall-notification-v2.md (READY; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 21 closed as DONE (`21-WP1`..`21-WP4`)
+- Next Target: start phase-22 and execute `P0 -> P1 -> P2 -> 22-WP4` with full gate closeout
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-27T13:46:23Z
+> Last verified at (UTC): 2026-02-27T16:35:00Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> WIP note (2026-02-27T13:46:23Z): Phase 20 fully closed after completing `20-WP1`..`20-WP4` with full closeout chain pass (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase20_task_center_v2`).
+> WIP note (2026-02-27T16:35:00Z): Phase 21 fully closed after completing `21-WP1`..`21-WP4` with full closeout chain pass (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `demo_phase21_airspace_compliance_hub_v2`).
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
 - mypy: PASS (72 source files)
@@ -74,6 +74,7 @@
 - phase-18-outcomes-repository-object-storage.md: DONE
 - phase-19-real-device-video-integration.md: DONE
 - phase-20-task-center-v2-optimization.md: DONE
+- phase-21-airspace-compliance-hub-v2.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -106,10 +107,12 @@
 - 18-WP5 artifacts are present: storage region/tier model extension for raw data (`storage_region`, `access_tier`, `RawDataAccessTier`), transition API (`PATCH /api/outcomes/raw/{raw_id}/storage`) with transition history in `meta.storage_transitions`, migration chain `202602260080/081/082`, and regression coverage (`tests/test_outcomes.py::test_raw_data_upload_session_complete_and_download`).
 - 19-WP1/19-WP2/19-WP3 artifacts are present: integration service-router chain (`app/services/integration_service.py`, `app/api/routers/integration.py`) with device session runtime (`/api/integration/device-sessions/*`) and video stream management (`/api/integration/video-streams/*`), integration DTO/enums (`app/domain/models.py`), command-center video slot live integration (`app/web/static/command_center.js`, `app/web/templates/command_center.html`), regression coverage (`tests/test_integration.py`), and phase demo (`infra/scripts/demo_phase19_real_device_video_integration.py`).
 - 20-WP1/20-WP2/20-WP3 artifacts are present: task-template v2 payload model and API extension (`template_version`, `route_template`, `payload_template`), template clone endpoint (`POST /api/task-center/templates/{template_id}:clone`), batch create endpoint (`POST /api/task-center/tasks:batch-create`), schedule overlap conflict guard and auto-dispatch explainability v2 in `app/services/task_center_service.py`, regression coverage (`tests/test_task_center.py::test_task_center_v2_template_conflict_and_batch`), and phase demo (`infra/scripts/demo_phase20_task_center_v2.py`).
+- 21-WP1/21-WP2/21-WP3 artifacts are present: layered airspace policy fields (`policy_layer`, `policy_effect`, `org_unit_id`) and hierarchical resolver (`platform default/tenant/org_unit`, `deny>allow`) in `app/services/compliance_service.py`; configurable approval flow chain (`/api/compliance/approval-flows/templates`, `/api/compliance/approval-flows/instances`, `/api/compliance/approval-flows/instances/{instance_id}/actions`); preflight template version/evidence requirement enforcement (`template_version`, `evidence_requirements`, item `evidence`); compliance decision record API/export (`/api/compliance/decision-records*`); task-center mission compliance snapshot linkage (`app/services/task_center_service.py`); migration chain `202602270083/084/085`; regression coverage (`tests/test_compliance.py`, `tests/test_task_center.py`); and phase demo (`infra/scripts/demo_phase21_airspace_compliance_hub_v2.py`).
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-27T16:35:00Z (UTC): Phase 21 closed as DONE (`21-WP1`..`21-WP4`). Delivered layered airspace policy resolver (`platform default/tenant/org_unit`, `deny>allow`) integrated into mission-plan and command precheck gates, configurable approval flow chain (template/instance/actions), preflight template version + evidence requirements enforcement, compliance decision record API/export, and task-center mission compliance snapshot linkage. Added migration chain `202602270083/084/085`, demo `infra/scripts/demo_phase21_airspace_compliance_hub_v2.py`, and regression coverage in `tests/test_compliance.py` and `tests/test_task_center.py`; completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, phase21 demo), generated report `logs/phase-21-airspace-compliance-hub-v2.md.report.md`, and advanced checkpoint to `phase-22-alert-oncall-notification-v2.md` (`READY`).
 - 2026-02-27T13:46:23Z (UTC): Phase 20 closed as DONE (`20-WP1`..`20-WP4`). Delivered task-center v2 enhancements including template structured payloads (`template_version`/`route_template`/`payload_template`), template clone API (`/api/task-center/templates/{template_id}:clone`), batch task create API (`/api/task-center/tasks:batch-create`), dispatch overlap-conflict guard based on planned schedule windows, and explainable auto-dispatch strategy v2 with conflict penalty and score metadata. Added demo `infra/scripts/demo_phase20_task_center_v2.py` and regression coverage in `tests/test_task_center.py`; completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, phase20 demo), generated report `logs/phase-20-task-center-v2-optimization.md.report.md`, and advanced checkpoint to `phase-21-airspace-compliance-hub-v2.md` (`READY`).
 - 2026-02-27T13:25:36Z (UTC): Phase 19 closed as DONE (`19-WP1`..`19-WP4`). Delivered integration APIs for device sessions/video streams, adapter-driven telemetry session runtime (`FAKE`/`MAVLINK`/`DJI`), command-center video slot live integration, regression coverage (`tests/test_integration.py`), and phase demo (`infra/scripts/demo_phase19_real_device_video_integration.py`); completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, phase19 demo), generated report `logs/phase-19-real-device-video-integration.md.report.md`, and advanced checkpoint to `phase-20-task-center-v2-optimization.md` (`READY`).
 - 2026-02-26T19:51:06Z (UTC): Phase 18 closed as DONE (`18-WP1`..`18-WP6`). Added WP5 storage region/tier optimization (`RawDataAccessTier`, `/api/outcomes/raw/{raw_id}/storage`, migration chain `202602260080/081/082`), completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`), generated report `logs/phase-18-outcomes-repository-object-storage.md.report.md`, and advanced checkpoint to `phase-19-real-device-video-integration.md` (`READY`).

@@ -163,6 +163,7 @@ class CommandService:
                     drone_id=payload.drone_id,
                     command_type=payload.type,
                     params=payload.params,
+                    actor_id=actor_id,
                 )
             except ComplianceViolationError as exc:
                 compliance_passed = False

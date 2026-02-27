@@ -56,14 +56,14 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-27T13:46:23Z`
-- current_phase: `phase-21-airspace-compliance-hub-v2.md`
+- updated_at_utc: `2026-02-27T16:35:00Z`
+- current_phase: `phase-22-alert-oncall-notification-v2.md`
 - phase_status: `READY`
-- last_success_phase: `phase-20-task-center-v2-optimization.md`
-- current_focus: `Phase 20 is DONE (20-WP1..20-WP4 closed with full gates); next phase is Phase 21 and awaits start`
+- last_success_phase: `phase-21-airspace-compliance-hub-v2.md`
+- current_focus: `Phase 21 is DONE (21-WP1..21-WP4 closed with full gates); next phase is Phase 22 and awaits start`
 
 ## Next TODO (Execution Target)
-1. Start Phase 21 from P0 and execute in order `P0 -> P1 -> P2 -> 21-WP4`, keeping full gate pass as closeout condition.
+1. Start Phase 22 from P0 and execute in order `P0 -> P1 -> P2 -> 22-WP4`, keeping full gate pass as closeout condition.
 2. Keep Docker Compose baseline gate commands below as regression checklist for each new phase.
 3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> phase-defined closeout WP`) for all future phases.
 
@@ -90,4 +90,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-21-airspace-compliance-hub-v2.md；启动并执行 Phase 21（P0 -> P1 -> P2 -> 21-WP4），通过全量门禁后关账并停止。`
+`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-22-alert-oncall-notification-v2.md；启动并执行 Phase 22（P0 -> P1 -> P2 -> 22-WP4），通过全量门禁后关账并停止。`

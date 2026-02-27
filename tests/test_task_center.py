@@ -152,6 +152,22 @@ def _create_asset_with_region(client: TestClient, token: str, code: str, region_
     return asset_id
 
 
+def _create_mission(client: TestClient, token: str, name: str, org_unit_id: str | None = None) -> str:
+    response = client.post(
+        "/api/mission/missions",
+        json={
+            "name": name,
+            "type": "POINT_TASK",
+            "org_unit_id": org_unit_id,
+            "payload": {"point": {"lat": 30.15, "lon": 114.25, "alt_m": 90}},
+            "constraints": {},
+        },
+        headers=_auth_header(token),
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 def test_task_center_p0_workflow(task_center_client: TestClient) -> None:
     tenant_id = _create_tenant(task_center_client, "task-center-main")
     _bootstrap_admin(task_center_client, tenant_id, "admin", "admin-pass")
@@ -633,3 +649,36 @@ def test_task_center_v2_template_conflict_and_batch(task_center_client: TestClie
     audit_actions = {row.action for row in audit_rows}
     assert "task_center.template.clone" in audit_actions
     assert "task_center.task.batch_create" in audit_actions
+
+
+def test_task_center_mission_task_embeds_compliance_snapshot(task_center_client: TestClient) -> None:
+    tenant_id = _create_tenant(task_center_client, "task-center-phase21-link")
+    _bootstrap_admin(task_center_client, tenant_id, "admin", "admin-pass")
+    admin_token = _login(task_center_client, tenant_id, "admin", "admin-pass")
+
+    org_unit_id = _create_org_unit(task_center_client, admin_token, "ops-link", "OPS-LINK")
+    mission_id = _create_mission(task_center_client, admin_token, "linked-mission", org_unit_id)
+
+    task_type_resp = task_center_client.post(
+        "/api/task-center/types",
+        json={"code": "LINKED", "name": "linked"},
+        headers=_auth_header(admin_token),
+    )
+    assert task_type_resp.status_code == 201
+    task_type_id = task_type_resp.json()["id"]
+
+    create_task_resp = task_center_client.post(
+        "/api/task-center/tasks",
+        json={
+            "task_type_id": task_type_id,
+            "mission_id": mission_id,
+            "org_unit_id": org_unit_id,
+            "name": "linked-task",
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert create_task_resp.status_code == 201
+    snapshot = create_task_resp.json()["context_data"]["compliance_snapshot"]
+    assert snapshot["mission_id"] == mission_id
+    assert snapshot["mission_state"] == "DRAFT"
+    assert snapshot["preflight"]["status"] is None

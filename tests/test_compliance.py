@@ -68,7 +68,14 @@ def _login(client: TestClient, tenant_id: str, username: str, password: str) -> 
     return response.json()["access_token"]
 
 
-def _create_mission(client: TestClient, token: str, name: str, *, emergency_fastlane: bool = False) -> str:
+def _create_mission(
+    client: TestClient,
+    token: str,
+    name: str,
+    *,
+    emergency_fastlane: bool = False,
+    org_unit_id: str | None = None,
+) -> str:
     response = client.post(
         "/api/mission/missions",
         json={
@@ -76,6 +83,7 @@ def _create_mission(client: TestClient, token: str, name: str, *, emergency_fast
             "type": "POINT_TASK",
             "payload": {"point": {"lat": 30.1, "lon": 114.2, "alt_m": 120}},
             "constraints": {"emergency_fastlane": emergency_fastlane} if emergency_fastlane else {},
+            "org_unit_id": org_unit_id,
         },
         headers=_auth_header(token),
     )
@@ -97,6 +105,16 @@ def _create_drone(client: TestClient, token: str, name: str) -> str:
     response = client.post(
         "/api/registry/drones",
         json={"name": name, "vendor": "FAKE", "capabilities": {"rth": True}},
+        headers=_auth_header(token),
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def _create_org_unit(client: TestClient, token: str, name: str, code: str) -> str:
+    response = client.post(
+        "/api/identity/org-units",
+        json={"name": name, "code": code, "node_type": "ORGANIZATION"},
         headers=_auth_header(token),
     )
     assert response.status_code == 201
@@ -324,3 +342,179 @@ def test_start_mission_command_requires_approval_and_preflight(compliance_client
     assert ok_resp.status_code == 201
     assert ok_resp.json()["status"] == "ACKED"
     assert ok_resp.json()["compliance_passed"] is True
+
+
+def test_org_unit_allow_zone_overrides_tenant_deny_zone(compliance_client: TestClient) -> None:
+    tenant_id = _create_tenant(compliance_client, "phase21-zone-layering")
+    _bootstrap_admin(compliance_client, tenant_id, "admin", "admin-pass")
+    token = _login(compliance_client, tenant_id, "admin", "admin-pass")
+
+    org_unit_id = _create_org_unit(compliance_client, token, "ops-hub", "OPS-HUB")
+
+    deny_resp = compliance_client.post(
+        "/api/compliance/zones",
+        json={
+            "name": "tenant-no-fly",
+            "zone_type": "NO_FLY",
+            "policy_layer": "TENANT",
+            "policy_effect": "DENY",
+            "geom_wkt": "POLYGON((114.19 30.09,114.21 30.09,114.21 30.11,114.19 30.11,114.19 30.09))",
+        },
+        headers=_auth_header(token),
+    )
+    assert deny_resp.status_code == 201
+
+    allow_resp = compliance_client.post(
+        "/api/compliance/zones",
+        json={
+            "name": "org-allow-corridor",
+            "zone_type": "NO_FLY",
+            "policy_layer": "ORG_UNIT",
+            "policy_effect": "ALLOW",
+            "org_unit_id": org_unit_id,
+            "geom_wkt": "POLYGON((114.19 30.09,114.21 30.09,114.21 30.11,114.19 30.11,114.19 30.09))",
+        },
+        headers=_auth_header(token),
+    )
+    assert allow_resp.status_code == 201
+
+    create_resp = compliance_client.post(
+        "/api/mission/missions",
+        json={
+            "name": "org-override-mission",
+            "type": "POINT_TASK",
+            "org_unit_id": org_unit_id,
+            "payload": {"point": {"lat": 30.1, "lon": 114.2, "alt_m": 100}},
+            "constraints": {},
+        },
+        headers=_auth_header(token),
+    )
+    assert create_resp.status_code == 201
+
+
+def test_approval_flow_and_preflight_evidence_gate(compliance_client: TestClient) -> None:
+    tenant_id = _create_tenant(compliance_client, "phase21-approval-preflight")
+    _bootstrap_admin(compliance_client, tenant_id, "admin", "admin-pass")
+    token = _login(compliance_client, tenant_id, "admin", "admin-pass")
+    drone_id = _create_drone(compliance_client, token, "phase21-drone")
+    mission_id = _create_mission(compliance_client, token, "phase21-mission")
+
+    flow_template_resp = compliance_client.post(
+        "/api/compliance/approval-flows/templates",
+        json={
+            "name": "mission-two-step",
+            "entity_type": "MISSION",
+            "steps": [
+                {"name": "L1", "reviewer_user_ids": []},
+                {"name": "L2", "reviewer_user_ids": []},
+            ],
+            "is_active": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert flow_template_resp.status_code == 201
+    flow_template_id = flow_template_resp.json()["id"]
+
+    flow_instance_resp = compliance_client.post(
+        "/api/compliance/approval-flows/instances",
+        json={
+            "template_id": flow_template_id,
+            "entity_type": "MISSION",
+            "entity_id": mission_id,
+        },
+        headers=_auth_header(token),
+    )
+    assert flow_instance_resp.status_code == 201
+    flow_instance_id = flow_instance_resp.json()["id"]
+
+    blocked_start_resp = compliance_client.post(
+        "/api/command/commands",
+        json={
+            "drone_id": drone_id,
+            "type": "START_MISSION",
+            "params": {"mission_id": mission_id},
+            "idempotency_key": "phase21-start-blocked-by-flow",
+            "expect_ack": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert blocked_start_resp.status_code == 409
+    assert blocked_start_resp.json()["detail"]["reason_code"] == "APPROVAL_FLOW_PENDING"
+
+    first_approve_resp = compliance_client.post(
+        f"/api/compliance/approval-flows/instances/{flow_instance_id}/actions",
+        json={"action": "APPROVE"},
+        headers=_auth_header(token),
+    )
+    assert first_approve_resp.status_code == 200
+    assert first_approve_resp.json()["status"] == "PENDING"
+
+    second_approve_resp = compliance_client.post(
+        f"/api/compliance/approval-flows/instances/{flow_instance_id}/actions",
+        json={"action": "APPROVE"},
+        headers=_auth_header(token),
+    )
+    assert second_approve_resp.status_code == 200
+    assert second_approve_resp.json()["status"] == "APPROVED"
+
+    template_resp = compliance_client.post(
+        "/api/compliance/preflight/templates",
+        json={
+            "name": "phase21-evidence-template",
+            "items": [{"code": "CHK-E", "title": "evidence check"}],
+            "template_version": "v2",
+            "evidence_requirements": {"required": True},
+            "require_approval_before_run": True,
+            "is_active": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert template_resp.status_code == 201
+    template_id = template_resp.json()["id"]
+
+    init_resp = compliance_client.post(
+        f"/api/compliance/missions/{mission_id}/preflight/init",
+        json={"template_id": template_id},
+        headers=_auth_header(token),
+    )
+    assert init_resp.status_code == 200
+
+    check_without_evidence = compliance_client.post(
+        f"/api/compliance/missions/{mission_id}/preflight/check-item",
+        json={"item_code": "CHK-E", "checked": True},
+        headers=_auth_header(token),
+    )
+    assert check_without_evidence.status_code == 409
+
+    check_with_evidence = compliance_client.post(
+        f"/api/compliance/missions/{mission_id}/preflight/check-item",
+        json={
+            "item_code": "CHK-E",
+            "checked": True,
+            "evidence": {"photo_url": "https://example.invalid/evidence.jpg"},
+        },
+        headers=_auth_header(token),
+    )
+    assert check_with_evidence.status_code == 200
+    assert check_with_evidence.json()["status"] == "COMPLETED"
+
+    start_ok_resp = compliance_client.post(
+        "/api/command/commands",
+        json={
+            "drone_id": drone_id,
+            "type": "START_MISSION",
+            "params": {"mission_id": mission_id},
+            "idempotency_key": "phase21-start-ok",
+            "expect_ack": True,
+        },
+        headers=_auth_header(token),
+    )
+    assert start_ok_resp.status_code == 201
+    assert start_ok_resp.json()["compliance_passed"] is True
+
+    decision_export_resp = compliance_client.get(
+        "/api/compliance/decision-records/export?entity_type=MISSION&entity_id=" + mission_id,
+        headers=_auth_header(token),
+    )
+    assert decision_export_resp.status_code == 200
+    assert "file_path" in decision_export_resp.json()

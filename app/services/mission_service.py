@@ -123,6 +123,8 @@ class MissionService:
                 payload=payload.payload,
                 constraints=constraints,
                 area_code=payload.area_code,
+                org_unit_id=payload.org_unit_id,
+                actor_id=actor_id,
             )
             if payload.drone_id is not None:
                 self._ensure_scoped_drone(session, tenant_id, payload.drone_id)
@@ -218,6 +220,9 @@ class MissionService:
                 payload=next_payload,
                 constraints=next_constraints,
                 area_code=next_area_code,
+                org_unit_id=next_org_unit_id,
+                mission_id=mission.id,
+                actor_id=actor_id,
             )
             mission.name = next_name
             mission.drone_id = next_drone_id

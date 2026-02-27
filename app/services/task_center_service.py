@@ -37,6 +37,7 @@ from app.domain.models import (
 from app.domain.state_machine import TaskCenterState, can_task_center_transition
 from app.infra.db import get_engine
 from app.infra.events import event_bus
+from app.services.compliance_service import ComplianceService
 from app.services.data_perimeter_service import DataPerimeterService
 
 
@@ -63,6 +64,7 @@ class TaskCenterService:
 
     def __init__(self) -> None:
         self._data_perimeter = DataPerimeterService()
+        self._compliance = ComplianceService()
 
     def _session(self) -> Session:
         return Session(get_engine(), expire_on_commit=False)
@@ -636,6 +638,12 @@ class TaskCenterService:
             "planned_start_at": schedule_start.isoformat() if schedule_start is not None else None,
             "planned_end_at": schedule_end.isoformat() if schedule_end is not None else None,
         }
+        if payload.mission_id is not None:
+            context_data["compliance_snapshot"] = self._compliance.build_mission_compliance_snapshot(
+                session,
+                tenant_id,
+                payload.mission_id,
+            )
 
         row = TaskCenterTask(
             tenant_id=tenant_id,

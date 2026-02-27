@@ -723,6 +723,17 @@ class AirspaceZoneType(StrEnum):
     SENSITIVE = "SENSITIVE"
 
 
+class AirspacePolicyLayer(StrEnum):
+    PLATFORM_DEFAULT = "PLATFORM_DEFAULT"
+    TENANT = "TENANT"
+    ORG_UNIT = "ORG_UNIT"
+
+
+class AirspacePolicyEffect(StrEnum):
+    ALLOW = "ALLOW"
+    DENY = "DENY"
+
+
 class ComplianceReasonCode(StrEnum):
     AIRSPACE_NO_FLY = "AIRSPACE_NO_FLY"
     AIRSPACE_ALT_LIMIT_EXCEEDED = "AIRSPACE_ALT_LIMIT_EXCEEDED"
@@ -732,6 +743,7 @@ class ComplianceReasonCode(StrEnum):
     COMMAND_GEOFENCE_BLOCKED = "COMMAND_GEOFENCE_BLOCKED"
     COMMAND_ALTITUDE_BLOCKED = "COMMAND_ALTITUDE_BLOCKED"
     COMMAND_SENSITIVE_RESTRICTED = "COMMAND_SENSITIVE_RESTRICTED"
+    APPROVAL_FLOW_PENDING = "APPROVAL_FLOW_PENDING"
 
 
 class PreflightChecklistStatus(StrEnum):
@@ -739,6 +751,25 @@ class PreflightChecklistStatus(StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     WAIVED = "WAIVED"
+
+
+class ApprovalFlowInstanceStatus(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class ApprovalFlowAction(StrEnum):
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
+    ROLLBACK = "ROLLBACK"
+
+
+class ComplianceDecision(StrEnum):
+    ALLOW = "ALLOW"
+    DENY = "DENY"
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
 
 
 class AirspaceZone(SQLModel, table=True):
@@ -753,6 +784,9 @@ class AirspaceZone(SQLModel, table=True):
     tenant_id: str = Field(foreign_key="tenants.id", index=True)
     name: str = Field(max_length=100, index=True)
     zone_type: AirspaceZoneType = Field(index=True)
+    policy_layer: AirspacePolicyLayer = Field(default=AirspacePolicyLayer.TENANT, index=True)
+    policy_effect: AirspacePolicyEffect = Field(default=AirspacePolicyEffect.DENY, index=True)
+    org_unit_id: str | None = Field(default=None, index=True)
     area_code: str | None = Field(default=None, max_length=100, index=True)
     geom_wkt: str
     max_alt_m: float | None = Field(default=None, ge=0)
@@ -779,6 +813,11 @@ class PreflightChecklistTemplate(SQLModel, table=True):
     description: str | None = None
     items: list[dict[str, Any]] = Field(
         default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    template_version: str = Field(default="v1", max_length=50)
+    evidence_requirements: dict[str, Any] = Field(
+        default_factory=dict,
         sa_column=Column(JSON, nullable=False),
     )
     require_approval_before_run: bool = Field(default=True, index=True)
@@ -832,6 +871,86 @@ class MissionPreflightChecklist(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now_utc, index=True)
     updated_at: datetime = Field(default_factory=now_utc, index=True)
     completed_at: datetime | None = Field(default=None, index=True)
+
+
+class ComplianceApprovalFlowTemplate(SQLModel, table=True):
+    __tablename__ = "compliance_approval_flow_templates"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_compliance_approval_flow_templates_tenant_id_id"),
+        Index("ix_compliance_approval_flow_templates_tenant_id_id", "tenant_id", "id"),
+        Index("ix_compliance_approval_flow_templates_tenant_entity", "tenant_id", "entity_type"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    name: str = Field(max_length=100, index=True)
+    entity_type: str = Field(max_length=50, index=True)
+    steps: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    is_active: bool = Field(default=True, index=True)
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class ComplianceApprovalFlowInstance(SQLModel, table=True):
+    __tablename__ = "compliance_approval_flow_instances"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_compliance_approval_flow_instances_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "template_id"],
+            ["compliance_approval_flow_templates.tenant_id", "compliance_approval_flow_templates.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_compliance_approval_flow_instances_tenant_id_id", "tenant_id", "id"),
+        Index("ix_compliance_approval_flow_instances_tenant_entity", "tenant_id", "entity_type", "entity_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    template_id: str = Field(index=True)
+    entity_type: str = Field(max_length=50, index=True)
+    entity_id: str = Field(index=True)
+    status: ApprovalFlowInstanceStatus = Field(default=ApprovalFlowInstanceStatus.PENDING, index=True)
+    current_step_index: int = Field(default=0, ge=0)
+    steps_snapshot: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    action_history: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+    completed_at: datetime | None = Field(default=None, index=True)
+
+
+class ComplianceDecisionRecord(SQLModel, table=True):
+    __tablename__ = "compliance_decision_records"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_compliance_decision_records_tenant_id_id"),
+        Index("ix_compliance_decision_records_tenant_id_id", "tenant_id", "id"),
+        Index("ix_compliance_decision_records_tenant_entity", "tenant_id", "entity_type", "entity_id"),
+        Index("ix_compliance_decision_records_tenant_source", "tenant_id", "source"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    source: str = Field(max_length=50, index=True)
+    entity_type: str = Field(max_length=50, index=True)
+    entity_id: str = Field(index=True)
+    decision: ComplianceDecision = Field(index=True)
+    reason_code: str | None = Field(default=None, max_length=100, index=True)
+    actor_id: str | None = Field(default=None, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class EventEnvelope(BaseModel):
@@ -2132,6 +2251,9 @@ class MissionTransitionRequest(BaseModel):
 class AirspaceZoneCreate(BaseModel):
     name: str
     zone_type: AirspaceZoneType
+    policy_layer: AirspacePolicyLayer = AirspacePolicyLayer.TENANT
+    policy_effect: AirspacePolicyEffect = AirspacePolicyEffect.DENY
+    org_unit_id: str | None = None
     area_code: str | None = None
     geom_wkt: str
     max_alt_m: float | None = PydanticField(default=None, ge=0)
@@ -2144,6 +2266,9 @@ class AirspaceZoneRead(ORMReadModel):
     tenant_id: str
     name: str
     zone_type: AirspaceZoneType
+    policy_layer: AirspacePolicyLayer
+    policy_effect: AirspacePolicyEffect
+    org_unit_id: str | None
     area_code: str | None
     geom_wkt: str
     max_alt_m: float | None
@@ -2158,6 +2283,8 @@ class PreflightChecklistTemplateCreate(BaseModel):
     name: str
     description: str | None = None
     items: list[dict[str, Any]] = PydanticField(default_factory=list)
+    template_version: str = "v1"
+    evidence_requirements: dict[str, Any] = PydanticField(default_factory=dict)
     require_approval_before_run: bool = True
     is_active: bool = True
 
@@ -2168,6 +2295,8 @@ class PreflightChecklistTemplateRead(ORMReadModel):
     name: str
     description: str | None
     items: list[dict[str, Any]]
+    template_version: str
+    evidence_requirements: dict[str, Any]
     require_approval_before_run: bool
     is_active: bool
     created_by: str
@@ -2184,6 +2313,7 @@ class MissionPreflightChecklistItemCheckRequest(BaseModel):
     item_code: str
     checked: bool = True
     note: str | None = None
+    evidence: dict[str, Any] = PydanticField(default_factory=dict)
 
 
 class MissionPreflightChecklistRead(ORMReadModel):
@@ -3473,6 +3603,65 @@ class ApprovalRecordRead(ORMReadModel):
     entity_id: str
     status: str
     approved_by: str
+    created_at: datetime
+
+
+class ComplianceApprovalFlowTemplateCreate(BaseModel):
+    name: str
+    entity_type: str
+    steps: list[dict[str, Any]] = PydanticField(default_factory=list, min_length=1)
+    is_active: bool = True
+
+
+class ComplianceApprovalFlowTemplateRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    name: str
+    entity_type: str
+    steps: list[dict[str, Any]]
+    is_active: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ComplianceApprovalFlowInstanceCreate(BaseModel):
+    template_id: str
+    entity_type: str
+    entity_id: str
+
+
+class ComplianceApprovalFlowInstanceActionRequest(BaseModel):
+    action: ApprovalFlowAction
+    note: str | None = None
+
+
+class ComplianceApprovalFlowInstanceRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    template_id: str
+    entity_type: str
+    entity_id: str
+    status: ApprovalFlowInstanceStatus
+    current_step_index: int
+    steps_snapshot: list[dict[str, Any]]
+    action_history: list[dict[str, Any]]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+
+
+class ComplianceDecisionRecordRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    source: str
+    entity_type: str
+    entity_id: str
+    decision: ComplianceDecision
+    reason_code: str | None
+    actor_id: str | None
+    detail: dict[str, Any]
     created_at: datetime
 
 
