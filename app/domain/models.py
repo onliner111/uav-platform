@@ -1287,6 +1287,63 @@ class BillingInvoiceStatus(StrEnum):
     VOID = "VOID"
 
 
+class ObservabilitySignalType(StrEnum):
+    LOG = "LOG"
+    METRIC = "METRIC"
+    TRACE = "TRACE"
+
+
+class ObservabilitySignalLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARN = "WARN"
+    ERROR = "ERROR"
+
+
+class ObservabilitySloStatus(StrEnum):
+    HEALTHY = "HEALTHY"
+    BREACHED = "BREACHED"
+
+
+class ObservabilityAlertSeverity(StrEnum):
+    P1 = "P1"
+    P2 = "P2"
+    P3 = "P3"
+
+
+class ObservabilityAlertStatus(StrEnum):
+    OPEN = "OPEN"
+    ACKED = "ACKED"
+    CLOSED = "CLOSED"
+
+
+class ReliabilityBackupRunType(StrEnum):
+    FULL = "FULL"
+    INCREMENTAL = "INCREMENTAL"
+
+
+class ReliabilityBackupRunStatus(StrEnum):
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
+
+class ReliabilityRestoreDrillStatus(StrEnum):
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+
+
+class SecurityInspectionCheckStatus(StrEnum):
+    PASS = "PASS"
+    WARN = "WARN"
+    FAIL = "FAIL"
+
+
+class CapacityDecision(StrEnum):
+    SCALE_OUT = "SCALE_OUT"
+    SCALE_IN = "SCALE_IN"
+    HOLD = "HOLD"
+
+
 class AlertStatus(StrEnum):
     OPEN = "OPEN"
     ACKED = "ACKED"
@@ -2311,6 +2368,302 @@ class BillingInvoiceLine(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class ObservabilitySignal(SQLModel, table=True):
+    __tablename__ = "observability_signals"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_observability_signals_tenant_id_id"),
+        Index("ix_observability_signals_tenant_id_id", "tenant_id", "id"),
+        Index("ix_observability_signals_tenant_type", "tenant_id", "signal_type"),
+        Index("ix_observability_signals_tenant_service_ts", "tenant_id", "service_name", "created_at"),
+        Index("ix_observability_signals_tenant_trace", "tenant_id", "trace_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    signal_type: ObservabilitySignalType = Field(index=True)
+    level: ObservabilitySignalLevel = Field(default=ObservabilitySignalLevel.INFO, index=True)
+    service_name: str = Field(max_length=120, index=True)
+    signal_name: str = Field(max_length=120, index=True)
+    trace_id: str | None = Field(default=None, max_length=120, index=True)
+    span_id: str | None = Field(default=None, max_length=120, index=True)
+    status_code: int | None = Field(default=None, index=True)
+    duration_ms: int | None = Field(default=None, ge=0, index=True)
+    numeric_value: float | None = Field(default=None, index=True)
+    unit: str | None = Field(default=None, max_length=40)
+    message: str | None = Field(default=None, max_length=500)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class ObservabilitySloPolicy(SQLModel, table=True):
+    __tablename__ = "observability_slo_policies"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_observability_slo_policies_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "policy_key",
+            name="uq_observability_slo_policies_tenant_key",
+        ),
+        Index("ix_observability_slo_policies_tenant_id_id", "tenant_id", "id"),
+        Index("ix_observability_slo_policies_tenant_key", "tenant_id", "policy_key"),
+        Index("ix_observability_slo_policies_tenant_service", "tenant_id", "service_name"),
+        Index("ix_observability_slo_policies_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    policy_key: str = Field(max_length=120, index=True)
+    service_name: str = Field(max_length=120, index=True)
+    signal_name: str = Field(default="request", max_length=120, index=True)
+    target_ratio: float = Field(default=0.99, ge=0.0, le=1.0)
+    latency_threshold_ms: int | None = Field(default=None, ge=1)
+    window_minutes: int = Field(default=5, ge=1, le=1440)
+    minimum_samples: int = Field(default=1, ge=1)
+    alert_severity: ObservabilityAlertSeverity = Field(
+        default=ObservabilityAlertSeverity.P2,
+        index=True,
+    )
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class ObservabilityAlertEvent(SQLModel, table=True):
+    __tablename__ = "observability_alert_events"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_observability_alert_events_tenant_id_id"),
+        Index("ix_observability_alert_events_tenant_id_id", "tenant_id", "id"),
+        Index("ix_observability_alert_events_tenant_status", "tenant_id", "status"),
+        Index("ix_observability_alert_events_tenant_source", "tenant_id", "source"),
+        Index("ix_observability_alert_events_tenant_created", "tenant_id", "created_at"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    source: str = Field(max_length=50, index=True)
+    severity: ObservabilityAlertSeverity = Field(default=ObservabilityAlertSeverity.P2, index=True)
+    status: ObservabilityAlertStatus = Field(default=ObservabilityAlertStatus.OPEN, index=True)
+    title: str = Field(max_length=200)
+    message: str = Field(max_length=500)
+    policy_id: str | None = Field(default=None, index=True)
+    target: str | None = Field(default=None, max_length=200, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    acked_at: datetime | None = Field(default=None, index=True)
+    closed_at: datetime | None = Field(default=None, index=True)
+
+
+class ObservabilitySloEvaluation(SQLModel, table=True):
+    __tablename__ = "observability_slo_evaluations"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_observability_slo_evaluations_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "policy_id"],
+            ["observability_slo_policies.tenant_id", "observability_slo_policies.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_observability_slo_evaluations_tenant_id_id", "tenant_id", "id"),
+        Index("ix_observability_slo_evaluations_tenant_policy", "tenant_id", "policy_id"),
+        Index("ix_observability_slo_evaluations_tenant_status", "tenant_id", "status"),
+        Index("ix_observability_slo_evaluations_tenant_window", "tenant_id", "window_start", "window_end"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    policy_id: str = Field(index=True)
+    window_start: datetime = Field(index=True)
+    window_end: datetime = Field(index=True)
+    total_samples: int = Field(default=0, ge=0)
+    good_samples: int = Field(default=0, ge=0)
+    availability_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    error_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
+    p95_latency_ms: int | None = Field(default=None, ge=0)
+    status: ObservabilitySloStatus = Field(default=ObservabilitySloStatus.HEALTHY, index=True)
+    alert_triggered: bool = Field(default=False, index=True)
+    alert_event_id: str | None = Field(default=None, index=True)
+    oncall_target: str | None = Field(default=None, max_length=200)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class ReliabilityBackupRun(SQLModel, table=True):
+    __tablename__ = "reliability_backup_runs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_reliability_backup_runs_tenant_id_id"),
+        Index("ix_reliability_backup_runs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_reliability_backup_runs_tenant_status", "tenant_id", "status"),
+        Index("ix_reliability_backup_runs_tenant_created", "tenant_id", "created_at"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    run_type: ReliabilityBackupRunType = Field(default=ReliabilityBackupRunType.FULL, index=True)
+    status: ReliabilityBackupRunStatus = Field(default=ReliabilityBackupRunStatus.SUCCESS, index=True)
+    storage_uri: str | None = Field(default=None, max_length=300)
+    checksum: str | None = Field(default=None, max_length=120)
+    is_drill: bool = Field(default=False, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    triggered_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    completed_at: datetime | None = Field(default=None, index=True)
+
+
+class ReliabilityRestoreDrill(SQLModel, table=True):
+    __tablename__ = "reliability_restore_drills"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_reliability_restore_drills_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "backup_run_id"],
+            ["reliability_backup_runs.tenant_id", "reliability_backup_runs.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_reliability_restore_drills_tenant_id_id", "tenant_id", "id"),
+        Index("ix_reliability_restore_drills_tenant_backup", "tenant_id", "backup_run_id"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    backup_run_id: str = Field(index=True)
+    status: ReliabilityRestoreDrillStatus = Field(default=ReliabilityRestoreDrillStatus.PASSED, index=True)
+    objective_rto_seconds: int = Field(default=300, ge=1)
+    actual_rto_seconds: int = Field(default=0, ge=0)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    executed_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class SecurityInspectionRun(SQLModel, table=True):
+    __tablename__ = "security_inspection_runs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_security_inspection_runs_tenant_id_id"),
+        Index("ix_security_inspection_runs_tenant_id_id", "tenant_id", "id"),
+        Index("ix_security_inspection_runs_tenant_created", "tenant_id", "created_at"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    baseline_version: str = Field(default="phase25-v1", max_length=50)
+    total_checks: int = Field(default=0, ge=0)
+    passed_checks: int = Field(default=0, ge=0)
+    warned_checks: int = Field(default=0, ge=0)
+    failed_checks: int = Field(default=0, ge=0)
+    score_percent: float = Field(default=100.0, ge=0.0, le=100.0)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    executed_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class SecurityInspectionItem(SQLModel, table=True):
+    __tablename__ = "security_inspection_items"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_security_inspection_items_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "run_id"],
+            ["security_inspection_runs.tenant_id", "security_inspection_runs.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_security_inspection_items_tenant_id_id", "tenant_id", "id"),
+        Index("ix_security_inspection_items_tenant_run", "tenant_id", "run_id"),
+        Index("ix_security_inspection_items_tenant_status", "tenant_id", "status"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    run_id: str = Field(index=True)
+    check_key: str = Field(max_length=120, index=True)
+    status: SecurityInspectionCheckStatus = Field(default=SecurityInspectionCheckStatus.PASS, index=True)
+    message: str = Field(max_length=500)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class CapacityPolicy(SQLModel, table=True):
+    __tablename__ = "capacity_policies"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_capacity_policies_tenant_id_id"),
+        UniqueConstraint("tenant_id", "meter_key", name="uq_capacity_policies_tenant_meter_key"),
+        Index("ix_capacity_policies_tenant_id_id", "tenant_id", "id"),
+        Index("ix_capacity_policies_tenant_meter", "tenant_id", "meter_key"),
+        Index("ix_capacity_policies_tenant_active", "tenant_id", "is_active"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    meter_key: str = Field(max_length=120, index=True)
+    target_utilization_pct: int = Field(default=75, ge=1, le=100)
+    scale_out_threshold_pct: int = Field(default=85, ge=1, le=100)
+    scale_in_threshold_pct: int = Field(default=55, ge=1, le=100)
+    min_replicas: int = Field(default=1, ge=1)
+    max_replicas: int = Field(default=10, ge=1)
+    current_replicas: int = Field(default=1, ge=1)
+    is_active: bool = Field(default=True, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    updated_by: str = Field(index=True)
+    created_at: datetime = Field(default_factory=now_utc, index=True)
+    updated_at: datetime = Field(default_factory=now_utc, index=True)
+
+
+class CapacityForecast(SQLModel, table=True):
+    __tablename__ = "capacity_forecasts"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_capacity_forecasts_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "policy_id"],
+            ["capacity_policies.tenant_id", "capacity_policies.id"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_capacity_forecasts_tenant_id_id", "tenant_id", "id"),
+        Index("ix_capacity_forecasts_tenant_policy", "tenant_id", "policy_id"),
+        Index("ix_capacity_forecasts_tenant_meter", "tenant_id", "meter_key"),
+        Index("ix_capacity_forecasts_tenant_generated", "tenant_id", "generated_at"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    tenant_id: str = Field(foreign_key="tenants.id", index=True)
+    policy_id: str = Field(index=True)
+    meter_key: str = Field(max_length=120, index=True)
+    window_start: datetime = Field(index=True)
+    window_end: datetime = Field(index=True)
+    predicted_usage: float = Field(default=0.0, ge=0.0)
+    recommended_replicas: int = Field(default=1, ge=1)
+    decision: CapacityDecision = Field(default=CapacityDecision.HOLD, index=True)
+    detail: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    generated_at: datetime = Field(default_factory=now_utc, index=True)
 
 
 class Command(BaseModel):
@@ -3937,6 +4290,265 @@ class BillingInvoiceCloseRequest(BaseModel):
 
 class BillingInvoiceVoidRequest(BaseModel):
     reason: str | None = None
+
+
+class ObservabilitySignalIngestItem(BaseModel):
+    signal_type: ObservabilitySignalType
+    level: ObservabilitySignalLevel = ObservabilitySignalLevel.INFO
+    service_name: str
+    signal_name: str
+    trace_id: str | None = None
+    span_id: str | None = None
+    status_code: int | None = None
+    duration_ms: int | None = PydanticField(default=None, ge=0)
+    numeric_value: float | None = None
+    unit: str | None = None
+    message: str | None = None
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+    occurred_at: datetime = PydanticField(default_factory=now_utc)
+
+
+class ObservabilitySignalIngestRequest(BaseModel):
+    items: list[ObservabilitySignalIngestItem] = PydanticField(default_factory=list, min_length=1)
+
+
+class ObservabilitySignalRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    signal_type: ObservabilitySignalType
+    level: ObservabilitySignalLevel
+    service_name: str
+    signal_name: str
+    trace_id: str | None
+    span_id: str | None
+    status_code: int | None
+    duration_ms: int | None
+    numeric_value: float | None
+    unit: str | None
+    message: str | None
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+
+
+class ObservabilitySignalIngestRead(BaseModel):
+    accepted_count: int
+    signals: list[ObservabilitySignalRead]
+
+
+class ObservabilityOverviewRead(BaseModel):
+    window_minutes: int
+    total_signals: int
+    error_signals: int
+    p95_latency_ms: int | None
+    by_type: dict[str, int]
+    by_level: dict[str, int]
+    computed_at: datetime = PydanticField(default_factory=now_utc)
+
+
+class ObservabilitySloPolicyCreate(BaseModel):
+    policy_key: str
+    service_name: str
+    signal_name: str = "request"
+    target_ratio: float = PydanticField(default=0.99, ge=0.0, le=1.0)
+    latency_threshold_ms: int | None = PydanticField(default=None, ge=1)
+    window_minutes: int = PydanticField(default=5, ge=1, le=1440)
+    minimum_samples: int = PydanticField(default=1, ge=1)
+    alert_severity: ObservabilityAlertSeverity = ObservabilityAlertSeverity.P2
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class ObservabilitySloPolicyRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    policy_key: str
+    service_name: str
+    signal_name: str
+    target_ratio: float
+    latency_threshold_ms: int | None
+    window_minutes: int
+    minimum_samples: int
+    alert_severity: ObservabilityAlertSeverity
+    is_active: bool
+    detail: dict[str, Any]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ObservabilitySloEvaluateRequest(BaseModel):
+    policy_ids: list[str] = PydanticField(default_factory=list)
+    window_minutes: int | None = PydanticField(default=None, ge=1, le=1440)
+    dry_run: bool = False
+
+
+class ObservabilityAlertEventRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    source: str
+    severity: ObservabilityAlertSeverity
+    status: ObservabilityAlertStatus
+    title: str
+    message: str
+    policy_id: str | None
+    target: str | None
+    detail: dict[str, Any]
+    created_at: datetime
+    acked_at: datetime | None
+    closed_at: datetime | None
+
+
+class ObservabilitySloEvaluationRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    policy_id: str
+    window_start: datetime
+    window_end: datetime
+    total_samples: int
+    good_samples: int
+    availability_ratio: float
+    error_ratio: float
+    p95_latency_ms: int | None
+    status: ObservabilitySloStatus
+    alert_triggered: bool
+    alert_event_id: str | None
+    oncall_target: str | None
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class ObservabilitySloEvaluateResultRead(BaseModel):
+    evaluated_count: int
+    breached_count: int
+    alerts_created: int
+    items: list[ObservabilitySloEvaluationRead]
+
+
+class ObservabilitySloOverviewRead(BaseModel):
+    policy_count: int
+    healthy_count: int
+    breached_count: int
+    latest_evaluated_at: datetime | None
+    items: list[ObservabilitySloEvaluationRead]
+
+
+class ReliabilityBackupRunRequest(BaseModel):
+    run_type: ReliabilityBackupRunType = ReliabilityBackupRunType.FULL
+    storage_uri: str | None = None
+    is_drill: bool = False
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class ReliabilityBackupRunRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    run_type: ReliabilityBackupRunType
+    status: ReliabilityBackupRunStatus
+    storage_uri: str | None
+    checksum: str | None
+    is_drill: bool
+    detail: dict[str, Any]
+    triggered_by: str
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class ReliabilityRestoreDrillRequest(BaseModel):
+    objective_rto_seconds: int = PydanticField(default=300, ge=1)
+    simulated_restore_seconds: int = PydanticField(default=120, ge=0)
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class ReliabilityRestoreDrillRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    backup_run_id: str
+    status: ReliabilityRestoreDrillStatus
+    objective_rto_seconds: int
+    actual_rto_seconds: int
+    detail: dict[str, Any]
+    executed_by: str
+    created_at: datetime
+
+
+class SecurityInspectionRunRequest(BaseModel):
+    baseline_version: str = "phase25-v1"
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class SecurityInspectionItemRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    run_id: str
+    check_key: str
+    status: SecurityInspectionCheckStatus
+    message: str
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class SecurityInspectionRunRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    baseline_version: str
+    total_checks: int
+    passed_checks: int
+    warned_checks: int
+    failed_checks: int
+    score_percent: float
+    detail: dict[str, Any]
+    executed_by: str
+    created_at: datetime
+    items: list[SecurityInspectionItemRead] = PydanticField(default_factory=list)
+
+
+class CapacityPolicyUpsertRequest(BaseModel):
+    target_utilization_pct: int = PydanticField(default=75, ge=1, le=100)
+    scale_out_threshold_pct: int = PydanticField(default=85, ge=1, le=100)
+    scale_in_threshold_pct: int = PydanticField(default=55, ge=1, le=100)
+    min_replicas: int = PydanticField(default=1, ge=1)
+    max_replicas: int = PydanticField(default=10, ge=1)
+    current_replicas: int = PydanticField(default=1, ge=1)
+    is_active: bool = True
+    detail: dict[str, Any] = PydanticField(default_factory=dict)
+
+
+class CapacityPolicyRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    meter_key: str
+    target_utilization_pct: int
+    scale_out_threshold_pct: int
+    scale_in_threshold_pct: int
+    min_replicas: int
+    max_replicas: int
+    current_replicas: int
+    is_active: bool
+    detail: dict[str, Any]
+    updated_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CapacityForecastRequest(BaseModel):
+    meter_key: str
+    window_minutes: int = PydanticField(default=60, ge=5, le=1440)
+    sample_minutes: int = PydanticField(default=180, ge=5, le=10080)
+
+
+class CapacityForecastRead(ORMReadModel):
+    id: str
+    tenant_id: str
+    policy_id: str
+    meter_key: str
+    window_start: datetime
+    window_end: datetime
+    predicted_usage: float
+    recommended_replicas: int
+    decision: CapacityDecision
+    detail: dict[str, Any]
+    generated_at: datetime
 
 
 class KpiSnapshotRecomputeRequest(BaseModel):

@@ -56,16 +56,16 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-27T17:51:44Z`
+- updated_at_utc: `2026-02-28T19:44:53Z`
 - current_phase: `phase-25-observability-reliability.md`
-- phase_status: `READY`
-- last_success_phase: `phase-24-billing-quota-system.md`
-- current_focus: `Phase 24 is DONE with full closeout gates; next phase is 25-WP1 when explicitly started`
+- phase_status: `DONE`
+- last_success_phase: `phase-25-observability-reliability.md`
+- current_focus: `Phase 25 is DONE with full closeout gates and checkpoint is closed at final phase`
 
 ## Next TODO (Execution Target)
-1. Start Phase 25 from `25-WP1`, then execute `25-WP2 -> 25-WP3 -> P2 -> 25-WP4`.
-2. Keep Docker Compose baseline gate commands below as regression checklist for each new phase.
-3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> phase-defined closeout WP`) for all future phases.
+1. Keep Docker Compose baseline gate commands below as regression checklist for any post-phase change.
+2. If roadmap extends beyond Phase 25, set `phases/state.md` to the new phase with `status=READY` before implementation.
+3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> phase-defined closeout WP`) for future phases.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -78,6 +78,7 @@ Use Docker Compose commands directly in this environment:
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_phase08_integration.py`
+- `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase25_observability_reliability.py`
 
 ## Docker Permission Rule (Mandatory)
 - For all Docker-related quality-gate commands in this environment, run with escalated permissions by default.
@@ -91,4 +92,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 status=READY，current_phase=phase-25-observability-reliability.md；开始执行 Phase 25（从 25-WP1 开始，随后 25-WP2 -> 25-WP3 -> P2 -> 25-WP4），通过全量门禁后关账并停止。`
+`先读取 phases/resume.md 和 phases/state.md。当前 status=DONE，last_success_phase=phase-25-observability-reliability.md；如有新增 roadmap phase，先更新 checkpoint 到 READY，再按 P0->P1->P2->WP4 执行并通过全量门禁。`

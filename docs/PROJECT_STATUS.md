@@ -6,15 +6,15 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-25-observability-reliability.md (READY; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 24 closeout completed (`24-WP1`..`24-WP4`), waiting explicit start for Phase 25
-- Next Target: start `25-WP1`, then `25-WP2 -> 25-WP3 -> P2 -> 25-WP4`
+- Current Phase: phase-25-observability-reliability.md (DONE; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 25 closeout completed (`25-WP1`..`25-WP4`)
+- Next Target: wait for next roadmap phase; keep baseline quality gates as regression checklist
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-27T17:51:44Z
+> Last verified at (UTC): 2026-02-28T19:44:53Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> Closeout note (2026-02-27T17:51:44Z): Phase 24 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase24_billing_quota.py`), and checkpoint advanced to `phase-25-observability-reliability.md` (`READY`).
+> Closeout note (2026-02-28T19:44:53Z): Phase 25 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`), and checkpoint status moved to `DONE`.
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
 - mypy: PASS (`docker compose ... app mypy app`)
@@ -42,8 +42,10 @@
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase16_saas_console_ui.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase23_ai_model_governance_v2.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase24_billing_quota.py
+  - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase25_observability_reliability.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_phase08_integration.py
   - docker compose -f infra/docker-compose.yml run --rm --build app pytest -q tests/test_billing.py
+  - docker compose -f infra/docker-compose.yml run --rm --build app pytest -q tests/test_observability.py
 
 ## 4. Completed Phases（已完成阶段）
 > 只记录“通过门禁”的阶段；每条必须带 revision / 时间 / 证据
@@ -81,6 +83,7 @@
 - phase-22-alert-oncall-notification-v2.md: DONE
 - phase-23-ai-model-governance-v2.md: DONE
 - phase-24-billing-quota-system.md: DONE
+- phase-25-observability-reliability.md: DONE
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
@@ -117,10 +120,12 @@
 - 22-WP1/22-WP2/22-WP3 artifacts are present: oncall/escalation model + APIs (`AlertOncallShift`, `AlertEscalationPolicy`, `AlertEscalationExecution`; `/api/alert/oncall/shifts*`, `/api/alert/escalation-policies*`, `/api/alert/alerts:escalation-run`), alert routing dynamic target resolution (`oncall://active`) and escalation triggers (`ACK_TIMEOUT`, `REPEAT_TRIGGER`, `SHIFT_HANDOVER`) in `app/services/alert_service.py`, minimal multi-channel dispatch (`IN_APP` + simulated `WEBHOOK`) and route receipt API (`POST /api/alert/routes/{route_log_id}:receipt`), aggregation/silence/SLA APIs (`/api/alert/aggregation-rules*`, `/api/alert/silence-rules*`, `/api/alert/sla/overview`) plus noise suppression optimization event (`alert.noise_suppressed`), migration chain `202602270086/087/088/089/090/091`, regression coverage (`tests/test_alert.py`, `tests/test_alert_oncall.py`, `tests/test_alert_phase22_wp3.py`), and phase demo (`infra/scripts/demo_phase22_alert_oncall_notification_v2.py`).
 - 23-WP1/23-WP2/23-WP3 artifacts are present: model-governance entities/API (`AiModelCatalog`, `AiModelVersion`, `AiModelRolloutPolicy`; `/api/ai/models*`, `/api/ai/models/{model_id}/versions*`, promote action), rollout-policy and threshold governance (`GET/PUT /api/ai/models/{model_id}/rollout-policy`, `POST /api/ai/jobs/{job_id}:bind-model-version`, forced version/threshold override in run trigger), evaluation/rollback/scheduled tick chain (`POST /api/ai/evaluations:recompute`, `GET /api/ai/evaluations/compare`, `POST /api/ai/models/{model_id}/rollout-policy:rollback`, `POST /api/ai/jobs:schedule-tick`), migration chain `202602270092/093/094`, regression coverage (`tests/test_ai_assistant.py`), and phase demo (`infra/scripts/demo_phase23_ai_model_governance_v2.py`).
 - 24-WP1/24-WP2/24-WP3 artifacts are present: billing plan/subscription/quota model and APIs (`/api/billing/plans*`, `/api/billing/tenants/{tenant_id}/subscriptions*`, `/api/billing/tenants/{tenant_id}/quotas*`), usage ingest/summary/quota-check chain (`POST /api/billing/usage:ingest`, `GET /api/billing/tenants/{tenant_id}/usage/summary`, `POST /api/billing/tenants/{tenant_id}/quotas:check`), invoice governance APIs (`POST /api/billing/invoices:generate`, `GET /api/billing/invoices/{invoice_id}`, `POST /api/billing/invoices/{invoice_id}:close`, `POST /api/billing/invoices/{invoice_id}:void`), migration chain `202602270095/096/097/098/099/100/101/102/103`, regression coverage (`tests/test_billing.py`), and phase demo/report (`infra/scripts/demo_phase24_billing_quota.py`, `logs/phase-24-billing-quota-system.md.report.md`).
+- 25-WP1/25-WP2/25-WP3 artifacts are present: observability/reliability domain and APIs (`app/services/observability_service.py`, `app/api/routers/observability.py`) covering signal ingest/query/overview (`/api/observability/signals*`, `/api/observability/overview`), SLO policy/evaluation/alerts (`/api/observability/slo*`, `/api/observability/alerts`), backup + restore drill + security inspection (`/api/observability/backups*`, `/api/observability/security-inspections*`), and capacity governance/forecast (`/api/observability/capacity*`); permission additions (`observability.read`, `observability.write`), migration chain `202602280104/105/106/107/108/109/110/111/112`, regression coverage (`tests/test_observability.py`), and phase demo/report (`infra/scripts/demo_phase25_observability_reliability.py`, `logs/phase-25-observability-reliability.md.report.md`).
 
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-28T19:44:53Z (UTC): Phase 25 closed as DONE (`25-WP1`..`25-WP4`). Delivered observability/reliability chain with unified signal ingest/query/overview, SLO policy/evaluation and auto-alert routing, backup run + restore drill flow, security inspection run/report flow, and capacity policy/forecast APIs. Added migration chain `202602280104/105/106/107/108/109/110/111/112`, demo `infra/scripts/demo_phase25_observability_reliability.py`, and regression coverage `tests/test_observability.py`; generated report `logs/phase-25-observability-reliability.md.report.md`, completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, phase25 demo), and moved checkpoint status to `DONE`.
 - 2026-02-27T17:51:44Z (UTC): Phase 24 closed as DONE (`24-WP1`..`24-WP4`). Delivered billing plan/subscription/quota governance, usage ingest/summary/quota-check chain, invoice lifecycle APIs (generate/list/detail/close/void), migration chain `202602270095/096/097/098/099/100/101/102/103`, and demo `infra/scripts/demo_phase24_billing_quota.py`; generated report `logs/phase-24-billing-quota-system.md.report.md`, completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, phase24 demo), and advanced checkpoint to `phase-25-observability-reliability.md` (`READY`).
 - 2026-02-27T17:03:04Z (UTC): Phase 24 RUNNING regression refresh completed after `24-WP1` + `24-WP2` delivery. Broad checks passed via Docker Compose (`ruff check app tests infra/scripts`, `mypy app`, full `pytest -q`, `alembic upgrade head`); checkpoint remains `phase-24-billing-quota-system.md` (`RUNNING`), next execution focus is `24-WP3`.
 - 2026-02-27T16:41:51Z (UTC): Phase 24 moved to RUNNING and completed `24-WP1` + `24-WP2` minimal chain. Delivered billing governance base (`BillingPlanCatalog`, `BillingPlanQuota`, `TenantSubscription`, `TenantQuotaOverride`) with APIs for plan/subscription/quota override/snapshot, added usage ingest idempotency and daily aggregation (`BillingUsageEvent`, `BillingUsageAggregateDaily`) plus usage summary and explicit quota-check APIs, and introduced billing permissions (`billing.read`, `billing.write`). Landed migration chain `202602270095/096/097/098/099/100`, added regression coverage `tests/test_billing.py`, and passed targeted verification via Docker Compose (`ruff`, `mypy`, `pytest -q tests/test_billing.py`, `pytest -q tests/test_ai_assistant.py tests/test_billing.py`, `alembic upgrade head`).

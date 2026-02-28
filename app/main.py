@@ -23,6 +23,7 @@ from app.api.routers import (
     kpi,
     map_router,
     mission,
+    observability,
     open_platform,
     outcomes,
     registry,
@@ -70,6 +71,7 @@ app.include_router(dashboard.ws_router, tags=["dashboard-ws"])
 app.include_router(approval.router, prefix="/api/approvals", tags=["approvals"])
 app.include_router(reporting.router, prefix="/api/reporting", tags=["reporting"])
 app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
+app.include_router(observability.router, prefix="/api/observability", tags=["observability"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(kpi.router, prefix="/api/kpi", tags=["kpi"])
 app.include_router(open_platform.router, prefix="/api/open-platform", tags=["open-platform"])
