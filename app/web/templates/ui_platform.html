@@ -1,0 +1,199 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Tenants</div>
+    <div class="value">{{ tenants|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Users</div>
+    <div class="value">{{ users|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Roles</div>
+    <div class="value">{{ roles|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Org Units</div>
+    <div class="value">{{ org_units|length }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Tenant</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in tenants %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Users</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Active</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in users %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.username }}</td>
+          <td>{{ item.is_active }}</td>
+          <td>{{ item.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Roles</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Description</th>
+          <th>System</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in roles %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.description or "-" }}</td>
+          <td>{{ item.is_system }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Organization Units</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Parent</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in org_units %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.node_type }}</td>
+          <td>{{ item.parent_id or "-" }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Role Templates</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Template Key</th>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Permissions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in role_templates %}
+        <tr>
+          <td><code>{{ item.template_key }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.description or "-" }}</td>
+          <td>{{ item.permission_names|length }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>RBAC UI Visibility Matrix</h2>
+  <p class="hint">Page-level and action-level visibility is determined by explicit read/write permissions.</p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Group</th>
+          <th>Page</th>
+          <th>Route</th>
+          <th>Page Permission</th>
+          <th>Write Permission</th>
+          <th>Write Actions</th>
+          <th>View</th>
+          <th>Write</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in visibility_matrix %}
+        <tr>
+          <td>{{ item.group }}</td>
+          <td>{{ item.page }}</td>
+          <td><code>{{ item.route }}</code></td>
+          <td><code>{{ item.page_permission }}</code></td>
+          <td><code>{{ item.write_permission }}</code></td>
+          <td>{{ item.write_actions }}</td>
+          <td><span class="status-pill {% if not item.can_view %}danger{% endif %}">{% if item.can_view %}ALLOW{% else %}DENY{% endif %}</span></td>
+          <td><span class="status-pill {% if item.can_write %}warn{% else %}danger{% endif %}">{% if item.can_write %}ALLOW{% else %}DENY{% endif %}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Governance Shortcuts</h2>
+  <div class="hero-actions">
+    <a class="button-link ghost-link" href="/api/identity/role-templates" target="_blank" rel="noopener noreferrer">Role Templates API</a>
+    <a class="button-link ghost-link" href="/api/identity/permissions" target="_blank" rel="noopener noreferrer">Permissions API</a>
+    <a class="button-link ghost-link" href="/api/tenants/{{ tenant_id }}/export" target="_blank" rel="noopener noreferrer">Tenant Export</a>
+  </div>
+  {% if can_identity_write %}
+  <p class="hint">This account has <code>identity.write</code> and can perform mutating governance operations via API/UI actions.</p>
+  {% endif %}
+</div>
+{% endblock %}

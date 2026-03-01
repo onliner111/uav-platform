@@ -2,7 +2,14 @@
 
 {% block content %}
 <div class="panel">
-  <h2>Defect List</h2>
+  <div class="ui-section-head">
+    <h2>Defect List</h2>
+    <div class="ui-action-row">
+      <a class="console-link" href="/ui/inspection">Inspection Board</a>
+      <a class="console-link" href="/ui/task-center">Task Center</a>
+      <a class="console-link" href="/ui/emergency">Emergency</a>
+    </div>
+  </div>
   <table>
     <thead>
       <tr>
@@ -11,16 +18,27 @@
         <th>Status</th>
         <th>Assigned</th>
         <th>Observation</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody>
       {% for item in defects %}
       <tr>
-        <td>{{ item.id }}</td>
+        <td><code>{{ item.id }}</code></td>
         <td>{{ item.severity }}</td>
         <td>{{ item.status }}</td>
         <td>{{ item.assigned_to }}</td>
-        <td>{{ item.observation_id }}</td>
+        <td><code>{{ item.observation_id }}</code></td>
+        <td>
+          <button
+            type="button"
+            class="js-prefill-defect"
+            data-defect-id="{{ item.id }}"
+            data-observation-id="{{ item.observation_id }}"
+          >
+            Select
+          </button>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -39,11 +57,13 @@
       <input id="assigned-to" placeholder="user id">
     </div>
   </div>
+  <label style="margin-top:8px;">Assign Note</label>
+  <input id="assign-note" placeholder="optional note">
   <div class="grid cols-2" style="margin-top:12px;">
-    <button id="assign-btn">Assign</button>
+    <button id="assign-btn" {% if not can_defect_write %}disabled{% endif %}>Assign</button>
     <div>
       <label>New Status</label>
-      <select id="next-status">
+      <select id="next-status" {% if not can_defect_write %}disabled{% endif %}>
         <option>ASSIGNED</option>
         <option>IN_PROGRESS</option>
         <option>FIXED</option>
@@ -52,8 +72,28 @@
       </select>
     </div>
   </div>
-  <button id="status-btn" style="margin-top:10px;">Update Status</button>
-  <div class="hint" id="defect-result"></div>
+  <label style="margin-top:8px;">Status Note</label>
+  <input id="status-note" placeholder="optional note" {% if not can_defect_write %}disabled{% endif %}>
+  <button id="status-btn" style="margin-top:10px;" {% if not can_defect_write %}disabled{% endif %}>Update Status</button>
+  {% if not can_defect_write %}
+  <p class="hint">`defect.write` permission is required for assign/status actions.</p>
+  {% endif %}
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Load Detail</h3>
+      <label>Defect ID</label>
+      <input id="defect-detail-id" placeholder="defect id">
+      <button id="defect-detail-btn" type="button" style="margin-top:10px;">Load Detail</button>
+    </div>
+    <div>
+      <h3>Cross-link</h3>
+      <label>Observation ID</label>
+      <input id="defect-observation-id" placeholder="observation id">
+      <a class="console-link" href="/ui/inspection" style="display:inline-block; margin-top:10px;">Go To Inspection</a>
+    </div>
+  </div>
+  <pre id="defect-detail-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No detail loaded.</pre>
+  <div class="hint action-result" id="defect-result" role="status" aria-live="polite"></div>
 </div>
 {% endblock %}
 

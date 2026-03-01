@@ -44,6 +44,12 @@ Codex MUST execute phases sequentially.
 34. phase-23-ai-model-governance-v2.md
 35. phase-24-billing-quota-system.md
 36. phase-25-observability-reliability.md
+37. phase-26-ui-information-architecture-design-system.md
+38. phase-27-operations-ui-workflow-closure.md
+39. phase-28-compliance-alert-operations-workbench.md
+40. phase-29-data-ai-governance-ui.md
+41. phase-30-commercial-platform-ops-ui.md
+42. phase-31-observability-reliability-ops-console.md
 
 ---
 

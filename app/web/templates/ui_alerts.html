@@ -1,0 +1,432 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Open Alerts</div>
+    <div class="value">{{ alert_status_counts.get("OPEN", 0) }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Acked Alerts</div>
+    <div class="value">{{ alert_status_counts.get("ACKED", 0) }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Closed Alerts</div>
+    <div class="value">{{ alert_status_counts.get("CLOSED", 0) }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Oncall / Escalation</div>
+    <div class="value">{{ oncall_shifts|length }} / {{ escalation_policies|length }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="ui-section-head">
+    <h2>Alert Queue</h2>
+    <form method="get" action="/ui/alerts" class="ui-action-row">
+      <input type="hidden" name="token" value="{{ token }}">
+      <select name="alert_status" aria-label="Filter by alert status">
+        <option value="">All Status</option>
+        {% for item in alert_status_options %}
+        <option value="{{ item }}" {% if selected_alert_status == item %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+      <input name="drone_id" value="{{ selected_alert_drone }}" placeholder="drone id">
+      <button type="submit">Apply Filter</button>
+    </form>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Drone</th>
+          <th>Type</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Last Seen</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in alerts %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.drone_id }}</td>
+          <td>{{ item.alert_type }}</td>
+          <td>{{ item.priority_level }}</td>
+          <td><span class="status-pill">{{ item.status }}</span></td>
+          <td>{{ item.last_seen_at }}</td>
+          <td>
+            <button type="button" class="js-alert-select" data-alert-id="{{ item.id }}">Select</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Operations</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Acknowledge Alert</h3>
+      <label>Alert ID</label>
+      <input id="alert-ack-id" placeholder="alert id">
+      <label style="margin-top:8px;">Comment</label>
+      <input id="alert-ack-comment" placeholder="optional comment">
+      <button id="alert-ack-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Ack</button>
+    </div>
+    <div>
+      <h3>Close Alert</h3>
+      <label>Alert ID</label>
+      <input id="alert-close-id" placeholder="alert id">
+      <label style="margin-top:8px;">Comment</label>
+      <input id="alert-close-comment" placeholder="optional comment">
+      <button id="alert-close-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Close</button>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Create Routing Rule</h3>
+      <label>Priority</label>
+      <select id="routing-priority">
+        {% for item in alert_priority_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Alert Type (optional)</label>
+      <select id="routing-type">
+        <option value="">ALL</option>
+        {% for item in alert_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Channel</label>
+      <select id="routing-channel">
+        {% for item in alert_channel_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Target</label>
+      <input id="routing-target" placeholder="oncall://active or user id">
+      <button id="routing-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Create Routing Rule</button>
+    </div>
+    <div>
+      <h3>Create Oncall Shift</h3>
+      <label>Shift Name</label>
+      <input id="oncall-name" value="day-shift">
+      <label style="margin-top:8px;">Target</label>
+      <input id="oncall-target" value="oncall://active">
+      <label style="margin-top:8px;">Starts At (ISO)</label>
+      <input id="oncall-starts-at" placeholder="2026-03-01T00:00:00Z">
+      <label style="margin-top:8px;">Ends At (ISO)</label>
+      <input id="oncall-ends-at" placeholder="2026-03-01T08:00:00Z">
+      <label style="margin-top:8px;">Timezone</label>
+      <input id="oncall-timezone" value="UTC">
+      <button id="oncall-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Create Shift</button>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Create Escalation Policy</h3>
+      <label>Priority</label>
+      <select id="escalation-priority">
+        {% for item in alert_priority_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Ack Timeout (seconds)</label>
+      <input id="escalation-ack-timeout" type="number" min="30" value="1800">
+      <label style="margin-top:8px;">Repeat Threshold</label>
+      <input id="escalation-repeat-threshold" type="number" min="2" value="3">
+      <label style="margin-top:8px;">Max Escalation Level</label>
+      <input id="escalation-max-level" type="number" min="1" value="1">
+      <label style="margin-top:8px;">Channel</label>
+      <select id="escalation-channel">
+        {% for item in alert_channel_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Target</label>
+      <input id="escalation-target" value="oncall://active">
+      <button id="escalation-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Create Policy</button>
+    </div>
+    <div>
+      <h3>Escalation Run</h3>
+      <label>Dry Run</label>
+      <select id="escalation-run-dry">
+        <option value="false">false</option>
+        <option value="true">true</option>
+      </select>
+      <label style="margin-top:8px;">Limit</label>
+      <input id="escalation-run-limit" type="number" min="1" max="1000" value="200">
+      <button id="escalation-run-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Run Escalation</button>
+      <pre id="escalation-run-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No run result.</pre>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Create Silence Rule</h3>
+      <label>Name</label>
+      <input id="silence-name" value="silent-window">
+      <label style="margin-top:8px;">Alert Type (optional)</label>
+      <select id="silence-type">
+        <option value="">ALL</option>
+        {% for item in alert_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Drone ID (optional)</label>
+      <input id="silence-drone-id" placeholder="drone id">
+      <label style="margin-top:8px;">Starts At (optional ISO)</label>
+      <input id="silence-starts-at" placeholder="2026-03-01T00:00:00Z">
+      <label style="margin-top:8px;">Ends At (optional ISO)</label>
+      <input id="silence-ends-at" placeholder="2026-03-01T08:00:00Z">
+      <button id="silence-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Create Silence Rule</button>
+    </div>
+    <div>
+      <h3>Create Aggregation Rule</h3>
+      <label>Name</label>
+      <input id="aggregation-name" value="aggregation-rule">
+      <label style="margin-top:8px;">Alert Type (optional)</label>
+      <select id="aggregation-type">
+        <option value="">ALL</option>
+        {% for item in alert_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Window Seconds</label>
+      <input id="aggregation-window" type="number" min="10" value="300">
+      <button id="aggregation-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Create Aggregation Rule</button>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Load Routes / Actions / Review</h3>
+      <label>Alert ID</label>
+      <input id="alert-review-id" placeholder="alert id">
+      <div class="ui-action-row" style="margin-top:10px;">
+        <button id="alert-routes-btn" type="button">Routes</button>
+        <button id="alert-actions-btn" type="button">Actions</button>
+        <button id="alert-review-btn" type="button">Review</button>
+      </div>
+      <pre id="alert-review-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No data loaded.</pre>
+    </div>
+    <div>
+      <h3>Add Handling Action</h3>
+      <label>Alert ID</label>
+      <input id="alert-action-id" placeholder="alert id">
+      <label style="margin-top:8px;">Action Type</label>
+      <select id="alert-action-type" {% if not can_alert_write %}disabled{% endif %}>
+        {% for item in alert_action_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Note</label>
+      <input id="alert-action-note" placeholder="optional note" {% if not can_alert_write %}disabled{% endif %}>
+      <button id="alert-action-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Add Action</button>
+      <label style="margin-top:8px;">Route Log ID</label>
+      <input id="route-receipt-id" placeholder="route log id" {% if not can_alert_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Delivery Status</label>
+      <select id="route-receipt-status" {% if not can_alert_write %}disabled{% endif %}>
+        {% for item in alert_delivery_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="route-receipt-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Submit Receipt</button>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>SLA Overview</h3>
+      <label>From (ISO, optional)</label>
+      <input id="sla-from-ts" placeholder="2026-03-01T00:00:00Z">
+      <label style="margin-top:8px;">To (ISO, optional)</label>
+      <input id="sla-to-ts" placeholder="2026-03-01T08:00:00Z">
+      <button id="sla-load-btn" type="button" style="margin-top:10px;">Load SLA</button>
+      <pre id="sla-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No SLA data.</pre>
+    </div>
+    <div>
+      <h3>Batch Close</h3>
+      <label>Alert IDs (one per line)</label>
+      <textarea id="batch-close-ids" rows="5" placeholder="alert-id-a&#10;alert-id-b" {% if not can_alert_write %}disabled{% endif %}></textarea>
+      <label style="margin-top:8px;">Comment</label>
+      <input id="batch-close-comment" placeholder="optional comment" {% if not can_alert_write %}disabled{% endif %}>
+      <button id="batch-close-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>Batch Close</button>
+      {% if not can_alert_write %}
+      <p class="hint">`alert.write` permission is required for write actions.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hint action-result" id="alerts-result" role="status" aria-live="polite"></div>
+</div>
+
+<div class="panel">
+  <h2>Routing Rules</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Priority</th>
+          <th>Alert Type</th>
+          <th>Channel</th>
+          <th>Target</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in routing_rules %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.priority_level }}</td>
+          <td>{{ item.alert_type or "-" }}</td>
+          <td>{{ item.channel }}</td>
+          <td>{{ item.target }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Oncall Shifts</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Target</th>
+          <th>Starts</th>
+          <th>Ends</th>
+          <th>Timezone</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in oncall_shifts %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.shift_name }}</td>
+          <td>{{ item.target }}</td>
+          <td>{{ item.starts_at }}</td>
+          <td>{{ item.ends_at }}</td>
+          <td>{{ item.timezone }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Escalation Policies</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Priority</th>
+          <th>Ack Timeout</th>
+          <th>Repeat Threshold</th>
+          <th>Max Level</th>
+          <th>Channel</th>
+          <th>Target</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in escalation_policies %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.priority_level }}</td>
+          <td>{{ item.ack_timeout_seconds }}</td>
+          <td>{{ item.repeat_threshold }}</td>
+          <td>{{ item.max_escalation_level }}</td>
+          <td>{{ item.escalation_channel }}</td>
+          <td>{{ item.escalation_target }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Silence Rules</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Alert Type</th>
+          <th>Drone</th>
+          <th>Window</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in silence_rules %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.alert_type or "-" }}</td>
+          <td>{{ item.drone_id or "-" }}</td>
+          <td>{{ item.starts_at or "-" }} ~ {{ item.ends_at or "-" }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Aggregation Rules</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Alert Type</th>
+          <th>Window(s)</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in aggregation_rules %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.alert_type or "-" }}</td>
+          <td>{{ item.window_seconds }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_ALERT_WRITE = {{ can_alert_write | tojson }};
+</script>
+<script src="/static/alerts_ui.js"></script>
+{% endblock %}

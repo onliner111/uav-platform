@@ -22,25 +22,66 @@
   </div>
   <div class="hint">Click map to set incident point.</div>
   <div id="map"></div>
-  <button id="create-incident-btn" style="margin-top:10px;">Create Incident</button>
-  <button id="create-task-btn" style="margin-top:10px;">One-click Create Task</button>
-  <div class="hint" id="emergency-result"></div>
+  {% if can_incident_write %}
+  <div class="grid cols-2" style="margin-top:10px;">
+    <div>
+      <label>Task Name (optional)</label>
+      <input id="incident-task-name" placeholder="Emergency patrol task">
+    </div>
+    <div>
+      <label>Template ID (optional)</label>
+      <input id="incident-template-id" placeholder="inspection template id">
+    </div>
+  </div>
+  <button id="create-incident-btn" type="button" style="margin-top:10px;">Create Incident</button>
+  <button id="create-task-btn" type="button" style="margin-top:10px;">One-click Create Task</button>
+  {% else %}
+  <p class="hint">`incident.write` permission is required for create actions.</p>
+  {% endif %}
+  <div class="hint action-result" id="emergency-result" role="status" aria-live="polite"></div>
 </div>
 
 <div class="panel">
-  <h2>Recent Incidents</h2>
+  <div class="ui-section-head">
+    <h2>Recent Incidents</h2>
+    <div class="ui-action-row">
+      <a class="console-link" href="/ui/command-center">Command Center</a>
+      <a class="console-link" href="/ui/task-center">Task Center</a>
+      <a class="console-link" href="/ui/inspection">Inspection</a>
+    </div>
+  </div>
   <table>
     <thead>
-      <tr><th>ID</th><th>Title</th><th>Level</th><th>Status</th><th>Task</th></tr>
+      <tr><th>ID</th><th>Title</th><th>Level</th><th>Status</th><th>Task</th><th>Action</th></tr>
     </thead>
     <tbody>
       {% for item in incidents %}
       <tr>
-        <td>{{ item.id }}</td>
+        <td><code>{{ item.id }}</code></td>
         <td>{{ item.title }}</td>
         <td>{{ item.level }}</td>
         <td>{{ item.status }}</td>
-        <td>{{ item.linked_task_id }}</td>
+        <td>
+          {% if item.linked_task_id %}
+          <a class="console-link" href="/ui/task-center">{{ item.linked_task_id }}</a>
+          {% else %}
+          -
+          {% endif %}
+        </td>
+        <td>
+          {% if can_incident_write %}
+          <button
+            type="button"
+            class="js-incident-create-task"
+            data-incident-id="{{ item.id }}"
+            {% if item.linked_task_id %}disabled{% endif %}
+          >
+            {% if item.linked_task_id %}Task Created{% else %}Create Task{% endif %}
+          </button>
+          {% else %}
+          <span class="hint">Read only</span>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -49,6 +90,9 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  window.__CAN_INCIDENT_WRITE = {{ can_incident_write | tojson }};
+</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/static/emergency.js"></script>
 {% endblock %}

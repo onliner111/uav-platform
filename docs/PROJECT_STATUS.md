@@ -6,15 +6,27 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-25-observability-reliability.md (DONE; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 25 closeout completed (`25-WP1`..`25-WP4`)
-- Next Target: wait for next roadmap phase; keep baseline quality gates as regression checklist
+- Current Phase: phase-31-observability-reliability-ops-console.md (READY; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 30 closed as DONE (`30-WP1`..`30-WP6`) with full gate pass and report.
+- Next Target: start Phase 31 sequence `P0 -> P1 -> P2 -> 31-WP6`
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-02-28T19:44:53Z
+> Last verified at (UTC): 2026-03-01T13:19:33Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
-> Closeout note (2026-02-28T19:44:53Z): Phase 25 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`), and checkpoint status moved to `DONE`.
+> Closeout note (2026-03-01T13:19:33Z): Phase 30 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`, `demo_phase30_commercial_platform_ops_ui.py`), and checkpoint moved to `phase-31-observability-reliability-ops-console.md` with status `READY`.
+> Closeout note (2026-03-01T12:40:32Z): Phase 29 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`), and checkpoint moved to `phase-30-commercial-platform-ops-ui.md` with status `READY`.
+> Closeout note (2026-03-01T12:03:03Z): Phase 28 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase28_compliance_alert_operations_workbench.py`), and checkpoint moved to `phase-29-data-ai-governance-ui.md` with status `READY`.
+> Closeout note (2026-03-01T05:26:00Z): Phase 27 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase27_operations_ui_closure.py`), and checkpoint moved to `phase-28-compliance-alert-operations-workbench.md` with status `READY`.
+> Closeout note (2026-02-28T21:09:17Z): Phase 26 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`), and checkpoint status moved to `DONE`.
+> Planning note (2026-02-28T20:35:59Z): Added UI productization roadmap blueprints `phase-26`..`phase-31` and moved checkpoint to `phase-26-ui-information-architecture-design-system.md` with status `READY`.
+> Phase note (2026-02-28T20:45:51Z): `26-WP1` passed targeted checks (`pytest tests/test_ui_console.py`, `ruff check app/api/routers/ui.py`, `mypy app/api/routers/ui.py`) and checkpoint status moved to `RUNNING`.
+> Phase note (2026-02-28T20:49:00Z): `26-WP2` passed regression check (`pytest tests/test_ui_console.py`) after token/component baseline and multi-page template standardization.
+> Phase note (2026-02-28T20:52:40Z): `26-WP3` passed regression check (`pytest tests/test_ui_console.py`) after introducing shared action-interaction helpers and wiring high-frequency write pages.
+> Phase note (2026-02-28T20:55:18Z): `26-WP4` passed targeted checks (`ruff`, `mypy`, `pytest tests/test_ui_console.py`) after adding centralized UI RBAC visibility matrix and action-level permission regression coverage.
+> Phase note (2026-02-28T20:57:19Z): `26-WP5` passed regression check (`pytest tests/test_ui_console.py`) after mobile/a11y enhancements (skip link, aria labels/live region, keyboard escape, reduced-motion support).
+> Phase note (2026-02-28T20:59:44Z): `26-WP6` passed regression baseline checks (`ruff`, `pytest tests/test_ui_console.py`) after adding phase-26 UI baseline docs and expanded UI assertions.
+> Transition note (2026-02-28T21:12:00Z): After explicit command, checkpoint moved to `phase-27-operations-ui-workflow-closure.md` with status `RUNNING`.
 
 - ruff: PASS (`docker compose ... app ruff check app tests infra/scripts`)
 - mypy: PASS (`docker compose ... app mypy app`)
@@ -22,6 +34,17 @@
 - e2e: PASS (`demo_e2e.py` + `verify_smoke.py`)
 - phase08 integration: PASS (`verify_phase08_integration.py`)
 - alembic head: PASS (`docker compose ... app alembic upgrade head`)
+- phase26 wp1 targeted checks: PASS (`pytest -q tests/test_ui_console.py`, `ruff check app/api/routers/ui.py`, `mypy app/api/routers/ui.py`)
+- phase26 wp2 regression check: PASS (`pytest -q tests/test_ui_console.py`)
+- phase26 wp3 regression check: PASS (`pytest -q tests/test_ui_console.py`)
+- phase26 wp4 targeted checks: PASS (`ruff check app/api/routers/ui.py tests/test_ui_console.py`, `mypy app/api/routers/ui.py`, `pytest -q tests/test_ui_console.py`)
+- phase26 wp5 regression check: PASS (`pytest -q tests/test_ui_console.py`)
+- phase26 wp6 baseline checks: PASS (`ruff check app/api/routers/ui.py tests/test_ui_console.py`, `pytest -q tests/test_ui_console.py`)
+- phase26 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`)
+- phase27 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase27_operations_ui_closure.py`)
+- phase28 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase28_compliance_alert_operations_workbench.py`)
+- phase29 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`)
+- phase30 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`, `demo_phase30_commercial_platform_ops_ui.py`)
 
 ## 3. Evidence（证据 / 可复现命令）
 > 所有结论必须能用这些命令复现
@@ -43,6 +66,10 @@
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase23_ai_model_governance_v2.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase24_billing_quota.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase25_observability_reliability.py
+  - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase27_operations_ui_closure.py
+  - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase28_compliance_alert_operations_workbench.py
+  - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase29_data_ai_governance_ui.py
+  - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase30_commercial_platform_ops_ui.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_phase08_integration.py
   - docker compose -f infra/docker-compose.yml run --rm --build app pytest -q tests/test_billing.py
   - docker compose -f infra/docker-compose.yml run --rm --build app pytest -q tests/test_observability.py
@@ -84,9 +111,20 @@
 - phase-23-ai-model-governance-v2.md: DONE
 - phase-24-billing-quota-system.md: DONE
 - phase-25-observability-reliability.md: DONE
+- phase-26-ui-information-architecture-design-system.md: DONE
+- phase-27-operations-ui-workflow-closure.md: DONE
+- phase-28-compliance-alert-operations-workbench.md: DONE
+- phase-29-data-ai-governance-ui.md: DONE
+- phase-30-commercial-platform-ops-ui.md: DONE
+
+## 4.2 Planned Next Phases（后续规划阶段）
+- phase-31-observability-reliability-ops-console.md: READY
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
+- 30-WP1..WP6 artifacts are present: commercial ops/open-platform pages and scripts (`app/web/templates/ui_commercial_ops.html`, `app/web/templates/ui_open_platform.html`, `app/web/static/commercial_ops_ui.js`, `app/web/static/open_platform_ui.js`), UI router/nav/matrix extensions (`app/api/routers/ui.py`), phase30 UI RBAC regression (`tests/test_ui_console.py::test_ui_phase30_commercial_open_platform_write_visibility`), and replay demo (`infra/scripts/demo_phase30_commercial_platform_ops_ui.py`).
+- 29-WP1..WP6 artifacts are present: reporting/data/ai governance UI closure (`app/web/templates/ui_reports.html`, `app/web/templates/ui_ai_governance.html`), workbench scripts (`app/web/static/reports_ui.js`, `app/web/static/ai_governance_ui.js`), UI router/action gating updates (`app/api/routers/ui.py`), reporting export-list API (`app/api/routers/reporting.py`, `app/services/reporting_service.py`), replay demo (`infra/scripts/demo_phase29_data_ai_governance_ui.py`), and phase29 UI RBAC regression (`tests/test_ui_console.py::test_ui_phase29_data_ai_workbench_write_visibility`).
+- 27-WP1..WP6 artifacts are present: operations deep-page UI updates (`app/web/templates/{ui_task_center,ui_assets,inspection_list,inspection_task_detail,defects,emergency}.html`), unified action scripts (`app/web/static/{task_center_ui,assets_ui,inspection_list,inspection_task,defects,emergency}.js`), phase27 demo (`infra/scripts/demo_phase27_operations_ui_closure.py`), and UI RBAC regression addition (`tests/test_ui_console.py::test_ui_execute_pages_readonly_mode_hides_write_actions`).
 - 07B B1/B2/B3 migrations are present: `202602230014`..`202602230022`.
 - 07B B4 migrations are present: `202602240023`..`202602240025`.
 - 07B B5 migrations are present: `202602240026`..`202602240028` (reporting/compliance approval boundary landed).
@@ -125,6 +163,15 @@
 ## 5. Audit Log（自动审计记录）
 > 每次“自动关账/推进”都追加一条。失败也要写入 logs/ 下报告。
 
+- 2026-02-28T21:12:00Z (UTC): Phase transition executed after explicit command. Checkpoint switched from `phase-26-ui-information-architecture-design-system.md` (`DONE`) to `phase-27-operations-ui-workflow-closure.md` (`RUNNING`) to start operations-domain UI closure.
+- 2026-02-28T21:09:17Z (UTC): Phase 26 closed as DONE (`26-WP1`..`26-WP7`). Delivered UI IA regrouping, design-token/component baseline, list/action interaction unification, RBAC visibility matrix and validation, mobile/a11y improvements, and phase-26 UI regression baseline artifacts. Full closeout chain passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`); report generated at `logs/phase-26-ui-information-architecture-design-system.md.report.md`; checkpoint status moved to `DONE`.
+- 2026-02-28T20:59:44Z (UTC): Phase 26 continued with `26-WP6` completed. Added regression baseline artifact `docs/UI_REGRESSION_BASELINE_PHASE26.md`, expanded UI regression coverage in `tests/test_ui_console.py` (navigation/a11y markers and platform RBAC matrix assertions), and revalidated with targeted checks (`ruff`, `pytest -q tests/test_ui_console.py`). Next focus is `26-WP7` closeout.
+- 2026-02-28T20:57:19Z (UTC): Phase 26 continued with `26-WP5` completed. Added mobile and accessibility improvements: skip link and nav labels (`console_base.html`), action-result live regions (`ui_task_center`, `ui_assets`, `ui_alerts`), mobile sidebar ESC close (`console_shell.js`), and reduced-motion + accessibility styling (`ui.css`). Regression check passed via `docker compose ... app pytest -q tests/test_ui_console.py`; next focus is `26-WP6`.
+- 2026-02-28T20:55:18Z (UTC): Phase 26 continued with `26-WP4` completed. Added centralized UI visibility matrix in `app/api/routers/ui.py`, rendered matrix view on platform governance page (`app/web/templates/ui_platform.html`), and extended regression coverage with action-level write-visibility test (`tests/test_ui_console.py::test_ui_task_center_action_visibility_by_write_permission`). Targeted checks passed (`ruff`, `mypy`, `pytest -q tests/test_ui_console.py`); next focus is `26-WP5`.
+- 2026-02-28T20:52:40Z (UTC): Phase 26 continued with `26-WP3` completed. Unified list/action interaction pattern by adding shared helper `app/web/static/ui_action_helpers.js` (result severity rendering, busy-button state, normalized error messages), wiring Task Center/Assets/Alerts action scripts to shared behavior, and standardizing action result slots in related templates (`ui_task_center`, `ui_assets`, `ui_alerts`). Regression check passed via `docker compose ... app pytest -q tests/test_ui_console.py`; next focus is `26-WP4`.
+- 2026-02-28T20:49:00Z (UTC): Phase 26 continued with `26-WP2` completed. Added design-token/component baseline (`typography/spacing/radius/focus-ring` tokens + primitives for section/action/field/kpi components) in `app/web/static/ui.css`, standardized KPI/section patterns across core UI pages, and added baseline design documentation `docs/UI_DESIGN_SYSTEM_BASELINE.md`. Regression check passed via `docker compose ... app pytest -q tests/test_ui_console.py`; next focus is `26-WP3`.
+- 2026-02-28T20:45:51Z (UTC): Phase 26 moved to RUNNING with `26-WP1` completed. Delivered UI IA regrouping in console shell by introducing grouped navigation model (`Overview/Observe/Execute/Govern/Platform`), grouped sidebar rendering, grouped module entries and role entry paths, plus related style updates. Verified with targeted commands (`docker compose ... app pytest -q tests/test_ui_console.py`, `docker compose ... app ruff check app/api/routers/ui.py`, `docker compose ... app mypy app/api/routers/ui.py`).
+- 2026-02-28T20:35:59Z (UTC): Roadmap extended with UI productization blueprints `phase-26`..`phase-31` (IA/design-system, operations UI closure, compliance/alert operations workbench, data+AI governance UI, commercial/platform ops UI, observability/reliability ops console). Updated execution chain in `phases/index.md`, moved checkpoint to `phase-26-ui-information-architecture-design-system.md` (`READY`) in `phases/state.md`, and refreshed resume entrypoint in `phases/resume.md`.
 - 2026-02-28T19:44:53Z (UTC): Phase 25 closed as DONE (`25-WP1`..`25-WP4`). Delivered observability/reliability chain with unified signal ingest/query/overview, SLO policy/evaluation and auto-alert routing, backup run + restore drill flow, security inspection run/report flow, and capacity policy/forecast APIs. Added migration chain `202602280104/105/106/107/108/109/110/111/112`, demo `infra/scripts/demo_phase25_observability_reliability.py`, and regression coverage `tests/test_observability.py`; generated report `logs/phase-25-observability-reliability.md.report.md`, completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, phase25 demo), and moved checkpoint status to `DONE`.
 - 2026-02-27T17:51:44Z (UTC): Phase 24 closed as DONE (`24-WP1`..`24-WP4`). Delivered billing plan/subscription/quota governance, usage ingest/summary/quota-check chain, invoice lifecycle APIs (generate/list/detail/close/void), migration chain `202602270095/096/097/098/099/100/101/102/103`, and demo `infra/scripts/demo_phase24_billing_quota.py`; generated report `logs/phase-24-billing-quota-system.md.report.md`, completed full closeout chain (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, phase24 demo), and advanced checkpoint to `phase-25-observability-reliability.md` (`READY`).
 - 2026-02-27T17:03:04Z (UTC): Phase 24 RUNNING regression refresh completed after `24-WP1` + `24-WP2` delivery. Broad checks passed via Docker Compose (`ruff check app tests infra/scripts`, `mypy app`, full `pytest -q`, `alembic upgrade head`); checkpoint remains `phase-24-billing-quota-system.md` (`RUNNING`), next execution focus is `24-WP3`.

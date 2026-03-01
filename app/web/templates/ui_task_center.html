@@ -1,0 +1,261 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Total Tasks</div>
+    <div class="value">{{ tasks|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Pending Approval</div>
+    <div class="value">{{ task_state_counts.get("APPROVAL_PENDING", 0) }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>In Progress</div>
+    <div class="value">{{ task_state_counts.get("IN_PROGRESS", 0) }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Templates / Types</div>
+    <div class="value">{{ templates|length }} / {{ task_types|length }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="ui-section-head">
+    <h2>Task Queue</h2>
+    <form method="get" action="/ui/task-center" class="ui-action-row">
+      <input type="hidden" name="token" value="{{ token }}">
+      <select name="state" aria-label="Filter tasks by state">
+        <option value="">All States</option>
+        {% for state in task_state_options %}
+        <option value="{{ state }}" {% if selected_task_state == state %}selected{% endif %}>{{ state }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Apply Filter</button>
+    </form>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>State</th>
+          <th>Priority</th>
+          <th>Dispatch</th>
+          <th>Assigned</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in tasks %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td><span class="status-pill">{{ item.state }}</span></td>
+          <td>{{ item.priority }}</td>
+          <td>{{ item.dispatch_mode }}</td>
+          <td>{{ item.assigned_to or "-" }}</td>
+          <td>{{ item.updated_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if can_task_write %}
+<div class="panel">
+  <h2>Quick Actions</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Create Task</h3>
+      <label>Task Type</label>
+      <select id="task-create-type">
+        {% for item in task_types %}
+        <option value="{{ item.id }}">{{ item.name }} ({{ item.code }})</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Template (optional)</label>
+      <select id="task-create-template">
+        <option value="">No Template</option>
+        {% for item in templates %}
+        <option value="{{ item.id }}">{{ item.name }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Task Name</label>
+      <input id="task-create-name" placeholder="task name">
+      <div class="grid cols-2" style="margin-top:8px;">
+        <div>
+          <label>Priority</label>
+          <input id="task-create-priority" type="number" min="1" max="10" value="5">
+        </div>
+        <div>
+          <label>Risk</label>
+          <input id="task-create-risk" type="number" min="1" max="5" value="3">
+        </div>
+      </div>
+      <button id="task-create-btn" type="button" style="margin-top:10px;">Create Task</button>
+    </div>
+    <div>
+      <h3>Transition Task State</h3>
+      <label>Task ID</label>
+      <input id="task-transition-id" placeholder="task id">
+      <label style="margin-top:8px;">Target State</label>
+      <select id="task-transition-state">
+        {% for state in task_state_options %}
+        <option value="{{ state }}">{{ state }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Note</label>
+      <input id="task-transition-note" placeholder="optional note">
+      <button id="task-transition-btn" type="button" style="margin-top:10px;">Transition</button>
+    </div>
+    <div>
+      <h3>Dispatch Task</h3>
+      <label>Task ID</label>
+      <input id="task-dispatch-id" placeholder="task id">
+      <label style="margin-top:8px;">Assigned User ID</label>
+      <input id="task-dispatch-user" placeholder="user id">
+      <label style="margin-top:8px;">Note</label>
+      <input id="task-dispatch-note" placeholder="optional note">
+      <button id="task-dispatch-btn" type="button" style="margin-top:10px;">Dispatch</button>
+    </div>
+  </div>
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Submit Approval</h3>
+      <label>Task ID</label>
+      <input id="task-submit-approval-id" placeholder="task id">
+      <label style="margin-top:8px;">Note</label>
+      <input id="task-submit-approval-note" placeholder="optional note">
+      <button id="task-submit-approval-btn" type="button" style="margin-top:10px;">Submit</button>
+    </div>
+    <div>
+      <h3>Approve / Reject</h3>
+      <label>Task ID</label>
+      <input id="task-approve-id" placeholder="task id">
+      <label style="margin-top:8px;">Decision</label>
+      <select id="task-approve-decision" {% if not can_task_approve %}disabled{% endif %}>
+        <option value="APPROVE">APPROVE</option>
+        <option value="REJECT">REJECT</option>
+      </select>
+      <label style="margin-top:8px;">Note</label>
+      <input id="task-approve-note" placeholder="optional note" {% if not can_task_approve %}disabled{% endif %}>
+      <button id="task-approve-btn" type="button" style="margin-top:10px;" {% if not can_task_approve %}disabled{% endif %}>Apply Decision</button>
+      {% if not can_task_approve %}
+      <p class="hint">`mission.approve` permission is required.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Add Comment</h3>
+      <label>Task ID</label>
+      <input id="task-comment-id" placeholder="task id">
+      <label style="margin-top:8px;">Comment</label>
+      <input id="task-comment-content" placeholder="comment text">
+      <button id="task-comment-btn" type="button" style="margin-top:10px;">Add Comment</button>
+    </div>
+    <div>
+      <h3>Batch Create Tasks</h3>
+      <label>Task Type</label>
+      <select id="task-batch-type">
+        {% for item in task_types %}
+        <option value="{{ item.id }}">{{ item.name }} ({{ item.code }})</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Template (optional)</label>
+      <select id="task-batch-template">
+        <option value="">No Template</option>
+        {% for item in templates %}
+        <option value="{{ item.id }}">{{ item.name }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Task Names (one per line)</label>
+      <textarea id="task-batch-names" rows="4" placeholder="task-a&#10;task-b"></textarea>
+      <button id="task-batch-create-btn" type="button" style="margin-top:10px;">Batch Create</button>
+    </div>
+  </div>
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Load Comments</h3>
+      <label>Task ID</label>
+      <input id="task-comments-id" placeholder="task id">
+      <button id="task-comments-load-btn" type="button" style="margin-top:10px;">Load Comments</button>
+      <pre id="task-comments-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No comments loaded.</pre>
+    </div>
+    <div>
+      <h3>Load History</h3>
+      <label>Task ID</label>
+      <input id="task-history-id" placeholder="task id">
+      <button id="task-history-load-btn" type="button" style="margin-top:10px;">Load History</button>
+      <pre id="task-history-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No history loaded.</pre>
+    </div>
+  </div>
+  <div class="hint action-result" id="task-center-result" role="status" aria-live="polite"></div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2>Templates</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Template ID</th>
+          <th>Name</th>
+          <th>Task Type</th>
+          <th>Default Priority</th>
+          <th>Requires Approval</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in templates %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.task_type_id }}</td>
+          <td>{{ item.default_priority }}</td>
+          <td>{{ item.requires_approval }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Task Types</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in task_types %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.code }}</td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if can_task_write %}
+<script src="/static/task_center_ui.js"></script>
+{% endif %}
+{% endblock %}

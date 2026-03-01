@@ -1,10 +1,14 @@
 (function () {
   const auth = window.__CONSOLE_AUTH || {};
+  const ui = window.UIActionUtils || null;
   const token = window.__TOKEN || auth.token;
   const csrfToken = auth.csrfToken || "";
+  const canIncidentWrite = Boolean(window.__CAN_INCIDENT_WRITE);
   const resultNode = document.getElementById("emergency-result");
   const titleInput = document.getElementById("incident-title");
   const levelSelect = document.getElementById("incident-level");
+  const taskNameInput = document.getElementById("incident-task-name");
+  const templateIdInput = document.getElementById("incident-template-id");
   const createIncidentBtn = document.getElementById("create-incident-btn");
   const createTaskBtn = document.getElementById("create-task-btn");
 
@@ -13,6 +17,29 @@
       resultNode.textContent = "Missing session token.";
     }
     return;
+  }
+
+  function showResult(type, message) {
+    if (ui && typeof ui.setResult === "function") {
+      ui.setResult(resultNode, type, message);
+      return;
+    }
+    resultNode.textContent = message;
+  }
+
+  function toMessage(err) {
+    if (ui && typeof ui.toMessage === "function") {
+      return ui.toMessage(err);
+    }
+    return String((err && err.message) || err || "request failed");
+  }
+
+  async function withBusyButton(button, pendingLabel, action) {
+    if (ui && typeof ui.withBusyButton === "function") {
+      await ui.withBusyButton(button, pendingLabel, action);
+      return;
+    }
+    await action();
   }
 
   let selected = { lat: 30.5928, lon: 114.3055 };
@@ -27,7 +54,7 @@
   map.on("click", (event) => {
     selected = { lat: event.latlng.lat, lon: event.latlng.lng };
     marker.setLatLng([selected.lat, selected.lon]);
-    resultNode.textContent = `Location selected: ${selected.lat.toFixed(6)}, ${selected.lon.toFixed(6)}`;
+    showResult("success", `Location selected: ${selected.lat.toFixed(6)}, ${selected.lon.toFixed(6)}`);
   });
 
   async function post(path, payload) {
@@ -47,37 +74,81 @@
     return body;
   }
 
-  createIncidentBtn.addEventListener("click", async () => {
-    const title = titleInput.value.trim();
-    const level = levelSelect.value;
-    if (!title) {
-      resultNode.textContent = "Title is required.";
-      return;
+  function buildCreateTaskPayload() {
+    const payload = {};
+    const templateId = (templateIdInput && templateIdInput.value ? templateIdInput.value : "").trim();
+    const taskName = (taskNameInput && taskNameInput.value ? taskNameInput.value : "").trim();
+    if (templateId) {
+      payload.template_id = templateId;
     }
-    const locationGeom = `POINT(${selected.lon.toFixed(6)} ${selected.lat.toFixed(6)})`;
-    try {
-      const incident = await post("/api/incidents", {
-        title,
-        level,
-        location_geom: locationGeom,
+    if (taskName) {
+      payload.task_name = taskName;
+    }
+    return payload;
+  }
+
+  async function createTaskForIncident(targetIncidentId, triggerBtn) {
+    await withBusyButton(triggerBtn, "Creating...", async () => {
+      try {
+        const task = await post(`/api/incidents/${targetIncidentId}/create-task`, buildCreateTaskPayload());
+        showResult("success", `Task created: ${task.task_id} (mission ${task.mission_id})`);
+      } catch (err) {
+        showResult("danger", toMessage(err));
+      }
+    });
+  }
+
+  if (canIncidentWrite && createIncidentBtn) {
+    createIncidentBtn.addEventListener("click", async () => {
+      const title = titleInput.value.trim();
+      const level = levelSelect.value;
+      if (!title) {
+        showResult("warn", "Title is required.");
+        return;
+      }
+      const locationGeom = `POINT(${selected.lon.toFixed(6)} ${selected.lat.toFixed(6)})`;
+      await withBusyButton(createIncidentBtn, "Creating...", async () => {
+        try {
+          const incident = await post("/api/incidents", {
+            title,
+            level,
+            location_geom: locationGeom,
+          });
+          incidentId = incident.id;
+          showResult("success", `Incident created: ${incident.id}`);
+        } catch (err) {
+          showResult("danger", toMessage(err));
+        }
       });
-      incidentId = incident.id;
-      resultNode.textContent = `Incident created: ${incident.id}`;
-    } catch (err) {
-      resultNode.textContent = err.message;
-    }
+    });
+  }
+
+  if (canIncidentWrite && createTaskBtn) {
+    createTaskBtn.addEventListener("click", async () => {
+      if (!incidentId) {
+        showResult("warn", "Create or select incident first.");
+        return;
+      }
+      await createTaskForIncident(incidentId, createTaskBtn);
+    });
+  }
+
+  document.querySelectorAll(".js-incident-create-task").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!canIncidentWrite || button.disabled) {
+        return;
+      }
+      const rowIncidentId = button.getAttribute("data-incident-id") || "";
+      if (!rowIncidentId) {
+        showResult("warn", "Incident ID is missing.");
+        return;
+      }
+      incidentId = rowIncidentId;
+      await createTaskForIncident(rowIncidentId, button);
+    });
   });
 
-  createTaskBtn.addEventListener("click", async () => {
-    if (!incidentId) {
-      resultNode.textContent = "Create incident first.";
-      return;
-    }
-    try {
-      const task = await post(`/api/incidents/${incidentId}/create-task`, {});
-      resultNode.textContent = `Task created in emergency mode: ${task.task_id} (mission ${task.mission_id})`;
-    } catch (err) {
-      resultNode.textContent = err.message;
-    }
-  });
+  if (!canIncidentWrite) {
+    showResult("warn", "Read-only mode: incident write actions are disabled.");
+  }
 })();

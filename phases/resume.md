@@ -36,6 +36,12 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 32. `phases/phase-23-ai-model-governance-v2.md`
 33. `phases/phase-24-billing-quota-system.md`
 34. `phases/phase-25-observability-reliability.md`
+35. `phases/phase-26-ui-information-architecture-design-system.md`
+36. `phases/phase-27-operations-ui-workflow-closure.md`
+37. `phases/phase-28-compliance-alert-operations-workbench.md`
+38. `phases/phase-29-data-ai-governance-ui.md`
+39. `phases/phase-30-commercial-platform-ops-ui.md`
+40. `phases/phase-31-observability-reliability-ops-console.md`
 
 Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
@@ -56,16 +62,16 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-02-28T19:44:53Z`
-- current_phase: `phase-25-observability-reliability.md`
-- phase_status: `DONE`
-- last_success_phase: `phase-25-observability-reliability.md`
-- current_focus: `Phase 25 is DONE with full closeout gates and checkpoint is closed at final phase`
+- updated_at_utc: `2026-03-01T13:19:33Z`
+- current_phase: `phase-31-observability-reliability-ops-console.md`
+- phase_status: `READY`
+- last_success_phase: `phase-30-commercial-platform-ops-ui.md`
+- current_focus: `Phase 30 closed as DONE; checkpoint advanced to Phase 31 (READY)`
 
 ## Next TODO (Execution Target)
-1. Keep Docker Compose baseline gate commands below as regression checklist for any post-phase change.
-2. If roadmap extends beyond Phase 25, set `phases/state.md` to the new phase with `status=READY` before implementation.
-3. Continue to enforce intra-phase auto-continue rule (`P0 -> P1 -> P2 -> phase-defined closeout WP`) for future phases.
+1. Start `phase-31-observability-reliability-ops-console.md` in sequence `P0 -> P1 -> P2 -> 31-WP6`.
+2. Complete `31-WP1` observability reliability core console and `31-WP2` SLO/incidents operations closure.
+3. Keep Docker Compose baseline gate commands below as regression checklist for phase closeout.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -79,6 +85,8 @@ Use Docker Compose commands directly in this environment:
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_phase08_integration.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase25_observability_reliability.py`
+- `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase29_data_ai_governance_ui.py`
+- `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase30_commercial_platform_ops_ui.py`
 
 ## Docker Permission Rule (Mandatory)
 - For all Docker-related quality-gate commands in this environment, run with escalated permissions by default.
@@ -92,4 +100,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 status=DONE，last_success_phase=phase-25-observability-reliability.md；如有新增 roadmap phase，先更新 checkpoint 到 READY，再按 P0->P1->P2->WP4 执行并通过全量门禁。`
+`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=phase-31-observability-reliability-ops-console.md，status=READY，last_success_phase=phase-30-commercial-platform-ops-ui.md；请按 P0->P1->P2->31-WP6 连续执行并通过全量门禁。`

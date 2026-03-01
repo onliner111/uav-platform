@@ -3,30 +3,33 @@
 {% block content %}
 <div class="panel">
   <h2>Capabilities</h2>
-  <ul>
+  <div class="capability-grid">
     {% for point in capability_points %}
-    <li>{{ point }}</li>
+    <article class="capability-item">
+      <span class="capability-index">{{ loop.index }}</span>
+      <p>{{ point }}</p>
+    </article>
     {% endfor %}
-  </ul>
+  </div>
 </div>
 
 <div class="panel">
-  <h2>API Entries</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Capability</th>
-        <th>Endpoint</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in api_links %}
-      <tr>
-        <td>{{ item.label }}</td>
-        <td><code>{{ item.href }}</code></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="hub-head">
+    <h2>API Entries</h2>
+    <a class="console-link" href="/docs" target="_blank" rel="noopener noreferrer">Open API Docs</a>
+  </div>
+  <div class="api-entry-grid">
+    {% for item in api_links %}
+    <article class="api-entry-card">
+      <h3>{{ item.label }}</h3>
+      <code>{{ item.href }}</code>
+      <div class="api-entry-actions">
+        <a class="button-link ghost-link" href="{{ item.href }}" target="_blank" rel="noopener noreferrer">Open</a>
+        <button class="ghost copy-endpoint" type="button" data-copy-endpoint="{{ item.href }}">Copy</button>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="hint">These entries are safe navigation shortcuts. Write operations still follow RBAC and audit constraints.</p>
 </div>
 {% endblock %}

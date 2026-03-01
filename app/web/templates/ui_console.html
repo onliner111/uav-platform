@@ -1,20 +1,37 @@
 {% extends "console_base.html" %}
 
 {% block content %}
-<div class="cards">
-  <div class="card">
+<div class="panel hero-panel">
+  <div class="hero-head">
+    <div>
+      <h2>Unified Operations Workbench</h2>
+      <p>Start from command visibility, then enter task execution and closure workflows.</p>
+    </div>
+    <div class="hero-actions">
+      {% if module_entries|length > 0 %}
+      <a class="button-link" href="{{ module_entries[0].href }}">Open {{ module_entries[0].label }}</a>
+      {% endif %}
+      {% if module_entries|length > 1 %}
+      <a class="button-link ghost-link" href="{{ module_entries[1].href }}">Go To {{ module_entries[1].label }}</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
     <div>Online Devices</div>
     <div class="value">{{ stats.online_devices }}</div>
   </div>
-  <div class="card">
+  <div class="card ui-kpi-card">
     <div>Today Inspections</div>
     <div class="value">{{ stats.today_inspections }}</div>
   </div>
-  <div class="card">
+  <div class="card ui-kpi-card">
     <div>Total Defects</div>
     <div class="value">{{ stats.defects_total }}</div>
   </div>
-  <div class="card">
+  <div class="card ui-kpi-card">
     <div>Realtime Alerts</div>
     <div class="value">{{ stats.realtime_alerts }}</div>
   </div>
@@ -22,13 +39,77 @@
 
 <div class="panel">
   <h2>Module Entries</h2>
-  <div class="module-grid">
-    {% for item in module_entries %}
-    <a class="module-card" href="{{ item.href }}" data-nav-item data-nav-label="{{ item.label | lower }}">
-      <h3>{{ item.label }}</h3>
-      <p>{{ item.description }}</p>
-    </a>
-    {% endfor %}
+  <p class="hint">Modules are grouped by operational stage to reduce context switching.</p>
+  {% for group in module_entry_groups %}
+  <section class="module-group">
+    <div class="module-group-head">
+      <h3>{{ group.label }}</h3>
+      <p>{{ group.description }}</p>
+    </div>
+    <div class="module-grid">
+      {% for item in group["items"] %}
+      <a class="module-card" href="{{ item.href }}" data-nav-item data-nav-label="{{ item.label | lower }}" title="{{ item.description }}">
+        <h4>{{ item.label }}</h4>
+        <p>{{ item.description }}</p>
+        <span class="module-cta">Enter Module</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+<div class="panel">
+  <h2>Role Entry Paths</h2>
+  <div class="workflow-grid">
+    <div class="workflow-step">
+      <span class="workflow-index">D</span>
+      <div>
+        <h3>Dispatcher</h3>
+        <p>Command Center -> Task Center -> Assets for dispatch and execution closure.</p>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <span class="workflow-index">C</span>
+      <div>
+        <h3>Compliance</h3>
+        <p>Compliance -> Reports for approval governance, decision records, and audit output.</p>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <span class="workflow-index">P</span>
+      <div>
+        <h3>Platform Admin</h3>
+        <p>Platform -> Alerts -> Reports for tenant governance, oncall operations, and KPI review.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Recommended Workflow</h2>
+  <div class="workflow-grid">
+    <div class="workflow-step">
+      <span class="workflow-index">1</span>
+      <div>
+        <h3>Observe</h3>
+        <p>Use Command Center for live map, tracks, alerts, and video feed status.</p>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <span class="workflow-index">2</span>
+      <div>
+        <h3>Execute</h3>
+        <p>Run inspection, defect, and emergency workflows to complete operational actions.</p>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <span class="workflow-index">3</span>
+      <div>
+        <h3>Govern</h3>
+        <p>Enter reports, compliance, alerts, and platform modules for governance and audit.</p>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

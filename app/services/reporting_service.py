@@ -154,6 +154,21 @@ class ReportingService:
         with self._session() as session:
             return self._get_scoped_outcome_report_export(session, tenant_id, export_id)
 
+    def list_outcome_report_exports(
+        self,
+        tenant_id: str,
+        *,
+        status: ReportExportStatus | None = None,
+        limit: int = 50,
+    ) -> list[OutcomeReportExport]:
+        with self._session() as session:
+            statement = select(OutcomeReportExport).where(OutcomeReportExport.tenant_id == tenant_id)
+            if status is not None:
+                statement = statement.where(OutcomeReportExport.status == status)
+            rows = list(session.exec(statement).all())
+            rows.sort(key=lambda item: item.created_at, reverse=True)
+            return rows[: max(1, min(limit, 200))]
+
     def run_outcome_report_retention(
         self,
         tenant_id: str,

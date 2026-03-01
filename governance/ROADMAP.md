@@ -180,19 +180,20 @@
 
 ---
 
-## 7. M2-M4 阶段规划入口（基于“项目最终目标.md”）
+## 7. M2-M6 阶段规划入口（基于“项目最终目标.md”）
 
 为对齐“**一网统飞系统**”最终目标，新增后续阶段规划蓝图：
 
 - `phases/phase-08-one-net-unified-flight-planning.md`（Phase 08-15）
 - `phases/phase-16-saas-console-ui.md` ... `phases/phase-25-observability-reliability.md`（Phase 16-25）
+- `phases/phase-26-ui-information-architecture-design-system.md` ... `phases/phase-31-observability-reliability-ops-console.md`（Phase 26-31）
 
 该组蓝图定义了：
-- Phase 08-25 的目标、范围、验收与退出标准
+- Phase 08-31 的目标、范围、验收与退出标准
 - A-J 能力映射到阶段的落地顺序
-- M2/M3/M4 里程碑分组与执行顺序
+- M2/M3/M4/M5/M6 里程碑分组与执行顺序
 
 执行建议：
-- 从 `phases/state.md -> current_phase` 启动（当前为 `phase-17-multi-org-data-perimeter-v2.md`）
-- 按 `phases/index.md` 顺序推进至 `phase-25-observability-reliability.md`
+- 从 `phases/state.md -> current_phase` 启动（当前为 `phase-26-ui-information-architecture-design-system.md`，状态 `DONE`，等待显式指令后再进入 `phase-27`）
+- 按 `phases/index.md` 顺序推进至 `phase-31-observability-reliability-ops-console.md`
 - 每阶段执行时继续遵循 `phases/reporting.md` 与 `governance/AGENTS.md`

@@ -1,0 +1,127 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Credentials</div>
+    <div class="value">{{ credentials|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Webhooks</div>
+    <div class="value">{{ webhooks|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Adapter Events</div>
+    <div class="value">{{ adapter_events|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Write Access</div>
+    <div class="value">{{ "YES" if can_open_platform_write else "NO" }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Open Platform Access + Webhook Ops</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Credentials</h3>
+      <label>Key ID (optional)</label>
+      <input id="open-credential-key-id" placeholder="phase30-key" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">API Key (optional)</label>
+      <input id="open-credential-api-key" placeholder="api-..." {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Signing Secret (optional)</label>
+      <input id="open-credential-signing-secret" placeholder="sig-..." {% if not can_open_platform_write %}disabled{% endif %}>
+      <button id="open-credential-create-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Create Credential</button>
+      <button id="open-credential-list-btn" type="button" style="margin-top:10px;">Load Credentials</button>
+      <pre id="open-credential-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No credential result.</pre>
+    </div>
+    <div>
+      <h3>Webhook Endpoints</h3>
+      <label>Name</label>
+      <input id="open-webhook-name" placeholder="phase30-hook" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Endpoint URL</label>
+      <input id="open-webhook-url" placeholder="https://example.invalid/hook" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Event Type</label>
+      <input id="open-webhook-event-type" value="workorder.upsert" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Credential ID (optional)</label>
+      <input id="open-webhook-credential-id" placeholder="credential id" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Auth Type</label>
+      <select id="open-webhook-auth-type" {% if not can_open_platform_write %}disabled{% endif %}>
+        {% for item in open_webhook_auth_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="open-webhook-create-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Create Webhook</button>
+      <button id="open-webhook-list-btn" type="button" style="margin-top:10px;">Load Webhooks</button>
+      <pre id="open-webhook-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No webhook result.</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Dispatch + Adapter Ingress</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Dispatch Test</h3>
+      <label>Endpoint ID</label>
+      <input id="open-dispatch-endpoint-id" placeholder="endpoint id" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Payload JSON</label>
+      <textarea id="open-dispatch-payload" rows="3" {% if not can_open_platform_write %}disabled{% endif %}>{"ticket_id":"PH30-001"}</textarea>
+      <button id="open-webhook-dispatch-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Dispatch Test</button>
+      <pre id="open-dispatch-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No dispatch result.</pre>
+    </div>
+    <div>
+      <h3>Adapter Event Ingest Test</h3>
+      <label>Key ID</label>
+      <input id="open-adapter-key-id" placeholder="credential key id" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">API Key</label>
+      <input id="open-adapter-api-key" placeholder="credential api key" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Signing Secret</label>
+      <input id="open-adapter-signing-secret" placeholder="credential signing secret" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Event Type</label>
+      <input id="open-adapter-event-type" value="workorder.upsert" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Payload JSON</label>
+      <textarea id="open-adapter-payload" rows="3" {% if not can_open_platform_write %}disabled{% endif %}>{"ticket_id":"PH30-001"}</textarea>
+      <button id="open-adapter-ingest-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Ingest Adapter Event</button>
+      <button id="open-adapter-events-btn" type="button" style="margin-top:10px;">Load Adapter Events</button>
+      <pre id="open-adapter-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No adapter action result.</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Webhook Catalog</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Endpoint ID</th>
+          <th>Name</th>
+          <th>Event Type</th>
+          <th>Credential</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in webhooks %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.event_type }}</td>
+          <td><code>{{ item.credential_id or "-" }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<pre id="open-platform-result" class="hint" style="min-height:22px;"></pre>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_OPEN_PLATFORM_WRITE = {{ "true" if can_open_platform_write else "false" }};
+</script>
+<script src="/static/ui_action_helpers.js"></script>
+<script src="/static/open_platform_ui.js"></script>
+{% endblock %}

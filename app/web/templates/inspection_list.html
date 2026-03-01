@@ -28,4 +28,39 @@
     </tbody>
   </table>
 </div>
+{% if can_inspection_write %}
+<div class="panel">
+  <h2>Create Inspection Task</h2>
+  <div class="grid cols-2">
+    <div>
+      <label>Template</label>
+      <select id="inspection-create-template">
+        {% for item in templates %}
+        <option value="{{ item.id }}">{{ item.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Task Name</label>
+      <input id="inspection-create-name" placeholder="inspection task name">
+    </div>
+    <div>
+      <label>Priority</label>
+      <input id="inspection-create-priority" type="number" min="1" max="10" value="5">
+    </div>
+    <div>
+      <label>Area Geometry (optional)</label>
+      <input id="inspection-create-geom" placeholder="POINT(114.30 30.59)">
+    </div>
+  </div>
+  <button id="inspection-create-btn" type="button" style="margin-top:10px;">Create Task</button>
+  <div class="hint action-result" id="inspection-list-result" role="status" aria-live="polite"></div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if can_inspection_write %}
+<script src="/static/inspection_list.js"></script>
+{% endif %}
 {% endblock %}

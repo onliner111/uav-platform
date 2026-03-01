@@ -1,0 +1,198 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Total Assets</div>
+    <div class="value">{{ assets|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Available</div>
+    <div class="value">{{ available_count }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Healthy</div>
+    <div class="value">{{ healthy_count }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Regions</div>
+    <div class="value">{{ region_count }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Resource Pool Summary By Region</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>Total</th>
+          <th>Available</th>
+          <th>Healthy</th>
+          <th>By Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in pool_summary %}
+        <tr>
+          <td>{{ item.region_code }}</td>
+          <td>{{ item.total_assets }}</td>
+          <td>{{ item.available_assets }}</td>
+          <td>{{ item.healthy_assets }}</td>
+          <td><code>{{ item.by_type }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if can_asset_write %}
+<div class="panel">
+  <h2>Quick Actions</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Update Availability</h3>
+      <label>Asset ID</label>
+      <input id="asset-availability-id" placeholder="asset id">
+      <label style="margin-top:8px;">Availability</label>
+      <select id="asset-availability-status">
+        {% for status in availability_options %}
+        <option value="{{ status }}">{{ status }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Region Code (optional)</label>
+      <input id="asset-availability-region" placeholder="region code">
+      <button id="asset-availability-btn" type="button" style="margin-top:10px;">Apply Availability</button>
+    </div>
+    <div>
+      <h3>Update Health</h3>
+      <label>Asset ID</label>
+      <input id="asset-health-id" placeholder="asset id">
+      <label style="margin-top:8px;">Health Status</label>
+      <select id="asset-health-status">
+        {% for status in health_options %}
+        <option value="{{ status }}">{{ status }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Health Score (0-100)</label>
+      <input id="asset-health-score" type="number" min="0" max="100" placeholder="optional">
+      <button id="asset-health-btn" type="button" style="margin-top:10px;">Apply Health</button>
+    </div>
+  </div>
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Create Maintenance Workorder</h3>
+      <label>Asset ID</label>
+      <input id="mw-create-asset-id" placeholder="asset id">
+      <label style="margin-top:8px;">Title</label>
+      <input id="mw-create-title" placeholder="workorder title">
+      <label style="margin-top:8px;">Priority (1-10)</label>
+      <input id="mw-create-priority" type="number" min="1" max="10" value="5">
+      <label style="margin-top:8px;">Assigned To (optional)</label>
+      <input id="mw-create-assigned-to" placeholder="user id">
+      <label style="margin-top:8px;">Note (optional)</label>
+      <input id="mw-create-note" placeholder="note">
+      <button id="mw-create-btn" type="button" style="margin-top:10px;">Create Workorder</button>
+    </div>
+    <div>
+      <h3>Transition / Close Workorder</h3>
+      <label>Workorder ID</label>
+      <input id="mw-transition-id" placeholder="workorder id">
+      <label style="margin-top:8px;">Target Status</label>
+      <select id="mw-transition-status">
+        {% for status in maintenance_status_options %}
+        <option value="{{ status }}">{{ status }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Assigned To (optional)</label>
+      <input id="mw-transition-assigned-to" placeholder="user id">
+      <label style="margin-top:8px;">Note (optional)</label>
+      <input id="mw-transition-note" placeholder="note">
+      <div class="ui-action-row" style="margin-top:10px;">
+        <button id="mw-transition-btn" type="button">Apply Transition</button>
+        <button id="mw-close-btn" type="button">Close Workorder</button>
+      </div>
+      <label style="margin-top:8px;">History Workorder ID</label>
+      <input id="mw-history-id" placeholder="workorder id">
+      <button id="mw-history-btn" type="button" style="margin-top:10px;">Load History</button>
+      <pre id="mw-history-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No history loaded.</pre>
+    </div>
+  </div>
+  <div class="hint action-result" id="assets-result" role="status" aria-live="polite"></div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2>Asset Ledger</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Type</th>
+          <th>Code</th>
+          <th>Lifecycle</th>
+          <th>Availability</th>
+          <th>Health</th>
+          <th>Score</th>
+          <th>Region</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in assets %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.asset_type }}</td>
+          <td>{{ item.asset_code }}</td>
+          <td>{{ item.lifecycle_status }}</td>
+          <td>{{ item.availability_status }}</td>
+          <td>{{ item.health_status }}</td>
+          <td>{{ item.health_score if item.health_score is not none else "-" }}</td>
+          <td>{{ item.region_code or "-" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Maintenance Workorders</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Asset</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Assigned</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in maintenance_workorders %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td><code>{{ item.asset_id }}</code></td>
+          <td>{{ item.title }}</td>
+          <td><span class="status-pill">{{ item.status }}</span></td>
+          <td>{{ item.priority }}</td>
+          <td>{{ item.assigned_to or "-" }}</td>
+          <td>{{ item.updated_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if can_asset_write %}
+<script src="/static/assets_ui.js"></script>
+{% endif %}
+{% endblock %}

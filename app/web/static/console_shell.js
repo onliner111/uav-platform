@@ -3,7 +3,12 @@
   const navItems = Array.from(document.querySelectorAll("[data-nav-item]"));
   const favButtons = Array.from(document.querySelectorAll("[data-fav-toggle]"));
   const quickAccess = document.getElementById("quick-access");
+  const navToggle = document.getElementById("nav-toggle");
+  const sidebar = document.getElementById("console-sidebar");
+  const overlay = document.getElementById("console-overlay");
+  const copyButtons = Array.from(document.querySelectorAll("[data-copy-endpoint]"));
   const favStorageKey = "uav-console-favorites-v1";
+  const mobileBreakpoint = 1100;
 
   function loadFavorites() {
     try {
@@ -75,6 +80,22 @@
     });
   }
 
+  function setSidebarOpen(open) {
+    if (!sidebar || !overlay) {
+      return;
+    }
+    sidebar.classList.toggle("mobile-open", open);
+    overlay.classList.toggle("active", open);
+    if (navToggle) {
+      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    document.body.classList.toggle("nav-open", open);
+  }
+
+  function isMobile() {
+    return window.innerWidth <= mobileBreakpoint;
+  }
+
   const favorites = loadFavorites();
   renderFavorites(favorites);
   applySearch(searchInput ? searchInput.value : "");
@@ -100,4 +121,50 @@
       applySearch(searchInput.value);
     });
   }
+
+  if (navToggle && sidebar && overlay) {
+    navToggle.addEventListener("click", () => {
+      const currentlyOpen = sidebar.classList.contains("mobile-open");
+      setSidebarOpen(!currentlyOpen);
+    });
+
+    overlay.addEventListener("click", () => {
+      setSidebarOpen(false);
+    });
+
+    window.addEventListener("resize", () => {
+      if (!isMobile()) {
+        setSidebarOpen(false);
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      if (!sidebar.classList.contains("mobile-open")) {
+        return;
+      }
+      setSidebarOpen(false);
+      navToggle.focus();
+    });
+  }
+
+  copyButtons.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const endpoint = btn.getAttribute("data-copy-endpoint") || "";
+      if (!endpoint) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(endpoint);
+        btn.textContent = "Copied";
+      } catch (_err) {
+        btn.textContent = "Failed";
+      }
+      setTimeout(() => {
+        btn.textContent = "Copy";
+      }, 1200);
+    });
+  });
 })();

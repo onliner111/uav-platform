@@ -13,33 +13,90 @@
       <div><strong>Mission:</strong> {{ task.mission_id }}</div>
     </div>
     <div>
-      <button id="export-btn" data-task-id="{{ task.id }}" data-token="{{ token }}">Export HTML</button>
+      <button id="export-btn" data-task-id="{{ task.id }}" data-token="{{ token }}" {% if not can_inspection_write %}disabled{% endif %}>Export HTML</button>
       <div class="hint" id="export-result">No export yet.</div>
+      <div class="ui-action-row" style="margin-top:10px;">
+        <a class="console-link" href="/ui/defects">Open Defects</a>
+        <a class="console-link" href="/ui/task-center">Open Task Center</a>
+      </div>
     </div>
   </div>
   <div id="map"></div>
 </div>
+
+{% if can_inspection_write or can_defect_write %}
+<div class="panel">
+  <h2>Quick Actions</h2>
+  {% if can_inspection_write %}
+  <div class="grid cols-2">
+    <div>
+      <h3>Create Observation</h3>
+      <label>Latitude</label>
+      <input id="observation-lat" type="number" step="0.000001" placeholder="30.592800">
+      <label style="margin-top:8px;">Longitude</label>
+      <input id="observation-lon" type="number" step="0.000001" placeholder="114.305500">
+      <label style="margin-top:8px;">Altitude (m)</label>
+      <input id="observation-alt" type="number" step="0.1" value="50">
+      <label style="margin-top:8px;">Item Code</label>
+      <input id="observation-item-code" placeholder="line-crack">
+      <label style="margin-top:8px;">Severity (1-5)</label>
+      <input id="observation-severity" type="number" min="1" max="5" value="2">
+      <label style="margin-top:8px;">Note</label>
+      <input id="observation-note" placeholder="optional note">
+      <button id="observation-create-btn" type="button" style="margin-top:10px;">Create Observation</button>
+      <p class="hint">Tip: click map to fill lat/lon.</p>
+    </div>
+    {% endif %}
+    {% if can_defect_write %}
+    <div>
+      <h3>Create Defect From Observation</h3>
+      <label>Observation ID</label>
+      <input id="defect-observation-id" placeholder="observation id">
+      <button id="defect-create-btn" type="button" style="margin-top:10px;">Create Defect</button>
+      <p class="hint">You can also create directly from observation table actions.</p>
+    </div>
+    {% endif %}
+  </div>
+  <div class="hint action-result" id="inspection-task-result" role="status" aria-live="polite"></div>
+</div>
+{% endif %}
 
 <div class="panel">
   <h2>Observations</h2>
   <table>
     <thead>
       <tr>
+        <th>ID</th>
         <th>Time</th>
         <th>Item</th>
         <th>Severity</th>
         <th>Position</th>
         <th>Note</th>
+        {% if can_defect_write %}
+        <th>Action</th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
       {% for item in observations %}
       <tr>
+        <td><code>{{ item.id }}</code></td>
         <td>{{ item.ts }}</td>
         <td>{{ item.item_code }}</td>
         <td>{{ item.severity }}</td>
         <td>{{ item.position_lat }}, {{ item.position_lon }}</td>
         <td>{{ item.note }}</td>
+        {% if can_defect_write %}
+        <td>
+          <button
+            type="button"
+            class="js-create-defect-from-observation"
+            data-observation-id="{{ item.id }}"
+          >
+            Create Defect
+          </button>
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
@@ -49,6 +106,9 @@
 
 {% block scripts %}
 <script>
+  window.__TASK_ID = {{ task.id | tojson }};
+  window.__CAN_INSPECTION_WRITE = {{ can_inspection_write | tojson }};
+  window.__CAN_DEFECT_WRITE = {{ can_defect_write | tojson }};
   window.__OBS = {{ observations_json | tojson }};
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

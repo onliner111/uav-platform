@@ -13,6 +13,7 @@ from app.domain.models import (
     OutcomeReportRetentionRunRequest,
     OutcomeReportTemplateCreate,
     OutcomeReportTemplateRead,
+    ReportExportStatus,
     ReportingClosureRateRead,
     ReportingExportRequest,
     ReportingOverviewRead,
@@ -160,6 +161,21 @@ def create_outcome_report_export(
     except (NotFoundError, ConflictError) as exc:
         _handle_reporting_error(exc)
         raise
+
+
+@router.get(
+    "/outcome-report-exports",
+    response_model=list[OutcomeReportExportRead],
+    dependencies=[Depends(require_perm(PERM_REPORTING_READ))],
+)
+def list_outcome_report_exports(
+    claims: Claims,
+    service: Service,
+    status_filter: ReportExportStatus | None = None,
+    limit: int = 50,
+) -> list[OutcomeReportExportRead]:
+    rows = service.list_outcome_report_exports(claims["tenant_id"], status=status_filter, limit=limit)
+    return [OutcomeReportExportRead.model_validate(item) for item in rows]
 
 
 @router.get(

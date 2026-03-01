@@ -1,0 +1,196 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Plans</div>
+    <div class="value">{{ plans|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Subscriptions</div>
+    <div class="value">{{ subscriptions|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Invoices</div>
+    <div class="value">{{ invoices|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Write Access</div>
+    <div class="value">{{ "YES" if can_billing_write else "NO" }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Billing + Quota Operations</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Create Plan</h3>
+      <label>Plan Code</label>
+      <input id="billing-plan-code" placeholder="PRO_MONTHLY" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Display Name</label>
+      <input id="billing-plan-name" placeholder="Pro Monthly" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Billing Cycle</label>
+      <select id="billing-plan-cycle" {% if not can_billing_write %}disabled{% endif %}>
+        {% for item in billing_cycle_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Price Cents</label>
+      <input id="billing-plan-price-cents" type="number" min="0" value="29900" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Currency</label>
+      <input id="billing-plan-currency" value="CNY" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Quotas JSON</label>
+      <textarea id="billing-plan-quotas-json" rows="4" {% if not can_billing_write %}disabled{% endif %}>[{"quota_key":"users","quota_limit":50,"enforcement_mode":"HARD_LIMIT"}]</textarea>
+      <button id="billing-plan-create-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Create Plan</button>
+    </div>
+    <div>
+      <h3>Subscription + Overrides</h3>
+      <label>Plan ID</label>
+      <input id="billing-subscription-plan-id" placeholder="plan id" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Subscription Status</label>
+      <select id="billing-subscription-status" {% if not can_billing_write %}disabled{% endif %}>
+        {% for item in billing_subscription_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Auto Renew</label>
+      <select id="billing-subscription-auto-renew" {% if not can_billing_write %}disabled{% endif %}>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+      <button id="billing-subscription-create-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Create Subscription</button>
+      <label style="margin-top:8px;">Quota Overrides JSON</label>
+      <textarea id="billing-overrides-json" rows="4" {% if not can_billing_write %}disabled{% endif %}>[{"quota_key":"devices","override_limit":120,"enforcement_mode":"SOFT_LIMIT","is_active":true}]</textarea>
+      <button id="billing-override-upsert-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Upsert Overrides</button>
+      <pre id="billing-subscription-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No subscription action result.</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Usage + Invoice Governance</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Usage Ingest + Quota Check</h3>
+      <label>Meter Key</label>
+      <input id="billing-usage-meter-key" value="users" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Quantity</label>
+      <input id="billing-usage-quantity" type="number" min="1" value="1" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Source Event ID</label>
+      <input id="billing-usage-source-event-id" placeholder="evt-demo-001" {% if not can_billing_write %}disabled{% endif %}>
+      <button id="billing-usage-ingest-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Ingest Usage</button>
+      <button id="billing-usage-summary-btn" type="button" style="margin-top:10px;">Load Usage Summary</button>
+      <button id="billing-quota-check-btn" type="button" style="margin-top:10px;">Check Quota</button>
+      <pre id="billing-usage-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No usage action result.</pre>
+    </div>
+    <div>
+      <h3>Invoice Lifecycle</h3>
+      <label>Period Start (ISO)</label>
+      <input id="billing-invoice-period-start" placeholder="2026-03-01T00:00:00+00:00" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Period End (ISO)</label>
+      <input id="billing-invoice-period-end" placeholder="2026-04-01T00:00:00+00:00" {% if not can_billing_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Adjustments Cents</label>
+      <input id="billing-invoice-adjustments" type="number" value="0" {% if not can_billing_write %}disabled{% endif %}>
+      <button id="billing-invoice-generate-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Generate Invoice</button>
+      <label style="margin-top:8px;">Invoice ID</label>
+      <input id="billing-invoice-id" placeholder="invoice id">
+      <button id="billing-invoice-detail-btn" type="button" style="margin-top:10px;">Load Invoice Detail</button>
+      <button id="billing-invoice-close-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Close Invoice</button>
+      <button id="billing-invoice-void-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Void Invoice</button>
+      <pre id="billing-invoice-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No invoice action result.</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Tenant Ops Snapshot</h2>
+  {% if can_identity_read %}
+  <div class="cards ui-kpi-grid">
+    <div class="card ui-kpi-card">
+      <div>Users</div>
+      <div class="value">{{ users|length }}</div>
+    </div>
+    <div class="card ui-kpi-card">
+      <div>Roles</div>
+      <div class="value">{{ roles|length }}</div>
+    </div>
+    <div class="card ui-kpi-card">
+      <div>Org Units</div>
+      <div class="value">{{ org_units|length }}</div>
+    </div>
+  </div>
+  <p class="hint" style="margin-top:10px;">Identity details are available in Platform Governance page.</p>
+  <a class="button-link" href="/ui/platform?token={{ token }}">Open Platform Governance</a>
+  {% else %}
+  <p class="hint">This account lacks <code>identity.read</code>; tenant identity overview is hidden.</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>Plan Catalog</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Plan ID</th>
+          <th>Code</th>
+          <th>Display Name</th>
+          <th>Cycle</th>
+          <th>Price</th>
+          <th>Quota Keys</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan, quotas in plans %}
+        <tr>
+          <td><code>{{ plan.id }}</code></td>
+          <td>{{ plan.plan_code }}</td>
+          <td>{{ plan.display_name }}</td>
+          <td>{{ plan.billing_cycle }}</td>
+          <td>{{ plan.price_cents }} {{ plan.currency }}</td>
+          <td>{{ quotas|map(attribute='quota_key')|join(', ') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Recent Invoices</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice ID</th>
+          <th>Status</th>
+          <th>Period</th>
+          <th>Total Cents</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in invoices %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.period_start }} ~ {{ item.period_end }}</td>
+          <td>{{ item.total_amount_cents }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<pre id="commercial-result" class="hint" style="min-height:22px;"></pre>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_BILLING_WRITE = {{ "true" if can_billing_write else "false" }};
+  window.__CAN_IDENTITY_READ = {{ "true" if can_identity_read else "false" }};
+  window.__TENANT_ID = "{{ tenant_id }}";
+</script>
+<script src="/static/ui_action_helpers.js"></script>
+<script src="/static/commercial_ops_ui.js"></script>
+{% endblock %}

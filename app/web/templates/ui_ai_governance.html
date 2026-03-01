@@ -1,0 +1,224 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Models</div>
+    <div class="value">{{ model_catalogs|length if can_ai_data_read else 0 }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Jobs</div>
+    <div class="value">{{ jobs|length if can_ai_data_read else 0 }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Outputs</div>
+    <div class="value">{{ outputs|length if can_ai_data_read else 0 }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Write Access</div>
+    <div class="value">{{ "YES" if can_ai_data_write else "NO" }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Model Catalog + Version Governance</h2>
+  {% if can_ai_data_read %}
+  <div class="grid cols-2">
+    <div>
+      <h3>Create Model Catalog</h3>
+      <label>Model Key</label>
+      <input id="ai-model-key" placeholder="builtin:uav-assistant-lite" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Provider</label>
+      <input id="ai-model-provider" value="builtin" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Display Name</label>
+      <input id="ai-model-display-name" value="uav-assistant-lite" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Description</label>
+      <input id="ai-model-description" placeholder="optional" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-model-create-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Create Model</button>
+      <label style="margin-top:8px;">Filter: Model Key</label>
+      <input id="ai-model-filter-key" placeholder="model key">
+      <label style="margin-top:8px;">Filter: Provider</label>
+      <input id="ai-model-filter-provider" placeholder="provider">
+      <button id="ai-model-list-btn" type="button" style="margin-top:10px;">Load Models</button>
+      <pre id="ai-model-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No model query result.</pre>
+    </div>
+    <div>
+      <h3>Version + Promotion</h3>
+      <label>Model ID</label>
+      <input id="ai-version-model-id" placeholder="model id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Version</label>
+      <input id="ai-version-value" placeholder="phase29.v1" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Initial Status</label>
+      <select id="ai-version-status" {% if not can_ai_data_write %}disabled{% endif %}>
+        {% for item in ai_version_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Threshold JSON</label>
+      <textarea id="ai-version-thresholds" rows="3" placeholder='{"confidence_min":0.8}' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
+      <button id="ai-version-create-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Create Version</button>
+      <label style="margin-top:8px;">Version ID</label>
+      <input id="ai-promote-version-id" placeholder="version id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Target Status</label>
+      <select id="ai-promote-status" {% if not can_ai_data_write %}disabled{% endif %}>
+        {% for item in ai_version_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="ai-promote-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Promote Version</button>
+      <button id="ai-version-list-btn" type="button" style="margin-top:10px;">List Versions</button>
+      <pre id="ai-version-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No version result.</pre>
+    </div>
+  </div>
+  {% else %}
+  <p class="hint">This account lacks <code>ai.read</code> or <code>reporting.read</code>; AI datasets are hidden.</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>Rollout Policy + Compare + Rollback</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Policy Upsert / Get</h3>
+      <label>Model ID</label>
+      <input id="ai-policy-model-id" placeholder="model id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Default Version ID</label>
+      <input id="ai-policy-default-version-id" placeholder="version id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Traffic Allocation JSON</label>
+      <textarea id="ai-policy-traffic" rows="3" placeholder='[{"version_id":"...","weight":100}]' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
+      <label style="margin-top:8px;">Threshold Overrides JSON</label>
+      <textarea id="ai-policy-threshold" rows="3" placeholder='{"confidence_min":0.75}' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
+      <button id="ai-policy-upsert-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Upsert Policy</button>
+      <button id="ai-policy-get-btn" type="button" style="margin-top:10px;">Get Policy</button>
+      <label style="margin-top:8px;">Rollback Target Version ID</label>
+      <input id="ai-rollback-target-version-id" placeholder="target version id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Rollback Reason</label>
+      <input id="ai-rollback-reason" placeholder="reason" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-rollback-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Rollback</button>
+      <pre id="ai-policy-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No policy result.</pre>
+    </div>
+    <div>
+      <h3>Evaluation Recompute / Compare</h3>
+      <label>Recompute Model ID (optional)</label>
+      <input id="ai-recompute-model-id" placeholder="model id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Recompute Job ID (optional)</label>
+      <input id="ai-recompute-job-id" placeholder="job id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-recompute-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Recompute</button>
+      <label style="margin-top:8px;">Left Version ID</label>
+      <input id="ai-compare-left-version-id" placeholder="left version id">
+      <label style="margin-top:8px;">Right Version ID</label>
+      <input id="ai-compare-right-version-id" placeholder="right version id">
+      <label style="margin-top:8px;">Compare Job ID (optional)</label>
+      <input id="ai-compare-job-id" placeholder="job id">
+      <button id="ai-compare-btn" type="button" style="margin-top:10px;">Compare</button>
+      <pre id="ai-eval-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No evaluation result.</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Jobs / Runs / Evidence Replay</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Job + Run Operations</h3>
+      <label>Job Task ID (optional)</label>
+      <input id="ai-job-task-id" placeholder="task id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Job Mission ID (optional)</label>
+      <input id="ai-job-mission-id" placeholder="mission id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Job Topic (optional)</label>
+      <input id="ai-job-topic" placeholder="defect" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Job Type</label>
+      <select id="ai-job-type" {% if not can_ai_data_write %}disabled{% endif %}>
+        <option value="SUMMARY">SUMMARY</option>
+        <option value="SUGGESTION">SUGGESTION</option>
+      </select>
+      <label style="margin-top:8px;">Trigger Mode</label>
+      <select id="ai-job-trigger-mode" {% if not can_ai_data_write %}disabled{% endif %}>
+        <option value="MANUAL">MANUAL</option>
+        <option value="SCHEDULED">SCHEDULED</option>
+        <option value="NEAR_REALTIME">NEAR_REALTIME</option>
+      </select>
+      <label style="margin-top:8px;">Bind Model Version ID (optional)</label>
+      <input id="ai-job-model-version-id" placeholder="model version id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-job-create-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Create Job</button>
+      <label style="margin-top:8px;">Job ID</label>
+      <input id="ai-job-id" placeholder="job id">
+      <button id="ai-jobs-list-btn" type="button" style="margin-top:10px;">List Jobs</button>
+      <button id="ai-runs-list-btn" type="button" style="margin-top:10px;">List Runs</button>
+      <button id="ai-run-trigger-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Trigger Run</button>
+      <label style="margin-top:8px;">Retry Run ID</label>
+      <input id="ai-retry-run-id" placeholder="run id" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-run-retry-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Retry Run</button>
+      <pre id="ai-job-run-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No job/run result.</pre>
+    </div>
+    <div>
+      <h3>Output Review + Evidence Chain</h3>
+      <label>Output Filter: Job ID</label>
+      <input id="ai-output-filter-job-id" placeholder="job id">
+      <label style="margin-top:8px;">Output Filter: Run ID</label>
+      <input id="ai-output-filter-run-id" placeholder="run id">
+      <label style="margin-top:8px;">Review Status</label>
+      <select id="ai-output-filter-status">
+        <option value="">ALL</option>
+        {% for item in ai_output_review_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="ai-outputs-list-btn" type="button" style="margin-top:10px;">List Outputs</button>
+      <label style="margin-top:8px;">Output ID</label>
+      <input id="ai-output-id" placeholder="output id">
+      <button id="ai-output-review-get-btn" type="button" style="margin-top:10px;">Load Review Bundle</button>
+      <label style="margin-top:8px;">Review Action</label>
+      <select id="ai-review-action" {% if not can_ai_data_write %}disabled{% endif %}>
+        {% for item in ai_review_action_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Review Note</label>
+      <input id="ai-review-note" placeholder="note" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Override Payload JSON</label>
+      <textarea id="ai-review-override" rows="3" placeholder='{"summary":"manual summary","suggestion":"manual suggestion"}' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
+      <button id="ai-output-review-submit-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Submit Review</button>
+      <pre id="ai-output-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No output review data.</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Model Catalog Snapshot</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Model Key</th>
+          <th>Provider</th>
+          <th>Display Name</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in model_catalogs %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.model_key }}</td>
+          <td>{{ item.provider }}</td>
+          <td>{{ item.display_name }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="hint action-result" id="ai-governance-result" role="status" aria-live="polite"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_AI_DATA_READ = {{ can_ai_data_read | tojson }};
+  window.__CAN_AI_DATA_WRITE = {{ can_ai_data_write | tojson }};
+</script>
+<script src="/static/ai_governance_ui.js"></script>
+{% endblock %}

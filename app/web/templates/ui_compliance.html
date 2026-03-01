@@ -1,0 +1,366 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Approvals</div>
+    <div class="value">{{ approvals|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Airspace Zones</div>
+    <div class="value">{{ zones|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Preflight Templates</div>
+    <div class="value">{{ preflight_templates|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Decision Records</div>
+    <div class="value">{{ decision_records|length }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="hub-head ui-section-head">
+    <h2>Approvals</h2>
+    <div class="ui-action-row">
+      <input id="approval-filter-entity-type" placeholder="entity type">
+      <input id="approval-filter-entity-id" placeholder="entity id">
+      <button id="approval-filter-btn" type="button">Filter</button>
+      <button id="approval-export-btn" type="button">Export Audit</button>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Entity Type</th>
+          <th>Entity ID</th>
+          <th>Status</th>
+          <th>Approver</th>
+          <th>Created</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in approvals %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.entity_type }}</td>
+          <td>{{ item.entity_id }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.approved_by or "-" }}</td>
+          <td>{{ item.created_at }}</td>
+          <td>
+            <button
+              type="button"
+              class="js-select-approval"
+              data-entity-type="{{ item.entity_type }}"
+              data-entity-id="{{ item.entity_id }}"
+            >
+              Select
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <pre id="approval-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No approval data loaded.</pre>
+</div>
+
+<div class="panel">
+  <h2>Approval Flow Workbench</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Create Approval Record</h3>
+      <label>Entity Type</label>
+      <input id="approval-create-entity-type" placeholder="MISSION">
+      <label style="margin-top:8px;">Entity ID</label>
+      <input id="approval-create-entity-id" placeholder="entity id">
+      <label style="margin-top:8px;">Status</label>
+      <input id="approval-create-status" value="APPROVED">
+      <button id="approval-create-btn" type="button" style="margin-top:10px;" {% if not can_approval_write %}disabled{% endif %}>Create Approval</button>
+      <p class="hint">Approval record API is scoped by `approval.write`.</p>
+    </div>
+    <div>
+      <h3>Batch Create Approvals</h3>
+      <label>Entity Type</label>
+      <input id="approval-batch-entity-type" placeholder="MISSION">
+      <label style="margin-top:8px;">Status</label>
+      <input id="approval-batch-status" value="APPROVED">
+      <label style="margin-top:8px;">Entity IDs (one per line)</label>
+      <textarea id="approval-batch-entity-ids" rows="4" placeholder="entity-id-a&#10;entity-id-b"></textarea>
+      <button id="approval-batch-create-btn" type="button" style="margin-top:10px;" {% if not can_approval_write %}disabled{% endif %}>Batch Create</button>
+    </div>
+  </div>
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Create Flow Template</h3>
+      <label>Name</label>
+      <input id="flow-template-name" placeholder="mission-two-step">
+      <label style="margin-top:8px;">Entity Type</label>
+      <input id="flow-template-entity-type" value="MISSION">
+      <label style="margin-top:8px;">Steps JSON</label>
+      <textarea id="flow-template-steps" rows="4" placeholder='[{"name":"L1","reviewer_user_ids":[]}]'></textarea>
+      <button id="flow-template-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Template</button>
+    </div>
+    <div>
+      <h3>Create Flow Instance</h3>
+      <label>Template ID</label>
+      <input id="flow-instance-template-id" placeholder="template id">
+      <label style="margin-top:8px;">Entity Type</label>
+      <input id="flow-instance-entity-type" value="MISSION">
+      <label style="margin-top:8px;">Entity ID</label>
+      <input id="flow-instance-entity-id" placeholder="mission id">
+      <button id="flow-instance-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Instance</button>
+    </div>
+  </div>
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Act Flow Instance</h3>
+      <label>Instance ID</label>
+      <input id="flow-action-instance-id" placeholder="instance id">
+      <label style="margin-top:8px;">Action</label>
+      <select id="flow-action-type" {% if not can_mission_write %}disabled{% endif %}>
+        {% for item in approval_flow_action_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Note</label>
+      <input id="flow-action-note" placeholder="optional note" {% if not can_mission_write %}disabled{% endif %}>
+      <button id="flow-action-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Apply Action</button>
+      <button id="flow-load-btn" type="button" style="margin-top:10px;">Load Instance</button>
+    </div>
+    <div>
+      <h3>Batch Flow Action</h3>
+      <label>Instance IDs (one per line)</label>
+      <textarea id="flow-batch-instance-ids" rows="4" placeholder="instance-id-a&#10;instance-id-b" {% if not can_mission_write %}disabled{% endif %}></textarea>
+      <label style="margin-top:8px;">Action</label>
+      <select id="flow-batch-action" {% if not can_mission_write %}disabled{% endif %}>
+        {% for item in approval_flow_action_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="flow-batch-action-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Batch Apply</button>
+    </div>
+  </div>
+  {% if not can_approval_write and not can_mission_write %}
+  <p class="hint">Read-only mode: approval and flow write actions are disabled.</p>
+  {% endif %}
+  <pre id="flow-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No flow data loaded.</pre>
+</div>
+
+{% if can_mission_read %}
+<div class="panel">
+  <h2>Airspace Zones</h2>
+  <div class="grid cols-2">
+    <div>
+      <label>Name</label>
+      <input id="zone-create-name" placeholder="zone name">
+      <label style="margin-top:8px;">Zone Type</label>
+      <select id="zone-create-type" {% if not can_mission_write %}disabled{% endif %}>
+        {% for item in zone_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Policy Layer</label>
+      <select id="zone-create-layer" {% if not can_mission_write %}disabled{% endif %}>
+        {% for item in zone_layer_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Policy Effect</label>
+      <select id="zone-create-effect" {% if not can_mission_write %}disabled{% endif %}>
+        {% for item in zone_effect_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Org Unit ID (optional)</label>
+      <input id="zone-create-org-unit-id" placeholder="org unit id" {% if not can_mission_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Area Code (optional)</label>
+      <input id="zone-create-area-code" placeholder="area code" {% if not can_mission_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Polygon WKT</label>
+      <input id="zone-create-wkt" placeholder="POLYGON((114.19 30.09,114.21 30.09,114.21 30.11,114.19 30.11,114.19 30.09))" {% if not can_mission_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Max Alt (optional)</label>
+      <input id="zone-create-max-alt" type="number" min="0" step="0.1" placeholder="120" {% if not can_mission_write %}disabled{% endif %}>
+      <button id="zone-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Zone</button>
+    </div>
+    <div>
+      <h3>Zone Filter</h3>
+      <label>Type</label>
+      <select id="zone-filter-type">
+        <option value="">ALL</option>
+        {% for item in zone_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Layer</label>
+      <select id="zone-filter-layer">
+        <option value="">ALL</option>
+        {% for item in zone_layer_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Org Unit ID</label>
+      <input id="zone-filter-org-unit-id" placeholder="org unit id">
+      <button id="zone-filter-btn" type="button" style="margin-top:10px;">Filter Zones</button>
+      <pre id="zone-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No zone query result.</pre>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Layer</th>
+          <th>Effect</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in zones %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.zone_type }}</td>
+          <td>{{ item.policy_layer }}</td>
+          <td>{{ item.policy_effect }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Preflight Templates</h2>
+  <div class="grid cols-2">
+    <div>
+      <h3>Create Preflight Template</h3>
+      <label>Name</label>
+      <input id="preflight-template-name" placeholder="template name">
+      <label style="margin-top:8px;">Description</label>
+      <input id="preflight-template-description" placeholder="optional description">
+      <label style="margin-top:8px;">Template Version</label>
+      <input id="preflight-template-version" value="v1">
+      <label style="margin-top:8px;">Items JSON</label>
+      <textarea id="preflight-template-items" rows="4" placeholder='[{"code":"CHK-A","title":"airframe check"}]'></textarea>
+      <label style="margin-top:8px;">Evidence Requirements JSON</label>
+      <textarea id="preflight-template-evidence" rows="3" placeholder='{"required": true}'></textarea>
+      <button id="preflight-template-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Template</button>
+    </div>
+    <div>
+      <h3>Mission Preflight Execute</h3>
+      <label>Mission ID</label>
+      <input id="preflight-mission-id" placeholder="mission id">
+      <label style="margin-top:8px;">Template ID (optional)</label>
+      <input id="preflight-template-id" placeholder="template id">
+      <label style="margin-top:8px;">Required Items JSON (optional)</label>
+      <textarea id="preflight-required-items" rows="3" placeholder='[{"code":"CHK-A","title":"airframe"}]'></textarea>
+      <div class="ui-action-row" style="margin-top:10px;">
+        <button id="preflight-init-btn" type="button" {% if not can_mission_write %}disabled{% endif %}>Init</button>
+        <button id="preflight-load-btn" type="button">Load</button>
+      </div>
+      <label style="margin-top:8px;">Item Code</label>
+      <input id="preflight-item-code" placeholder="CHK-A">
+      <label style="margin-top:8px;">Checked</label>
+      <select id="preflight-item-checked" {% if not can_mission_write %}disabled{% endif %}>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+      <label style="margin-top:8px;">Note</label>
+      <input id="preflight-item-note" placeholder="optional note" {% if not can_mission_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Evidence JSON</label>
+      <textarea id="preflight-item-evidence" rows="3" placeholder='{"photo_url":"https://example.invalid/evidence.jpg"}' {% if not can_mission_write %}disabled{% endif %}></textarea>
+      <button id="preflight-check-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Check Item</button>
+      <pre id="preflight-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No preflight data.</pre>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Version</th>
+          <th>Items</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in preflight_templates %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.template_version }}</td>
+          <td>{{ item.items|length }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="hub-head ui-section-head">
+    <h2>Decision Records</h2>
+    <div class="ui-action-row">
+      <input id="decision-filter-source" placeholder="source">
+      <input id="decision-filter-entity-type" placeholder="entity type">
+      <input id="decision-filter-entity-id" placeholder="entity id">
+      <button id="decision-filter-btn" type="button">Filter</button>
+      <button id="decision-export-btn" type="button">Export Decisions</button>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Source</th>
+          <th>Entity</th>
+          <th>Decision</th>
+          <th>Reason</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in decision_records %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.source }}</td>
+          <td>{{ item.entity_type }} / {{ item.entity_id }}</td>
+          <td>{{ item.decision }}</td>
+          <td>{{ item.reason_code }}</td>
+          <td>{{ item.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <pre id="decision-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No decision data loaded.</pre>
+</div>
+{% else %}
+<div class="panel">
+  <h2>Mission Compliance Data</h2>
+  <p class="hint">This account currently lacks <code>mission.read</code>, so zone/template/decision datasets are hidden.</p>
+</div>
+{% endif %}
+
+<div class="hint action-result" id="compliance-result" role="status" aria-live="polite"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_APPROVAL_WRITE = {{ can_approval_write | tojson }};
+  window.__CAN_MISSION_WRITE = {{ can_mission_write | tojson }};
+  window.__CAN_MISSION_READ = {{ can_mission_read | tojson }};
+</script>
+<script src="/static/compliance_ui.js"></script>
+{% endblock %}

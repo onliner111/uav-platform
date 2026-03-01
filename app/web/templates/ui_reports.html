@@ -1,0 +1,302 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>Missions</div>
+    <div class="value">{{ overview.missions_total if can_reporting_read else 0 }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Defect Closure</div>
+    <div class="value">
+      {% if can_reporting_read %}
+      {{ "%.1f"|format((closure_rate.closure_rate or 0) * 100) }}%
+      {% else %}
+      0.0%
+      {% endif %}
+    </div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Raw Records</div>
+    <div class="value">{{ raw_records|length if can_inspection_read else 0 }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Outcome Records</div>
+    <div class="value">{{ outcome_records|length if can_inspection_read else 0 }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Report Templates</div>
+    <div class="value">{{ outcome_templates|length if can_reporting_read else 0 }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>Export Tasks</div>
+    <div class="value">{{ outcome_exports|length if can_reporting_read else 0 }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Data Outcomes Workbench</h2>
+  {% if can_inspection_read %}
+  <div class="grid cols-2">
+    <div>
+      <h3>Raw Data Filters</h3>
+      <label>Task ID</label>
+      <input id="raw-filter-task-id" placeholder="task id">
+      <label style="margin-top:8px;">Mission ID</label>
+      <input id="raw-filter-mission-id" placeholder="mission id">
+      <label style="margin-top:8px;">Data Type</label>
+      <select id="raw-filter-type">
+        <option value="">ALL</option>
+        {% for item in raw_data_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="raw-filter-btn" type="button" style="margin-top:10px;">Load Raw</button>
+      <label style="margin-top:8px;">Raw ID</label>
+      <input id="raw-storage-id" placeholder="raw id" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Access Tier</label>
+      <select id="raw-storage-tier" {% if not can_inspection_write %}disabled{% endif %}>
+        {% for item in raw_access_tier_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Storage Region (optional)</label>
+      <input id="raw-storage-region" placeholder="local" {% if not can_inspection_write %}disabled{% endif %}>
+      <button id="raw-storage-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>Transition Storage</button>
+      <pre id="raw-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No raw query result.</pre>
+    </div>
+    <div>
+      <h3>Outcome Records</h3>
+      <label>Task ID</label>
+      <input id="outcome-filter-task-id" placeholder="task id">
+      <label style="margin-top:8px;">Mission ID</label>
+      <input id="outcome-filter-mission-id" placeholder="mission id">
+      <label style="margin-top:8px;">Source Type</label>
+      <select id="outcome-filter-source">
+        <option value="">ALL</option>
+        {% for item in outcome_source_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Outcome Type</label>
+      <select id="outcome-filter-type">
+        <option value="">ALL</option>
+        {% for item in outcome_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Status</label>
+      <select id="outcome-filter-status">
+        <option value="">ALL</option>
+        {% for item in outcome_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="outcome-filter-btn" type="button" style="margin-top:10px;">Load Outcomes</button>
+      <pre id="outcome-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No outcome query result.</pre>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Create Outcome Record</h3>
+      <label>Source Type</label>
+      <select id="outcome-create-source" {% if not can_inspection_write %}disabled{% endif %}>
+        {% for item in outcome_source_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Source ID</label>
+      <input id="outcome-create-source-id" placeholder="source id" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Outcome Type</label>
+      <select id="outcome-create-type" {% if not can_inspection_write %}disabled{% endif %}>
+        {% for item in outcome_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Task ID (optional)</label>
+      <input id="outcome-create-task-id" placeholder="task id" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Mission ID (optional)</label>
+      <input id="outcome-create-mission-id" placeholder="mission id" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Payload JSON</label>
+      <textarea id="outcome-create-payload" rows="3" placeholder='{"note":"manual outcome"}' {% if not can_inspection_write %}disabled{% endif %}></textarea>
+      <button id="outcome-create-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>Create Outcome</button>
+    </div>
+    <div>
+      <h3>Lifecycle + Versions</h3>
+      <label>Outcome ID</label>
+      <input id="outcome-status-id" placeholder="outcome id" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Target Status</label>
+      <select id="outcome-status-target" {% if not can_inspection_write %}disabled{% endif %}>
+        {% for item in outcome_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Note (optional)</label>
+      <input id="outcome-status-note" placeholder="status note" {% if not can_inspection_write %}disabled{% endif %}>
+      <button id="outcome-status-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>Update Status</button>
+      <label style="margin-top:8px;">Versions Outcome ID</label>
+      <input id="outcome-versions-id" placeholder="outcome id">
+      <button id="outcome-versions-btn" type="button" style="margin-top:10px;">Load Versions</button>
+      <pre id="outcome-versions-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No version data.</pre>
+    </div>
+  </div>
+  {% else %}
+  <p class="hint">This account lacks <code>inspection:read</code>; outcome datasets are hidden.</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>Reporting Center</h2>
+  {% if can_reporting_read %}
+  <div class="grid cols-2">
+    <div>
+      <h3>Create Template</h3>
+      <label>Name</label>
+      <input id="report-template-name" placeholder="template name" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Default Format</label>
+      <select id="report-template-format" {% if not can_reporting_write %}disabled{% endif %}>
+        {% for item in report_format_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Title Template</label>
+      <input id="report-template-title" value="Outcome Report count={count}" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Body Template</label>
+      <textarea id="report-template-body" rows="3" placeholder="task={task_id} topic={topic}" {% if not can_reporting_write %}disabled{% endif %}></textarea>
+      <button id="report-template-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>Create Template</button>
+    </div>
+    <div>
+      <h3>Create Export Task</h3>
+      <label>Template ID</label>
+      <input id="report-export-template-id" placeholder="template id" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Format</label>
+      <select id="report-export-format" {% if not can_reporting_write %}disabled{% endif %}>
+        <option value="">DEFAULT</option>
+        {% for item in report_format_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Task ID (optional)</label>
+      <input id="report-export-task-id" placeholder="task id" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Topic (optional)</label>
+      <input id="report-export-topic" placeholder="defect" {% if not can_reporting_write %}disabled{% endif %}>
+      <button id="report-export-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>Create Export</button>
+      <pre id="report-export-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No export action result.</pre>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:12px;">
+    <div>
+      <h3>Export Task Tracking</h3>
+      <label>Status</label>
+      <select id="report-exports-status">
+        <option value="">ALL</option>
+        {% for item in report_export_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">Limit</label>
+      <input id="report-exports-limit" type="number" min="1" max="200" value="20">
+      <button id="report-exports-load-btn" type="button" style="margin-top:10px;">Load Exports</button>
+      <label style="margin-top:8px;">Export ID</label>
+      <input id="report-export-id" placeholder="export id">
+      <button id="report-export-get-btn" type="button" style="margin-top:10px;">Load Detail</button>
+      <pre id="report-export-detail-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No export detail.</pre>
+    </div>
+    <div>
+      <h3>Retention Lifecycle</h3>
+      <label>Retention Days</label>
+      <input id="report-retention-days" type="number" min="1" value="30" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">Dry Run</label>
+      <select id="report-retention-dry" {% if not can_reporting_write %}disabled{% endif %}>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+      <button id="report-retention-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>Run Retention</button>
+      <pre id="report-retention-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No retention result.</pre>
+    </div>
+  </div>
+  {% else %}
+  <p class="hint">This account lacks <code>reporting.read</code>; reporting datasets are hidden.</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>AI Governance Entry</h2>
+  {% if can_ai_read %}
+  <p class="hint">Use the dedicated AI governance workbench for model/version governance and evidence replay.</p>
+  <a class="button-link" href="/ui/ai-governance?token={{ token }}">Open AI Governance Workbench</a>
+  {% else %}
+  <p class="hint">This account lacks <code>ai.read</code>; AI governance page is hidden from navigation.</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>Report Templates</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Default Format</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in outcome_templates %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.format_default }}</td>
+          <td>{{ item.is_active }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Recent Export Tasks</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Template</th>
+          <th>Format</th>
+          <th>Status</th>
+          <th>Topic</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in outcome_exports %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.template_id }}</td>
+          <td>{{ item.report_format }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.topic or "-" }}</td>
+          <td>{{ item.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="hint action-result" id="reports-result" role="status" aria-live="polite"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_REPORTING_READ = {{ can_reporting_read | tojson }};
+  window.__CAN_REPORTING_WRITE = {{ can_reporting_write | tojson }};
+  window.__CAN_INSPECTION_READ = {{ can_inspection_read | tojson }};
+  window.__CAN_INSPECTION_WRITE = {{ can_inspection_write | tojson }};
+</script>
+<script src="/static/reports_ui.js"></script>
+{% endblock %}

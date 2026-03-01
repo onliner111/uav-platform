@@ -11,6 +11,9 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="console-body">
+  <a class="skip-link" href="#console-main">Skip to main content</a>
+  <div class="page-glow page-glow-a"></div>
+  <div class="page-glow page-glow-b"></div>
   <div class="console-app">
     <header class="console-topbar">
       <div>
@@ -27,9 +30,11 @@
           id="global-search"
           class="console-search"
           type="search"
-          placeholder="Search modules and quick entries"
+          placeholder="Search navigation and quick entries"
+          aria-label="Search navigation entries"
           autocomplete="off"
         >
+        <button id="nav-toggle" type="button" class="ghost nav-toggle" aria-controls="console-sidebar" aria-expanded="false">Menu</button>
         <a class="console-link" href="/ui/login?switch=1&next={{ request.url.path }}">Switch Tenant</a>
         <span class="console-meta">Tenant: {{ tenant_id }}</span>
         <span class="console-meta">User: {{ user_id }}</span>
@@ -40,24 +45,30 @@
       </div>
     </header>
 
-    <div class="console-frame">
-      <aside class="console-sidebar">
+    <div class="console-frame" id="console-frame">
+      <aside class="console-sidebar" id="console-sidebar" aria-label="Primary navigation">
         <div class="console-sidebar-title">Navigation</div>
-        <ul class="console-nav">
-          {% for item in nav_items %}
-          <li class="console-nav-item {% if item.active %}active{% endif %}" data-nav-item data-nav-label="{{ item.label | lower }}">
-            <a href="{{ item.href }}" data-nav-link>{{ item.label }}</a>
-            <button type="button" class="fav-toggle" data-fav-toggle data-fav-key="{{ item.key }}">Fav</button>
-          </li>
-          {% endfor %}
-        </ul>
+        {% for group in nav_groups %}
+        <section class="console-nav-group">
+          <div class="console-nav-group-title">{{ group.label }}</div>
+          <p class="console-nav-group-hint">{{ group.description }}</p>
+          <ul class="console-nav">
+            {% for item in group["items"] %}
+            <li class="console-nav-item {% if item.active %}active{% endif %}" data-nav-item data-nav-label="{{ item.label | lower }}">
+              <a href="{{ item.href }}" data-nav-link>{{ item.label }}</a>
+              <button type="button" class="fav-toggle" data-fav-toggle data-fav-key="{{ item.key }}">Fav</button>
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
         <div class="console-sidebar-title">Quick Access</div>
-        <ul id="quick-access" class="console-quick-list">
+        <ul id="quick-access" class="console-quick-list" aria-label="Quick access favorites">
           <li class="hint">Use "Fav" to pin entries.</li>
         </ul>
       </aside>
 
-      <main class="console-main">
+      <main class="console-main" id="console-main">
         <section class="console-page-head">
           <h1>{{ page_title }}</h1>
           <p>{{ page_subtitle }}</p>
@@ -66,11 +77,13 @@
       </main>
     </div>
   </div>
+  <button type="button" class="console-overlay" id="console-overlay" aria-hidden="true"></button>
 
   <script>
     window.__CONSOLE_AUTH = {{ {"token": token, "csrfToken": csrf_token, "tenantId": tenant_id, "userId": user_id} | tojson }};
     window.__TOKEN = {{ token | tojson }};
   </script>
+  <script src="/static/ui_action_helpers.js"></script>
   <script src="/static/console_shell.js"></script>
   {% block scripts %}{% endblock %}
 </body>
