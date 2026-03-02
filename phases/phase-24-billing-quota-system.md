@@ -1,7 +1,6 @@
 # Phase 24 - 计费与配额系统
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-23-ai-model-governance-v2.md`
 
 ## 1. Objective

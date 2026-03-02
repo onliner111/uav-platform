@@ -50,6 +50,10 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 46. `phases/phase-37-notification-collaboration-hub.md`
 47. `phases/phase-38-delivery-onboarding-operations.md`
 48. `phases/phase-39-release-adoption-lifecycle.md`
+49. `phases/phase-40-real-uav-integration-hardening.md`
+50. `phases/phase-41-dock-airport-control-integration.md`
+51. `phases/phase-42-media-stream-engineering.md`
+52. `phases/phase-43-pilot-rollout-operational-validation.md`
 
 Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
@@ -70,14 +74,14 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-03-02T05:06:26.0016159Z`
+- updated_at_utc: `2026-03-02T05:19:45.7280148Z`
 - current_phase: `DONE`
 - phase_status: `DONE`
 - last_success_phase: `phase-39-release-adoption-lifecycle.md`
-- current_focus: `Phase 39 is closed; 39-WP1..39-WP6 extended /ui/platform into a release-adoption console with release checks, help center, release notes, and gray-enable guidance. There is no active phase checkpoint now.`
+- current_focus: `Phase 39 is closed; 39-WP1..39-WP6 extended /ui/platform into a release-adoption console. Phase 40-43 blueprints are now added for real UAV integration, dock/airport control, media engineering, and pilot rollout validation, but there is still no active phase checkpoint.`
 
 ## Next TODO (Execution Target)
-1. No active execution phase. Wait for a new blueprint before moving the checkpoint out of `DONE`.
+1. No active execution phase. Phase 40-43 blueprints now exist, but wait for an explicit command before moving the checkpoint out of `DONE`.
 2. Reuse the Docker Compose regression checklist below for any future changes.
 3. Use `phases/state.md` as the execution SSOT; do not reopen completed phases unless explicitly requested.
 4. Keep all future UI changes at or above the Phase 32 productization baseline; do not allow UX regressions.
@@ -110,4 +114,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=DONE，status=DONE，last_success_phase=phase-39-release-adoption-lifecycle.md；Phase 39 已完成并关账，所有既定阶段已闭环，如需继续请先提供新的阶段蓝图。`
+`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=DONE，status=DONE，last_success_phase=phase-39-release-adoption-lifecycle.md；Phase 40-43 蓝图已补齐但尚未启动，如需继续请显式把 checkpoint 切到 phase-40-real-uav-integration-hardening.md。`

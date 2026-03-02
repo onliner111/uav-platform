@@ -1,7 +1,6 @@
 # Phase 17 - 多组织与数据权限 2.0
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-16-saas-console-ui.md`
 
 ## 1. Objective

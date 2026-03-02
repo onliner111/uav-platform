@@ -6,14 +6,15 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: DONE (all planned phases complete; from phases/state.md)
+- Current Phase: DONE (all executed phases complete; from phases/state.md)
 - Current Sub-Phase / Blueprint: Phase 39 is closed. `39-WP1`..`39-WP6` extended `/ui/platform` into a release-adoption console with release checks, help-center guidance, release notes, and gray-enable controls while preserving the Phase 38 onboarding baseline.
-- Next Target: no active checkpoint. Wait for a new blueprint before moving `phases/state.md` out of `DONE`.
+- Next Target: no active checkpoint. Phase 40-43 blueprints are now planned for the real-integration second cycle, but `phases/state.md` remains `DONE` until explicitly reopened.
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-03-02T05:06:26.0016159Z
+> Last verified at (UTC): 2026-03-02T05:19:45.7280148Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
+> Planning note (2026-03-02T05:19:45.7280148Z): Added Phase 40-43 planning blueprints for real UAV integration hardening, dock/airport control integration, media-stream engineering, and pilot rollout validation. Checkpoint remains `DONE`; new phases are planned only and require an explicit command before execution.
 > Closeout note (2026-03-02T05:06:26.0016159Z): Phase 39 closed as DONE. Extended `/ui/platform` into a release-adoption lifecycle console (`上线检查清单与巡检面板`, `内置帮助中心与培训模式`, `发布说明与升级引导`, `功能开关与灰度启用`), added replayable demo `demo_phase39_release_adoption_lifecycle.py`, and moved checkpoint to `DONE`.
 > Closeout note (2026-03-02T04:39:15.7859953Z): Phase 38 closed as DONE. Delivered delivery-first onboarding productization on `/ui/platform` (`租户开通向导`, config-pack center, mode switching, handoff panels, and governance overview), added replayable demo `demo_phase38_delivery_onboarding_operations.py`, and moved checkpoint to `phase-39-release-adoption-lifecycle.md` with status `READY`.
 > Closeout note (2026-03-02T04:20:34.9326215Z): Phase 37 closed as DONE. Delivered collaboration-first notification productization on `/ui/alerts` (`消息中心与待办中心`, unified to-do, channel strategy, escalation tracking, role-priority guidance), added replayable demo `demo_phase37_notification_collaboration_hub.py`, and moved checkpoint to `phase-38-delivery-onboarding-operations.md` with status `READY`.
@@ -153,7 +154,10 @@
 - phase-39-release-adoption-lifecycle.md: DONE
 
 ## 4.2 Planned Next Phases（后续规划阶段）
-- none (awaiting a new blueprint)
+- phase-40-real-uav-integration-hardening.md: PLANNED
+- phase-41-dock-airport-control-integration.md: PLANNED
+- phase-42-media-stream-engineering.md: PLANNED
+- phase-43-pilot-rollout-operational-validation.md: PLANNED
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。

@@ -1,9 +1,9 @@
 # 城市低空综合治理与应急指挥平台
-# 管理员操作手册（V2.0）
+# 管理员操作手册（V3.0）
 
-- 文档版本：V2.0
+- 文档版本：V3.0
 - 适用范围：平台管理员、业务管理员、安全审计管理员
-- 更新日期：2026-02-25
+- 更新日期：2026-03-02
 
 ---
 
@@ -19,6 +19,18 @@
 6. 成果目录与告警处置治理
 7. AI 产出人审与责任追踪
 8. 开放平台凭据与 Webhook 治理
+9. 上线保障、培训引导与版本运营
+
+### 1.1 建议谁看这份文档
+
+本手册主要面向：
+
+- 平台管理员
+- 业务管理员
+- 安全审计管理员
+- 交付管理员
+
+如果你主要负责日常业务操作而不是配置治理，建议优先阅读用户手册。
 
 ---
 
@@ -28,10 +40,14 @@
 
 - OpenAPI：`/docs`
 - 核心 UI 页面：
+  - `/ui/console`
   - `/ui/inspection`
   - `/ui/defects`
   - `/ui/emergency`
   - `/ui/command-center`
+  - `/ui/alerts`
+  - `/ui/reports`
+  - `/ui/platform`
 
 ### 2.2 前置准备
 
@@ -111,7 +127,20 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 4. 组织节点建议显式设置 `unit_type`（`ORGANIZATION` / `DEPARTMENT`）。
 5. 用户绑定组织时可写入岗位信息（`job_title`、`job_code`、`is_manager`）。
 
-### 3.6 数据边界策略（08B）
+### 3.6 管理员工作台与专项入口
+
+推荐入口：
+
+- 工作台首页：`/ui/console`
+- 管理员专项入口：控制台侧边栏与首页的“管理员专项入口”区块
+
+说明：
+
+1. 主导航用于高频业务页面。
+2. 低频技术治理页应从“管理员专项”进入。
+3. 不建议再依赖记忆直达 URL 作为日常使用方式。
+
+### 3.7 数据边界策略（08B）
 
 用途：按 `组织/项目/区域/任务` 维度限制用户可见数据范围。
 
@@ -146,7 +175,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 4. 08C 起策略变更与跨租户拒绝会写入结构化审计字段（`who/when/where/what/result`）。
 5. 17-P2 起支持显式拒绝维度（`denied_*`），并按固定顺序解析冲突：`explicit_deny > explicit_allow > inherited_allow > default_deny`。
 
-### 3.6.1 批量授权（08C）
+### 3.7.1 批量授权（08C）
 
 用途：一次请求为用户绑定多角色，返回逐项处理结果，适合批量授权场景。
 
@@ -169,7 +198,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 3. `denied_count`：跨租户拒绝数量（`cross_tenant_denied`）。
 4. `missing_count`：角色不存在数量（`not_found`）。
 
-### 3.6.2 平台超管治理（17-WP3）
+### 3.7.2 平台超管治理（17-WP3）
 
 用途：提供跨租户治理只读入口（租户清单、按租户查看用户）。
 
@@ -183,7 +212,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 1. 必须显式拥有 `platform.super_admin` 权限。
 2. 仅 `*`（wildcard）权限不足以调用该入口。
 
-### 3.6.3 角色继承策略与冲突解析（17-P2）
+### 3.7.3 角色继承策略与冲突解析（17-P2）
 
 用途：通过角色策略提供“继承允许”，并与用户显式允许/显式拒绝组合计算最终可见范围。
 
@@ -199,7 +228,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 2. 再在用户上写入显式允许或显式拒绝，处理例外。
 3. 通过 `data-policy:effective` 校验最终结果是否符合预期。
 
-### 3.7 推荐角色划分
+### 3.8 推荐角色划分
 
 1. `platform_admin`：全权限（平台运维/应急总指挥）
 2. `inspection_manager`：巡查与问题闭环管理
@@ -295,6 +324,8 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 页面：`/ui/command-center?token=<token>`
 
+当前页面已升级为“一张图值守模式”，支持值守 / 领导 / 演示三种模式，并提供事件时间轴、焦点对象和图层开关。
+
 数据接口：
 
 - `GET /api/dashboard/stats`
@@ -327,7 +358,74 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 9. 报表管理
+## 9. 通知协同与值守治理（37）
+
+页面：
+
+- `/ui/alerts`
+
+当前页面已升级为“通知协同中心”，管理员重点关注：
+
+1. 消息中心与待办积压
+2. 告警处理与催办状态
+3. 通知渠道配置是否符合值守口径
+4. 升级路径与回执链是否完整
+
+关键说明：
+
+- 主业务人员应从统一待办进入，不建议要求其手工记忆告警 ID。
+- 渠道策略、升级规则与低频配置应保持在管理语义下，不污染业务主路径。
+
+---
+
+## 10. 业务闭环与汇报管理（36）
+
+页面：
+
+- `/ui/reports`
+
+当前页面已升级为“业务闭环与汇报”，管理员重点关注：
+
+1. 问题闭环看板是否存在积压
+2. 成果审核与复核是否及时
+3. 典型案例是否形成沉淀
+4. 领导汇报口径是否一致
+
+接口：
+
+- `GET /api/reporting/overview`
+- `GET /api/reporting/closure-rate`
+- `GET /api/reporting/device-utilization`
+- `POST /api/reporting/export`
+
+---
+
+## 11. 平台开通、上线与版本运营（38-39）
+
+页面：
+
+- `/ui/platform`
+
+当前页面已升级为“上线保障与版本运营台”，覆盖：
+
+- 租户开通向导
+- 标准配置包与模板中心
+- 模式切换与交付交接
+- 上线检查清单与巡检面板
+- 内置帮助中心与培训模式
+- 发布说明与升级引导
+- 功能开关与灰度启用
+
+管理员要求：
+
+1. 先完成租户、组织、角色、账号准备，再进入生产模式。
+2. 上线前必须完成页面内上线检查清单。
+3. 培训模式、演示模式、生产模式要有明确使用口径。
+4. 高级治理区只用于补充治理动作，不作为日常主路径。
+
+---
+
+## 12. 报表管理
 
 接口：
 
@@ -344,7 +442,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 10. 租户级数据导出与清理管理（07C）
+## 13. 租户级数据导出与清理管理（07C）
 
 适用场景：
 1. 租户数据交付（导出）
@@ -386,7 +484,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 4. 跨租户访问按系统规则返回 404 语义。
 
 ---
-## 11. 成果与告警闭环治理（13）
+## 14. 成果与告警闭环治理（13）
 
 ### 11.1 成果目录治理
 
@@ -419,7 +517,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 12. AI 助手治理（14）
+## 15. AI 助手治理（14）
 
 ### 12.1 任务与运行治理
 
@@ -445,7 +543,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 13. KPI 与开放平台治理（15）
+## 16. KPI 与开放平台治理（15）
 
 ### 13.1 KPI 与治理报表
 
@@ -479,13 +577,14 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 14. 管理员日常巡检清单
+## 17. 管理员日常巡检清单
 
 每日：
 
 1. 检查 `healthz/readyz`
-2. 检查前一日问题闭环率
-3. 检查应急事件是否有未处理项
+2. 检查通知协同中心是否有高优待办积压
+3. 检查前一日问题闭环率
+4. 检查应急事件是否有未处理项
 
 每周：
 
@@ -493,6 +592,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 2. 复核角色权限最小化原则
 3. 抽查巡查导出报告
 4. 抽查 AI 人审动作链与开放平台入站签名有效率
+5. 抽查平台页中的上线检查、培训模式和发布说明口径是否一致
 
 每月：
 
@@ -502,7 +602,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 15. 常见管理问题
+## 18. 常见管理问题
 
 ### 15.1 403 无权限
 
@@ -525,7 +625,7 @@ curl -X POST http://localhost:8000/api/identity/dev-login \
 
 ---
 
-## 16. 接口清单附录
+## 19. 接口清单附录
 
-详细接口请参见：`docs/API_Appendix_V2.0.md`。
+详细接口请参见：`docs/API_Appendix_V3.0.md`。
 建议在系统升级后同步复核该附录中的路径与权限要求。

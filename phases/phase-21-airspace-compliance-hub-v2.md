@@ -1,7 +1,6 @@
 # Phase 21 - 空域合规中枢 v2
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-20-task-center-v2-optimization.md`
 
 ## 1. Objective

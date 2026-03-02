@@ -1,7 +1,6 @@
 # Phase 18 - 成果库与对象存储
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-17-multi-org-data-perimeter-v2.md`
 
 ## 1. Objective

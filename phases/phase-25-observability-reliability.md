@@ -1,7 +1,6 @@
 # Phase 25 - 可观测与可靠性体系
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-24-billing-quota-system.md`
 
 ## 1. Objective

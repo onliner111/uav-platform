@@ -58,6 +58,10 @@ Codex MUST execute phases sequentially.
 48. phase-37-notification-collaboration-hub.md
 49. phase-38-delivery-onboarding-operations.md
 50. phase-39-release-adoption-lifecycle.md
+51. phase-40-real-uav-integration-hardening.md
+52. phase-41-dock-airport-control-integration.md
+53. phase-42-media-stream-engineering.md
+54. phase-43-pilot-rollout-operational-validation.md
 
 ---
 

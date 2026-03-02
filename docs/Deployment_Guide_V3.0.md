@@ -1,10 +1,28 @@
 # 城市低空综合治理与应急指挥平台
-# 运维部署手册（V2.0）
+# 运维部署手册（V3.0）
 
-- 文档版本：V2.0
+- 文档版本：V3.0
 - 适用对象：运维工程师、实施工程师
-- 适用范围：`phase-01` 至 `phase-15` 已实现能力
-- 更新日期：2026-02-25
+- 适用范围：`phase-01` 至 `phase-39` 已实现能力
+- 更新日期：2026-03-02
+
+## 0. 建议谁看这份文档
+
+适合阅读：
+
+- 运维工程师
+- 实施工程师
+- 平台管理员（需要执行上线前检查时）
+
+不建议作为首选文档的读者：
+
+- 普通业务用户
+- 仅做日常业务操作的值守人员
+
+阅读建议：
+
+1. 先看 [文档导航_V3.0.md](./文档导航_V3.0.md) 确认当前场景
+2. 上线准备时，建议同时参考 [Admin_Manual_V3.0.md](./Admin_Manual_V3.0.md)
 
 ---
 
@@ -143,6 +161,7 @@ docker compose -f infra/docker-compose.yml run --rm --build app-tools python -m 
 docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_e2e.py
 docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_smoke.py
 docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase15_kpi_open_platform.py
+docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase39_release_adoption_lifecycle.py
 ```
 
 ---
@@ -278,7 +297,7 @@ cat backup_xxx.sql | docker compose -f infra/docker-compose.yml exec -T db \
 
 ## 13. 接口清单附录
 
-详细接口请参见 `docs/API_Appendix_V2.0.md`。
+详细接口请参见 `docs/API_Appendix_V3.0.md`。
 
 建议将该附录作为联调验收与上线回归的核对清单。
 

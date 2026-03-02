@@ -1,7 +1,6 @@
 # Phase 23 - AI 任务化与模型治理 v2
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-22-alert-oncall-notification-v2.md`
 
 ## 1. Objective

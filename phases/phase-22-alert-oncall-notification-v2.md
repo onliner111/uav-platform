@@ -1,7 +1,6 @@
 # Phase 22 - 告警值班与通知体系 v2
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-21-airspace-compliance-hub-v2.md`
 
 ## 1. Objective

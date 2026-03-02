@@ -1,7 +1,6 @@
 # Phase 16 - SaaS 控制台 UI
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-15-kpi-open-platform.md`
 
 ## 1. Objective

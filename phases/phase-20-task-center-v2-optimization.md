@@ -1,7 +1,6 @@
 # Phase 20 - 任务中心 v2 优化
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-19-real-device-video-integration.md`
 
 ## 1. Objective

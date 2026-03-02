@@ -188,12 +188,14 @@
 - `phases/phase-16-saas-console-ui.md` ... `phases/phase-25-observability-reliability.md`（Phase 16-25）
 - `phases/phase-26-ui-information-architecture-design-system.md` ... `phases/phase-31-observability-reliability-ops-console.md`（Phase 26-31）
 - `phases/phase-32-role-workbench-productization.md` ... `phases/phase-39-release-adoption-lifecycle.md`（Phase 32-39）
+- `phases/phase-40-real-uav-integration-hardening.md` ... `phases/phase-43-pilot-rollout-operational-validation.md`（Phase 40-43）
 
 该组蓝图定义了：
 - Phase 08-31 的目标、范围、验收与退出标准
 - A-J 能力映射到阶段的落地顺序
 - M2/M3/M4/M5/M6 里程碑分组与执行顺序
 - Phase 32-39 面向“正式交付给非技术业务人员长期使用”的产品化交付路线
+- Phase 40-43 面向“真实无人机 / 机巢 / 视频接入与首批试点验证”的二期落地路线
 
 新增 M7-M10 产品化交付阶段分组：
 - M7（Phase 32-33）：角色化工作台 + 一张图主界面
@@ -205,3 +207,12 @@
 - 从 `phases/state.md -> current_phase` 启动（当前为 `DONE`，表示 Phase 31 已关账，等待显式指令后再进入后续新阶段）
 - 按 `phases/index.md` 顺序推进至 `phase-39-release-adoption-lifecycle.md`
 - 每阶段执行时继续遵循 `phases/reporting.md` 与 `governance/AGENTS.md`
+
+新增 M11-M12 真实接入与试点阶段分组：
+- M11（Phase 40-42）：真机接入强化 + 机巢/机场联动 + 视频链路工程化
+- M12（Phase 43）：现场试点、培训值守、异常演练与运行验证
+
+执行建议（真实接入二期）：
+- 保持当前 `phases/state.md = DONE`，不要自动启动新阶段
+- 如需继续，显式将 checkpoint 切到 `phase-40-real-uav-integration-hardening.md`
+- 仍按 `phases/index.md` 顺序推进至 `phase-43-pilot-rollout-operational-validation.md`

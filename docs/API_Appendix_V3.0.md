@@ -1,18 +1,38 @@
 # 城市低空综合治理与应急指挥平台
-# 接口清单附录（V2.0）
+# 接口清单附录（V3.0）
 
-- 文档版本：V2.0
-- 更新日期：2026-02-25
-- 说明：本附录按模块整理当前系统已实现接口，路径与 `app/main.py` 路由注册一致（覆盖至 `phase-15`）。
+- 文档版本：V3.0
+- 更新日期：2026-03-02
+- 说明：本附录按模块整理当前系统已实现接口，路径与 `app/main.py` 路由注册一致（覆盖至 `phase-39`；`phase-40` 至 `phase-43` 仅为规划，尚未进入执行）。
+
+## 0. 建议谁看这份文档
+
+适合阅读：
+
+- 交付工程师
+- 联调工程师
+- 技术支持
+- 平台管理员（需要排查或核对接口时）
+
+不建议作为首选文档的读者：
+
+- 普通业务用户
+- 首次培训的非技术管理员
+
+阅读建议：
+
+1. 先看 [文档导航_V3.0.md](./文档导航_V3.0.md) 确认自己是否需要直接阅读本附录
+2. 如需了解系统边界，再配合 [Architecture_Overview_V3.0.md](./Architecture_Overview_V3.0.md) 一起阅读
 
 ---
 
 ## 1. 鉴权与通用说明
 
 1. 受保护接口需携带请求头：`Authorization: Bearer <access_token>`
-2. UI 页面使用查询参数：`?token=<access_token>`
-3. 健康检查接口无需鉴权：`/healthz`、`/readyz`
-4. 开放平台适配器入口使用签名头鉴权：`X-Open-Key-Id`、`X-Open-Api-Key`、`X-Open-Signature`
+2. 推荐 UI 通过会话登录使用：`/ui/login`
+3. 兼容 UI 查询参数：`?token=<access_token>`
+4. 健康检查接口无需鉴权：`/healthz`、`/readyz`
+5. 开放平台适配器入口使用签名头鉴权：`X-Open-Key-Id`、`X-Open-Api-Key`、`X-Open-Signature`
 
 ---
 
@@ -151,6 +171,12 @@
 | POST | `/api/alert/alerts/{alert_id}/actions` | 新增处置动作 |
 | GET | `/api/alert/alerts/{alert_id}/actions` | 处置动作列表 |
 | GET | `/api/alert/alerts/{alert_id}/review` | 告警复盘聚合（告警+路由+动作） |
+| POST | `/api/alert/oncall/shifts` | 创建值班班次 |
+| GET | `/api/alert/oncall/shifts` | 值班班次列表 |
+| POST | `/api/alert/escalation-policies` | 创建升级策略 |
+| GET | `/api/alert/escalation-policies` | 升级策略列表 |
+| POST | `/api/alert/alerts:escalation-run` | 触发升级运行 |
+| POST | `/api/alert/routes/{route_log_id}:receipt` | 写入通知回执 |
 
 ---
 
@@ -236,6 +262,10 @@
 | GET | `/api/reporting/closure-rate` | 闭环率统计 |
 | GET | `/api/reporting/device-utilization` | 设备利用率统计 |
 | POST | `/api/reporting/export` | 导出报表文件（支持 `task_id/from_ts/to_ts/topic`） |
+| POST | `/api/reporting/outcome-report-templates` | 创建成果报告模板 |
+| GET | `/api/reporting/outcome-report-templates` | 成果报告模板列表 |
+| POST | `/api/reporting/outcome-report-exports` | 创建成果报告导出任务 |
+| GET | `/api/reporting/outcome-report-exports` | 成果报告导出任务列表 |
 
 ---
 
@@ -244,11 +274,27 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/ui` | UI 首页（重定向） |
+| GET | `/ui/login` | UI 登录页 |
+| POST | `/ui/login` | UI 会话登录 |
+| POST | `/ui/logout` | UI 会话登出 |
+| GET | `/ui/console` | 角色化工作台首页 |
+| GET | `/ui/workbench/{role_key}` | 角色工作台详情页 |
 | GET | `/ui/inspection` | 巡查任务列表页 |
 | GET | `/ui/inspection/tasks/{task_id}` | 巡查任务地图详情页 |
 | GET | `/ui/defects` | 问题闭环页 |
 | GET | `/ui/emergency` | 应急处置页 |
 | GET | `/ui/command-center` | 指挥中心大屏页 |
+| GET | `/ui/task-center` | 任务中心页 |
+| GET | `/ui/assets` | 资产台账页 |
+| GET | `/ui/compliance` | 合规治理页 |
+| GET | `/ui/alerts` | 通知协同中心页 |
+| GET | `/ui/reports` | 业务闭环与汇报页 |
+| GET | `/ui/platform` | 上线保障与版本运营台 |
+| GET | `/ui/observability` | 可观测性管理员页 |
+| GET | `/ui/reliability` | 可靠性管理员页 |
+| GET | `/ui/ai-governance` | AI 治理管理员页 |
+| GET | `/ui/commercial-ops` | 商业运营管理员页 |
+| GET | `/ui/open-platform` | 开放平台管理员页 |
 
 ---
 
@@ -310,8 +356,10 @@
 | GET | `/api/map/overview` | 一张图聚合视图 |
 | GET | `/api/map/layers/resources` | 资源图层 |
 | GET | `/api/map/layers/tasks` | 任务图层 |
+| GET | `/api/map/layers/airspace` | 空域图层 |
 | GET | `/api/map/layers/alerts` | 告警图层 |
 | GET | `/api/map/layers/events` | 事件图层 |
+| GET | `/api/map/layers/outcomes` | 成果图层 |
 | GET | `/api/map/tracks/replay` | 航迹回放 |
 
 ---
@@ -324,7 +372,9 @@
 | GET | `/api/task-center/types` | 任务类型列表 |
 | POST | `/api/task-center/templates` | 创建任务模板 |
 | GET | `/api/task-center/templates` | 模板列表 |
+| POST | `/api/task-center/templates/{template_id}:clone` | 克隆任务模板 |
 | POST | `/api/task-center/tasks` | 创建任务中心任务 |
+| POST | `/api/task-center/tasks:batch-create` | 批量创建任务中心任务 |
 | GET | `/api/task-center/tasks` | 任务列表 |
 | GET | `/api/task-center/tasks/{task_id}` | 任务详情 |
 | POST | `/api/task-center/tasks/{task_id}/submit-approval` | 提交审批 |
@@ -346,10 +396,15 @@
 |---|---|---|
 | POST | `/api/outcomes/raw` | 新增原始数据目录记录 |
 | GET | `/api/outcomes/raw` | 原始数据目录列表 |
+| POST | `/api/outcomes/raw/uploads:init` | 初始化原始数据上传会话 |
+| POST | `/api/outcomes/raw/uploads/{upload_id}/complete` | 完成原始数据上传会话 |
+| GET | `/api/outcomes/raw/{raw_id}/download` | 下载原始数据对象 |
 | POST | `/api/outcomes/records` | 新增成果记录 |
 | POST | `/api/outcomes/records/from-observation/{observation_id}` | 由观测点生成成果记录 |
 | GET | `/api/outcomes/records` | 成果记录列表 |
 | PATCH | `/api/outcomes/records/{outcome_id}/status` | 更新成果状态 |
+| GET | `/api/outcomes/records/{outcome_id}/versions` | 查询成果版本链 |
+| POST | `/api/outcomes/records/{outcome_id}/versions` | 新增成果版本 |
 
 ---
 
@@ -366,6 +421,10 @@
 | GET | `/api/ai/outputs/{output_id}` | 输出详情 |
 | POST | `/api/ai/outputs/{output_id}/review` | 人审动作（通过/驳回/覆写） |
 | GET | `/api/ai/outputs/{output_id}/review` | 输出复核视图（输出+动作+证据） |
+| GET | `/api/ai/models` | 模型目录列表 |
+| POST | `/api/ai/models` | 创建模型目录 |
+| GET | `/api/ai/model-versions` | 模型版本列表 |
+| POST | `/api/ai/model-versions` | 创建模型版本 |
 
 ---
 
@@ -392,3 +451,34 @@
 | POST | `/api/open-platform/webhooks/{endpoint_id}/dispatch-test` | Webhook 发送测试 |
 | POST | `/api/open-platform/adapters/events/ingest` | 外部适配器事件入口（签名鉴权） |
 | GET | `/api/open-platform/adapters/events` | 外部事件入站记录列表 |
+
+---
+
+## 25. 真实接入与视频（`/api/integration`）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/integration/device-sessions/start` | 启动设备接入会话 |
+| POST | `/api/integration/device-sessions/{session_id}:stop` | 停止设备接入会话 |
+| GET | `/api/integration/device-sessions` | 设备接入会话列表 |
+| GET | `/api/integration/device-sessions/{session_id}` | 设备接入会话详情 |
+| POST | `/api/integration/video-streams` | 创建视频流配置 |
+| GET | `/api/integration/video-streams` | 视频流列表 |
+| GET | `/api/integration/video-streams/{stream_id}` | 视频流详情 |
+| PATCH | `/api/integration/video-streams/{stream_id}` | 更新视频流配置 |
+| DELETE | `/api/integration/video-streams/{stream_id}` | 删除视频流配置 |
+
+---
+
+## 26. 可观测性与可靠性（`/api/observability`）
+
+说明：
+- 本模块在 UI 中对应管理员专项页，主要面向管理员与运维角色。
+- 具体接口较多，建议以 OpenAPI 文档为准：`/docs`
+
+能力范围包括：
+
+- 信号与 SLO 观测
+- 备份与恢复演练
+- 安全巡检
+- 容量策略与预测

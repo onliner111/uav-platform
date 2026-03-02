@@ -1,7 +1,6 @@
 # Phase 19 - 真实设备与视频接入
 
 ## 0. Basis
-- Based on: `111.md`
 - Depends on: `phases/phase-18-outcomes-repository-object-storage.md`
 
 ## 1. Objective
