@@ -6,14 +6,19 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: READY (phase-36-business-closure-outcomes-consumption.md next; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 35 is closed. `35-WP1`..`35-WP6` delivered mobile-first field workbenches, weak-network retry guidance, and on-site simplified execution actions.
-- Next Target: start `36-WP1` / `36-WP2` (business closure boards and outcome-consumption views) while preserving or exceeding the Phase 32 productization baseline.
+- Current Phase: DONE (all planned phases complete; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 39 is closed. `39-WP1`..`39-WP6` extended `/ui/platform` into a release-adoption console with release checks, help-center guidance, release notes, and gray-enable controls while preserving the Phase 38 onboarding baseline.
+- Next Target: no active checkpoint. Wait for a new blueprint before moving `phases/state.md` out of `DONE`.
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-03-02T02:17:06.2632841Z
+> Last verified at (UTC): 2026-03-02T05:06:26.0016159Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
+> Closeout note (2026-03-02T05:06:26.0016159Z): Phase 39 closed as DONE. Extended `/ui/platform` into a release-adoption lifecycle console (`上线检查清单与巡检面板`, `内置帮助中心与培训模式`, `发布说明与升级引导`, `功能开关与灰度启用`), added replayable demo `demo_phase39_release_adoption_lifecycle.py`, and moved checkpoint to `DONE`.
+> Closeout note (2026-03-02T04:39:15.7859953Z): Phase 38 closed as DONE. Delivered delivery-first onboarding productization on `/ui/platform` (`租户开通向导`, config-pack center, mode switching, handoff panels, and governance overview), added replayable demo `demo_phase38_delivery_onboarding_operations.py`, and moved checkpoint to `phase-39-release-adoption-lifecycle.md` with status `READY`.
+> Closeout note (2026-03-02T04:20:34.9326215Z): Phase 37 closed as DONE. Delivered collaboration-first notification productization on `/ui/alerts` (`消息中心与待办中心`, unified to-do, channel strategy, escalation tracking, role-priority guidance), added replayable demo `demo_phase37_notification_collaboration_hub.py`, and moved checkpoint to `phase-38-delivery-onboarding-operations.md` with status `READY`.
+> Closeout note (2026-03-02T02:48:25.7905877Z): Phase 36 closed as DONE. Delivered business-closure and outcome-consumption productization on `/ui/reports` (`问题闭环看板`, review workbench, case/topic views, leadership reporting), added replayable demo `demo_phase36_business_closure_outcomes_consumption.py`, and moved checkpoint to `phase-37-notification-collaboration-hub.md` with status `READY`.
+> Phase note (2026-03-02T02:31:49.2287535Z): Phase 36 moved to `RUNNING`. Delivered `36-WP1`..`36-WP5` by rebuilding `/ui/reports` into a business-closure board (`问题闭环看板`), outcome review workbench, case/topic views, and leadership-reporting flows. Added route-side narrative aggregation in `app/api/routers/ui.py`, report-page business-selection linkage in `app/web/static/reports_ui.js`, and phase36 UI regression `tests/test_ui_console.py::test_ui_phase36_reports_page_presents_business_closure_views`. Targeted checks passed (`node --check app/web/static/reports_ui.js`, `ruff check app/api/routers/ui.py tests/test_ui_console.py`, `mypy app/api/routers/ui.py`, `pytest -q tests/test_ui_console.py`).
 > Closeout note (2026-03-02T02:17:06.2632841Z): Phase 35 closed as DONE. Delivered mobile-first field execution pages for inspection-task detail and defects, weak-network retry guidance, on-site note/media placeholders, and replayable demo `demo_phase35_mobile_field_operations.py`; checkpoint moved to `phase-36-business-closure-outcomes-consumption.md` with status `READY`.
 > Closeout note (2026-03-02T01:25:53.0815787Z): Phase 34 closed as DONE. Delivered guided inspection and emergency workflows, compliance approval-flow visualization, inline correction guidance, template recommendation/prefill hints, and replayable demo `demo_phase34_guided_task_workflow_usability.py`; checkpoint moved to `phase-35-mobile-field-operations.md` with status `READY`.
 > Phase note (2026-03-02T01:08:48.7731190Z): Phase 34 moved to `RUNNING`. Delivered `34-WP1` and `34-WP2` by rebuilding `/ui/inspection` as a three-step inspection-task wizard (`选择模板 -> 填写信息 -> 确认创建`) and `/ui/emergency` as a three-step incident wizard (`地图选点 -> 创建事件 -> 联动任务`). Targeted checks passed (`node --check app/web/static/inspection_list.js`, `node --check app/web/static/emergency.js`, `pytest -q tests/test_ui_console.py`).
@@ -61,6 +66,10 @@
 - phase34 wp1/wp2 targeted checks: PASS (`node --check app/web/static/inspection_list.js`, `node --check app/web/static/emergency.js`, `pytest -q tests/test_ui_console.py`)
 - phase34 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase34_guided_task_workflow_usability.py`)
 - phase35 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase35_mobile_field_operations.py`)
+- phase36 wp1-wp5 targeted checks: PASS (`node --check app/web/static/reports_ui.js`, `ruff check app/api/routers/ui.py tests/test_ui_console.py`, `mypy app/api/routers/ui.py`, `pytest -q tests/test_ui_console.py`)
+- phase36 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase36_business_closure_outcomes_consumption.py`)
+- phase37 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase37_notification_collaboration_hub.py`)
+- phase38 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase38_delivery_onboarding_operations.py`)
 
 ## 3. Evidence（证据 / 可复现命令）
 > 所有结论必须能用这些命令复现
@@ -138,12 +147,13 @@
 - phase-33-one-map-command-center-v2.md: DONE
 - phase-34-guided-task-workflow-usability.md: DONE
 - phase-35-mobile-field-operations.md: DONE
+- phase-36-business-closure-outcomes-consumption.md: DONE
+- phase-37-notification-collaboration-hub.md: DONE
+- phase-38-delivery-onboarding-operations.md: DONE
+- phase-39-release-adoption-lifecycle.md: DONE
 
 ## 4.2 Planned Next Phases（后续规划阶段）
-- phase-36-business-closure-outcomes-consumption.md: READY
-- phase-37-notification-collaboration-hub.md: PLANNED
-- phase-38-delivery-onboarding-operations.md: PLANNED
-- phase-39-release-adoption-lifecycle.md: PLANNED
+- none (awaiting a new blueprint)
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。

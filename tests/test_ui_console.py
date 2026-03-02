@@ -430,11 +430,12 @@ def test_ui_phase28_compliance_alert_workbench_write_visibility(ui_client: TestC
 
     readonly_alerts_page = ui_client.get(f"/ui/alerts?token={readonly_token}")
     assert readonly_alerts_page.status_code == 200
-    assert "值守 SLA 概览" in readonly_alerts_page.text
-    assert "告警类型" in readonly_alerts_page.text
+    assert "通知协同中心" in readonly_alerts_page.text
+    assert "统一待办视图" in readonly_alerts_page.text
+    assert "回执、催办与升级跟踪" in readonly_alerts_page.text
     assert "Alert Type" not in readonly_alerts_page.text
-    assert 'id="alert-ack-btn" type="button" style="margin-top:10px;" disabled' in readonly_alerts_page.text
-    assert 'id="routing-create-btn" type="button" style="margin-top:10px;" disabled' in readonly_alerts_page.text
+    assert 'id="alert-ack-btn" type="button" disabled' in readonly_alerts_page.text
+    assert 'id="routing-create-btn" type="button" disabled' in readonly_alerts_page.text
 
     readonly_compliance_page = ui_client.get(f"/ui/compliance?token={readonly_token}")
     assert readonly_compliance_page.status_code == 200
@@ -446,7 +447,8 @@ def test_ui_phase28_compliance_alert_workbench_write_visibility(ui_client: TestC
 
     admin_alerts_page = ui_client.get(f"/ui/alerts?token={admin_token}")
     assert admin_alerts_page.status_code == 200
-    assert 'id="alert-ack-btn" type="button" style="margin-top:10px;" disabled' not in admin_alerts_page.text
+    assert "消息中心与待办中心" in admin_alerts_page.text
+    assert 'id="alert-ack-btn" type="button" disabled' not in admin_alerts_page.text
 
     admin_compliance_page = ui_client.get(f"/ui/compliance?token={admin_token}")
     assert admin_compliance_page.status_code == 200
@@ -585,9 +587,10 @@ def test_ui_phase29_data_ai_workbench_write_visibility(ui_client: TestClient) ->
 
     readonly_reports_page = ui_client.get(f"/ui/reports?token={readonly_token}")
     assert readonly_reports_page.status_code == 200
-    assert "成果数据工作区" in readonly_reports_page.text
-    assert 'id="outcome-create-btn" type="button" style="margin-top:10px;" disabled' in readonly_reports_page.text
-    assert 'id="report-template-create-btn" type="button" style="margin-top:10px;" disabled' in readonly_reports_page.text
+    assert "问题闭环看板" in readonly_reports_page.text
+    assert "领导汇报与专题分析" in readonly_reports_page.text
+    assert 'id="outcome-create-btn" type="button" disabled' in readonly_reports_page.text
+    assert 'id="report-template-create-btn" type="button" disabled' in readonly_reports_page.text
 
     readonly_ai_page = ui_client.get(f"/ui/ai-governance?token={readonly_token}")
     assert readonly_ai_page.status_code == 200
@@ -597,15 +600,46 @@ def test_ui_phase29_data_ai_workbench_write_visibility(ui_client: TestClient) ->
 
     admin_reports_page = ui_client.get(f"/ui/reports?token={admin_token}")
     assert admin_reports_page.status_code == 200
+    assert "成果审核与复核工作台" in admin_reports_page.text
+    assert "典型案例与专题视图" in admin_reports_page.text
     assert "补充说明\uFF08高级配置\uFF09" in admin_reports_page.text
     assert "载荷 JSON" not in admin_reports_page.text
-    assert 'id="outcome-create-btn" type="button" style="margin-top:10px;" disabled' not in admin_reports_page.text
-    assert 'id="report-template-create-btn" type="button" style="margin-top:10px;" disabled' not in admin_reports_page.text
+    assert 'id="outcome-create-btn" type="button" disabled' not in admin_reports_page.text
+    assert 'id="report-template-create-btn" type="button" disabled' not in admin_reports_page.text
 
     admin_ai_page = ui_client.get(f"/ui/ai-governance?token={admin_token}")
     assert admin_ai_page.status_code == 200
     assert 'id="ai-model-create-btn" type="button" class="stack-gap-sm" disabled' not in admin_ai_page.text
     assert 'id="ai-version-create-btn" type="button" class="stack-gap-sm" disabled' not in admin_ai_page.text
+
+
+def test_ui_phase36_reports_page_presents_business_closure_views(ui_client: TestClient) -> None:
+    tenant_id = _create_tenant(ui_client, "ui-phase36-closure-tenant")
+    _bootstrap_admin(ui_client, tenant_id, "phase36_admin", "phase36-pass")
+    admin_token = _login_token(ui_client, tenant_id, "phase36_admin", "phase36-pass")
+
+    reports_page = ui_client.get(f"/ui/reports?token={admin_token}")
+    assert reports_page.status_code == 200
+    assert "问题闭环看板" in reports_page.text
+    assert "成果审核与复核工作台" in reports_page.text
+    assert "典型案例与专题视图" in reports_page.text
+    assert "领导汇报与专题分析" in reports_page.text
+    assert "生成汇报材料" in reports_page.text
+    assert "成果数据工作区" not in reports_page.text
+
+
+def test_ui_phase37_alerts_page_presents_collaboration_hub_views(ui_client: TestClient) -> None:
+    tenant_id = _create_tenant(ui_client, "ui-phase37-collab-tenant")
+    _bootstrap_admin(ui_client, tenant_id, "phase37_admin", "phase37-pass")
+    admin_token = _login_token(ui_client, tenant_id, "phase37_admin", "phase37-pass")
+
+    alerts_page = ui_client.get(f"/ui/alerts?token={admin_token}")
+    assert alerts_page.status_code == 200
+    assert "消息中心与待办中心" in alerts_page.text
+    assert "统一待办视图" in alerts_page.text
+    assert "通知渠道与发送策略" in alerts_page.text
+    assert "回执、催办与升级跟踪" in alerts_page.text
+    assert "角色优先级与协同建议" in alerts_page.text
 
 
 def test_ui_phase30_commercial_open_platform_write_visibility(ui_client: TestClient) -> None:
@@ -789,10 +823,41 @@ def test_ui_platform_rbac_matrix_rendering(ui_client: TestClient) -> None:
 
     response = ui_client.get(f"/ui/platform?token={token}")
     assert response.status_code == 200
+    assert "上线保障与版本运营台" in response.text
+    assert "租户开通向导" in response.text
     assert "RBAC 可见性矩阵" in response.text
     assert "/ui/task-center" in response.text
-    assert "mission.read" in response.text
-    assert "mission.write" in response.text
+    assert "标准配置包与模板中心" in response.text
+    assert "模式切换与交付交接" in response.text
+
+
+def test_ui_phase38_platform_page_presents_delivery_onboarding_views(ui_client: TestClient) -> None:
+    tenant_id = _create_tenant(ui_client, "ui-phase38-delivery-tenant")
+    _bootstrap_admin(ui_client, tenant_id, "phase38_admin", "phase38-pass")
+    token = _login_token(ui_client, tenant_id, "phase38_admin", "phase38-pass")
+
+    response = ui_client.get(f"/ui/platform?token={token}")
+    assert response.status_code == 200
+    assert "租户开通向导" in response.text
+    assert "标准配置包与模板中心" in response.text
+    assert "模式切换与交付交接" in response.text
+    assert "数据字典与治理总览" in response.text
+    assert "治理快捷入口" in response.text
+
+
+def test_ui_phase39_platform_page_presents_release_adoption_views(ui_client: TestClient) -> None:
+    tenant_id = _create_tenant(ui_client, "ui-phase39-release-tenant")
+    _bootstrap_admin(ui_client, tenant_id, "phase39_admin", "phase39-pass")
+    token = _login_token(ui_client, tenant_id, "phase39_admin", "phase39-pass")
+
+    response = ui_client.get(f"/ui/platform?token={token}")
+    assert response.status_code == 200
+    assert "上线检查清单与巡检面板" in response.text
+    assert "内置帮助中心与培训模式" in response.text
+    assert "发布说明与升级引导" in response.text
+    assert "功能开关与灰度启用" in response.text
+    assert "上线保障与版本运营台" in response.text
+    assert "培训演练脚本" in response.text
 
 
 def test_ui_login_rejects_invalid_csrf(ui_client: TestClient) -> None:

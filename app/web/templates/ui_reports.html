@@ -3,11 +3,11 @@
 {% block content %}
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>任务总量</div>
+    <div>任务覆盖</div>
     <div class="value">{{ overview.missions_total if can_reporting_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>缺陷闭环率</div>
+    <div>闭环率</div>
     <div class="value">
       {% if can_reporting_read %}
       {{ "%.1f"|format((closure_rate.closure_rate or 0) * 100) }}%
@@ -17,280 +17,573 @@
     </div>
   </div>
   <div class="card ui-kpi-card">
-    <div>原始记录</div>
-    <div class="value">{{ raw_records|length if can_inspection_read else 0 }}</div>
+    <div>待推进成果</div>
+    <div class="value">{{ outcome_pending_count if can_inspection_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>成果记录</div>
-    <div class="value">{{ outcome_records|length if can_inspection_read else 0 }}</div>
+    <div>待归档成果</div>
+    <div class="value">{{ outcome_verified_count if can_inspection_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>报告模板</div>
-    <div class="value">{{ outcome_templates|length if can_reporting_read else 0 }}</div>
+    <div>已沉淀案例</div>
+    <div class="value">{{ outcome_archived_count if can_inspection_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>导出任务</div>
+    <div>汇报任务</div>
     <div class="value">{{ outcome_exports|length if can_reporting_read else 0 }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>成果数据工作区</h2>
+  <h2>问题闭环看板</h2>
+  <p class="panel-subtitle">按“发现登记 → 整改推进 → 复核确认 → 闭环归档”查看当前事项，业务人员可直接判断处理进度和剩余工作量。</p>
   {% if can_inspection_read %}
-  <div class="grid cols-2">
-    <div>
-      <h3>原始数据筛选</h3>
-      <label>任务标识</label>
-      <input id="raw-filter-task-id" placeholder="可选，按任务过滤">
-      <label style="margin-top:8px;">任务批次标识</label>
-      <input id="raw-filter-mission-id" placeholder="可选，按批次过滤">
-      <label style="margin-top:8px;">数据类型</label>
-      <select id="raw-filter-type">
-        <option value="">全部类型</option>
-        {% for item in raw_data_type_options %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
-      <button id="raw-filter-btn" type="button" style="margin-top:10px;">加载原始数据</button>
-      <label style="margin-top:8px;">当前原始记录</label>
-      <input id="raw-storage-id" placeholder="请选择或填写原始记录标识" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">访问层级</label>
-      <select id="raw-storage-tier" {% if not can_inspection_write %}disabled{% endif %}>
-        {% for item in raw_access_tier_options %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
-      <label style="margin-top:8px;">存储区域（可选）</label>
-      <input id="raw-storage-region" placeholder="local" {% if not can_inspection_write %}disabled{% endif %}>
-      <button id="raw-storage-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>调整存储层级</button>
-      <pre id="raw-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载原始数据。</pre>
+  <div class="report-stage-grid">
+    {% for item in closure_stages %}
+    <div class="report-stage-card">
+      <div class="report-stage-head">
+        <strong>{{ item.label }}</strong>
+        <span class="status-pill{% if item.tone != 'success' %} {{ item.tone }}{% endif %}">{{ item.count }}</span>
+      </div>
+      <div class="report-stage-note">{{ item.note }}</div>
     </div>
-    <div>
-      <h3>成果记录筛选</h3>
+    {% endfor %}
+  </div>
+
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>待推进事项</h3>
+          <div class="table-panel-note">优先从这里选择需要复核或继续推进的事项，系统会自动带入后续动作。</div>
+        </div>
+      </div>
+      {% if review_queue %}
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>事项</th>
+              <th>来源</th>
+              <th>当前状态</th>
+              <th>最近更新</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in review_queue %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.title }}</div>
+                <div class="cell-subtle">{{ item.summary }}</div>
+              </td>
+              <td>
+                <div class="cell-main">{{ item.source_label }}</div>
+                <div class="cell-subtle">{{ item.task_label }}</div>
+              </td>
+              <td><span class="status-pill{% if item.status_tone != 'success' %} {{ item.status_tone }}{% endif %}">{{ item.status_label }}</span></td>
+              <td>{{ item.updated_at_label }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="button-link button-secondary"
+                  data-select-outcome="{{ item.id }}"
+                  data-select-task="{{ item.task_id }}"
+                  data-outcome-title="{{ item.title }}"
+                >
+                  纳入复核
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">当前暂无待推进事项，新的成果会自动进入这里。</div>
+      {% endif %}
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>闭环摘要</h3>
+          <div class="table-panel-note">让值守和管理角色快速知道“还有什么没做完”。</div>
+        </div>
+      </div>
+      <div class="hint-list">
+        <div class="hint-list-item">当前待推进 {{ outcome_pending_count }} 条，建议优先清理整改中的事项。</div>
+        <div class="hint-list-item">待归档 {{ outcome_verified_count }} 条，可由复核人员集中确认。</div>
+        <div class="hint-list-item">已沉淀案例 {{ outcome_archived_count }} 条，可直接用于复盘和汇报。</div>
+      </div>
+      <div id="outcome-review-context" class="result-surface">尚未选中事项。请先从左侧看板中选择一条待推进事项。</div>
+    </div>
+  </div>
+  {% else %}
+  <p class="hint">当前账号缺少 <code>inspection:read</code> 权限，问题闭环看板已隐藏。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>成果审核与复核工作台</h2>
+  <p class="panel-subtitle">围绕“选中事项 → 调整状态 → 留痕归档”推进复核，同时保留必要的成果登记与数据调阅入口。</p>
+  {% if can_inspection_read %}
+  <div class="report-workbench-grid">
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>成果筛选与对象选择</h3>
+          <div class="table-panel-note">按任务、来源和状态筛选成果，筛选结果用于人工复核判断。</div>
+        </div>
+      </div>
       <label>任务标识</label>
       <input id="outcome-filter-task-id" placeholder="可选，按任务过滤">
-      <label style="margin-top:8px;">任务批次标识</label>
+      <label>任务批次标识</label>
       <input id="outcome-filter-mission-id" placeholder="可选，按批次过滤">
-      <label style="margin-top:8px;">来源类型</label>
+      <label>来源</label>
       <select id="outcome-filter-source">
         <option value="">全部来源</option>
         {% for item in outcome_source_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">成果类型</label>
+      <label>成果类型</label>
       <select id="outcome-filter-type">
         <option value="">全部类型</option>
         {% for item in outcome_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">状态</label>
+      <label>闭环状态</label>
       <select id="outcome-filter-status">
         <option value="">全部状态</option>
         {% for item in outcome_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <button id="outcome-filter-btn" type="button" style="margin-top:10px;">加载成果记录</button>
-      <pre id="outcome-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载成果记录。</pre>
+      <button id="outcome-filter-btn" type="button">加载成果队列</button>
+      <pre id="outcome-box" class="result-box">尚未加载成果队列。</pre>
     </div>
-  </div>
 
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>创建成果记录</h3>
-      <label>来源类型</label>
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>登记新成果</h3>
+          <div class="table-panel-note">用于补录新成果。普通业务路径优先从巡检、告警或现场页面自动沉淀到这里。</div>
+        </div>
+      </div>
+      <label>来源</label>
       <select id="outcome-create-source" {% if not can_inspection_write %}disabled{% endif %}>
         {% for item in outcome_source_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">来源对象标识</label>
+      <label>来源对象标识</label>
       <input id="outcome-create-source-id" placeholder="请输入来源对象标识" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">成果类型</label>
+      <label>成果类型</label>
       <select id="outcome-create-type" {% if not can_inspection_write %}disabled{% endif %}>
         {% for item in outcome_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">关联任务（可选）</label>
+      <label>关联任务（可选）</label>
       <input id="outcome-create-task-id" placeholder="可选，关联任务标识" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">关联批次（可选）</label>
+      <label>关联批次（可选）</label>
       <input id="outcome-create-mission-id" placeholder="可选，关联批次标识" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">补充说明（高级配置）</label>
+      <label>补充说明（高级配置）</label>
       <textarea id="outcome-create-payload" rows="3" placeholder='{"note":"补充说明"}' {% if not can_inspection_write %}disabled{% endif %}></textarea>
-      <button id="outcome-create-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>创建成果记录</button>
+      <button id="outcome-create-btn" type="button" {% if not can_inspection_write %}disabled{% endif %}>登记成果</button>
     </div>
-    <div>
-      <h3>状态与版本</h3>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>推进复核与归档</h3>
+          <div class="table-panel-note">从待推进事项中选中后，系统会自动带入当前成果。</div>
+        </div>
+      </div>
       <label>当前成果</label>
-      <input id="outcome-status-id" placeholder="请选择或填写成果标识" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">目标状态</label>
+      <input id="outcome-status-id" placeholder="请先从看板中选择事项" {% if not can_inspection_write %}disabled{% endif %}>
+      <label>下一步状态</label>
       <select id="outcome-status-target" {% if not can_inspection_write %}disabled{% endif %}>
         {% for item in outcome_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">说明（可选）</label>
-      <input id="outcome-status-note" placeholder="可选，填写状态说明" {% if not can_inspection_write %}disabled{% endif %}>
-      <button id="outcome-status-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>更新成果状态</button>
-      <label style="margin-top:8px;">版本查询对象</label>
-      <input id="outcome-versions-id" placeholder="请输入成果标识">
-      <button id="outcome-versions-btn" type="button" style="margin-top:10px;">加载版本记录</button>
-      <pre id="outcome-versions-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载版本记录。</pre>
+      <label>复核说明（可选）</label>
+      <input id="outcome-status-note" placeholder="可选，填写复核说明" {% if not can_inspection_write %}disabled{% endif %}>
+      <button id="outcome-status-btn" type="button" {% if not can_inspection_write %}disabled{% endif %}>更新闭环状态</button>
+      <label>版本查询对象</label>
+      <input id="outcome-versions-id" placeholder="默认随当前成果联动">
+      <button id="outcome-versions-btn" type="button">加载版本留痕</button>
+      <pre id="outcome-versions-box" class="result-box">尚未加载版本留痕。</pre>
     </div>
   </div>
+
+  <details class="report-secondary-panel">
+    <summary>数据与原始记录调阅（扩展）</summary>
+    <div class="report-workbench-grid">
+      <div class="report-surface form-stack">
+        <div class="table-panel-head">
+          <div>
+            <h3>原始记录调阅</h3>
+            <div class="table-panel-note">用于核对原始留存，不作为日常业务主路径。</div>
+          </div>
+        </div>
+        <label>任务标识</label>
+        <input id="raw-filter-task-id" placeholder="可选，按任务过滤">
+        <label>任务批次标识</label>
+        <input id="raw-filter-mission-id" placeholder="可选，按批次过滤">
+        <label>数据类型</label>
+        <select id="raw-filter-type">
+          <option value="">全部类型</option>
+          {% for item in raw_data_type_options %}
+          <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
+        <button id="raw-filter-btn" type="button">加载原始记录</button>
+        <pre id="raw-box" class="result-box">尚未加载原始记录。</pre>
+      </div>
+
+      <div class="report-surface form-stack">
+        <div class="table-panel-head">
+          <div>
+            <h3>存储层级调整</h3>
+            <div class="table-panel-note">仅用于治理留存策略，普通业务无需频繁操作。</div>
+          </div>
+        </div>
+        <label>当前原始记录</label>
+        <input id="raw-storage-id" placeholder="请选择或填写原始记录标识" {% if not can_inspection_write %}disabled{% endif %}>
+        <label>访问层级</label>
+        <select id="raw-storage-tier" {% if not can_inspection_write %}disabled{% endif %}>
+          {% for item in raw_access_tier_options %}
+          <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
+        <label>存储区域（可选）</label>
+        <input id="raw-storage-region" placeholder="local" {% if not can_inspection_write %}disabled{% endif %}>
+        <button id="raw-storage-btn" type="button" {% if not can_inspection_write %}disabled{% endif %}>调整存储层级</button>
+      </div>
+    </div>
+  </details>
   {% else %}
-  <p class="hint">当前账号缺少 <code>inspection:read</code> 权限，成果数据区已隐藏。</p>
+  <p class="hint">当前账号缺少 <code>inspection:read</code> 权限，成果审核工作台已隐藏。</p>
   {% endif %}
 </div>
 
 <div class="panel">
-  <h2>报告导出中心</h2>
-  {% if can_reporting_read %}
-  <div class="grid cols-2">
-    <div>
-      <h3>创建报告模板</h3>
-      <label>模板名称</label>
-      <input id="report-template-name" placeholder="请输入模板名称" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">默认格式</label>
-      <select id="report-template-format" {% if not can_reporting_write %}disabled{% endif %}>
-        {% for item in report_format_options %}
-        <option value="{{ item }}">{{ item }}</option>
+  <h2>典型案例与专题视图</h2>
+  <p class="panel-subtitle">把已经形成闭环的成果沉淀成可复盘、可汇报、可复用的案例与专题。</p>
+  {% if can_inspection_read %}
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>典型案例</h3>
+          <div class="table-panel-note">优先展示已闭环或已完成复核的事项，方便沉淀经验和对外汇报。</div>
+        </div>
+      </div>
+      {% if case_highlights %}
+      <div class="report-case-grid">
+        {% for item in case_highlights %}
+        <div class="report-case-card">
+          <div class="report-case-head">
+            <strong>{{ item.title }}</strong>
+            <span class="status-pill{% if item.status_tone != 'success' %} {{ item.status_tone }}{% endif %}">{{ item.status_label }}</span>
+          </div>
+          <div class="report-case-summary">{{ item.summary }}</div>
+          <div class="cell-subtle">{{ item.source_label }} · {{ item.task_label }}</div>
+          <button
+            type="button"
+            class="button-link button-secondary"
+            data-select-outcome="{{ item.id }}"
+            data-select-task="{{ item.task_label if item.task_label != '未关联任务' else '' }}"
+            data-outcome-title="{{ item.title }}"
+          >
+            载入到复核区
+          </button>
+        </div>
         {% endfor %}
-      </select>
-      <label style="margin-top:8px;">标题模板</label>
-      <input id="report-template-title" value="成果报告 count={count}" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">正文模板</label>
-      <textarea id="report-template-body" rows="3" placeholder="task={task_id} topic={topic}" {% if not can_reporting_write %}disabled{% endif %}></textarea>
-      <button id="report-template-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>创建模板</button>
+      </div>
+      {% else %}
+      <div class="empty-state">当前还没有可沉淀的典型案例，完成归档后会自动出现在这里。</div>
+      {% endif %}
     </div>
-    <div>
-      <h3>创建导出任务</h3>
-      <label>报告模板</label>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>专题聚焦</h3>
+          <div class="table-panel-note">按成果类型汇总，帮助业务团队快速切换到专题复盘视角。</div>
+        </div>
+      </div>
+      {% if topic_summary %}
+      <div class="report-topic-grid">
+        {% for item in topic_summary %}
+        <div class="report-topic-card">
+          <div class="report-topic-count">{{ item.count }}</div>
+          <strong>{{ item.label }}</strong>
+          <div class="report-stage-note">{{ item.note }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">暂无专题数据，新的成果归档后会自动形成专题汇总。</div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <p class="hint">当前账号缺少 <code>inspection:read</code> 权限，案例与专题视图已隐藏。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>领导汇报与专题分析</h2>
+  <p class="panel-subtitle">将闭环数据直接转成汇报语言，减少领导视图与底层字段之间的转换成本。</p>
+  {% if can_reporting_read %}
+  <div class="report-topic-grid">
+    {% for item in leadership_cards %}
+    <div class="report-topic-card">
+      <div class="report-topic-count">{{ item.value }}</div>
+      <strong>{{ item.label }}</strong>
+      <div class="report-stage-note">{{ item.note }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>汇报重点</h3>
+          <div class="table-panel-note">这些内容可以直接作为日会、周会或专题汇报的口径。</div>
+        </div>
+      </div>
+      <div class="hint-list">
+        {% for item in leadership_focus %}
+        <div class="hint-list-item">{{ item }}</div>
+        {% endfor %}
+      </div>
+      <div id="leader-export-context" class="result-surface">尚未选中汇报任务。可先在下方选择模板或已创建的汇报任务。</div>
+    </div>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>生成汇报材料</h3>
+          <div class="table-panel-note">选择模板后直接生成面向领导的汇报文件。</div>
+        </div>
+      </div>
+      <label>汇报模板</label>
       <select id="report-export-template-id" {% if not can_reporting_write %}disabled{% endif %}>
         <option value="">请选择模板</option>
         {% for item in outcome_templates %}
         <option value="{{ item.id }}">{{ item.name }} ({{ item.id }})</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">导出格式</label>
+      <label>导出格式</label>
       <select id="report-export-format" {% if not can_reporting_write %}disabled{% endif %}>
         <option value="">默认模板格式</option>
         {% for item in report_format_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">关联任务（可选）</label>
-      <input id="report-export-task-id" placeholder="可选，按任务标识导出" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">主题（可选）</label>
-      <input id="report-export-topic" placeholder="defect" {% if not can_reporting_write %}disabled{% endif %}>
-      <button id="report-export-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>创建导出任务</button>
-      <pre id="report-export-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未创建导出任务。</pre>
+      <label>关联任务（可选）</label>
+      <input id="report-export-task-id" placeholder="可选，按任务导出" {% if not can_reporting_write %}disabled{% endif %}>
+      <label>专题关键词（可选）</label>
+      <input id="report-export-topic" placeholder="例如：缺陷、隐患、应急" {% if not can_reporting_write %}disabled{% endif %}>
+      <button id="report-export-create-btn" type="button" {% if not can_reporting_write %}disabled{% endif %}>生成汇报任务</button>
+      <pre id="report-export-box" class="result-box">尚未生成汇报任务。</pre>
     </div>
   </div>
 
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>导出任务跟踪</h3>
+  <div class="report-workbench-grid">
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>汇报任务跟踪</h3>
+          <div class="table-panel-note">查看近期汇报输出进度，并可直接拉取详情。</div>
+        </div>
+      </div>
       <label>状态</label>
       <select id="report-exports-status">
-          <option value="">全部</option>
+        <option value="">全部状态</option>
         {% for item in report_export_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">加载数量</label>
+      <label>加载数量</label>
       <input id="report-exports-limit" type="number" min="1" max="200" value="20">
-      <button id="report-exports-load-btn" type="button" style="margin-top:10px;">加载导出列表</button>
-      <label style="margin-top:8px;">导出任务</label>
-      <input id="report-export-id" placeholder="请输入导出任务标识">
-      <button id="report-export-get-btn" type="button" style="margin-top:10px;">加载详情</button>
-      <pre id="report-export-detail-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载导出详情。</pre>
+      <button id="report-exports-load-btn" type="button">加载汇报列表</button>
+      <label>当前汇报任务</label>
+      <input id="report-export-id" placeholder="可从下方列表一键带入">
+      <button id="report-export-get-btn" type="button">加载汇报详情</button>
+      <pre id="report-export-detail-box" class="result-box">尚未加载汇报详情。</pre>
     </div>
-    <div>
-      <h3>保留期治理</h3>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>模板与保留治理</h3>
+          <div class="table-panel-note">用于保持汇报模板稳定和导出记录可治理。</div>
+        </div>
+      </div>
+      <label>模板名称</label>
+      <input id="report-template-name" placeholder="请输入模板名称" {% if not can_reporting_write %}disabled{% endif %}>
+      <label>默认格式</label>
+      <select id="report-template-format" {% if not can_reporting_write %}disabled{% endif %}>
+        {% for item in report_format_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label>标题模板</label>
+      <input id="report-template-title" value="成果汇报 count={count}" {% if not can_reporting_write %}disabled{% endif %}>
+      <label>正文模板</label>
+      <textarea id="report-template-body" rows="3" placeholder="task={task_id} topic={topic}" {% if not can_reporting_write %}disabled{% endif %}></textarea>
+      <button id="report-template-create-btn" type="button" {% if not can_reporting_write %}disabled{% endif %}>创建汇报模板</button>
       <label>保留天数</label>
       <input id="report-retention-days" type="number" min="1" value="30" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">演练模式</label>
+      <label>演练模式</label>
       <select id="report-retention-dry" {% if not can_reporting_write %}disabled{% endif %}>
-        <option value="true">true</option>
-        <option value="false">false</option>
+        <option value="true">仅演练</option>
+        <option value="false">直接执行</option>
       </select>
-      <button id="report-retention-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>执行保留期治理</button>
-      <pre id="report-retention-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未执行保留期治理。</pre>
+      <button id="report-retention-btn" type="button" {% if not can_reporting_write %}disabled{% endif %}>执行保留治理</button>
+      <pre id="report-retention-box" class="result-box">尚未执行保留治理。</pre>
     </div>
   </div>
   {% else %}
-  <p class="hint">当前账号缺少 <code>reporting.read</code> 权限，报告导出区已隐藏。</p>
+  <p class="hint">当前账号缺少 <code>reporting.read</code> 权限，领导汇报与专题分析区已隐藏。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>汇报模板与近期输出</h2>
+  <p class="panel-subtitle">保留必要的治理视图，但默认作为辅助信息，不抢占主业务路径。</p>
+  {% if can_reporting_read %}
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>汇报模板列表</h3>
+          <div class="table-panel-note">选择模板后会自动带入“生成汇报材料”。</div>
+        </div>
+      </div>
+      {% if outcome_templates %}
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>模板</th>
+              <th>默认格式</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in outcome_templates %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.name }}</div>
+                <div class="cell-subtle">{{ item.id }}</div>
+              </td>
+              <td>{{ item.format_default }}</td>
+              <td><span class="status-pill{% if item.is_active %} info{% else %} muted{% endif %}">{{ "启用中" if item.is_active else "已停用" }}</span></td>
+              <td>
+                <button
+                  type="button"
+                  class="button-link button-secondary"
+                  data-select-template="{{ item.id }}"
+                  data-template-name="{{ item.name }}"
+                >
+                  用于汇报
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">当前还没有汇报模板，请先创建一个模板。</div>
+      {% endif %}
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>最近汇报任务</h3>
+          <div class="table-panel-note">可直接把历史汇报任务带入详情区，复用之前的输出内容。</div>
+        </div>
+      </div>
+      {% if outcome_exports %}
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>汇报任务</th>
+              <th>格式</th>
+              <th>状态</th>
+              <th>主题</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in outcome_exports %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.id }}</div>
+                <div class="cell-subtle">{{ item.created_at }}</div>
+              </td>
+              <td>{{ item.report_format }}</td>
+              <td>
+                <span class="status-pill{% if item.status == "RUNNING" %} warn{% elif item.status == "FAILED" %} danger{% elif item.status == "SUCCEEDED" %} info{% else %} muted{% endif %}">
+                  {% if item.status == "RUNNING" %}
+                  生成中
+                  {% elif item.status == "SUCCEEDED" %}
+                  已完成
+                  {% elif item.status == "FAILED" %}
+                  失败
+                  {% else %}
+                  {{ item.status }}
+                  {% endif %}
+                </span>
+              </td>
+              <td>{{ item.topic or "综合复盘" }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="button-link button-secondary"
+                  data-select-export="{{ item.id }}"
+                  data-export-task="{{ item.task_id or '' }}"
+                  data-export-topic="{{ item.topic or '综合复盘' }}"
+                >
+                  查看详情
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">当前还没有汇报任务，生成后会在这里持续展示。</div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <p class="hint">当前账号缺少 <code>reporting.read</code> 权限，汇报治理列表已隐藏。</p>
   {% endif %}
 </div>
 
 <div class="panel">
   <h2>AI 治理入口</h2>
   {% if can_ai_read %}
-  <p class="hint">需要模型治理时，进入专门的 AI 治理工作台，不把复杂模型操作堆在报表页。</p>
+  <p class="hint">需要模型治理时，进入专门的 AI 治理工作台，不把复杂模型操作堆在成果消费页。</p>
   <a class="button-link" href="/ui/ai-governance?token={{ token }}">进入 AI 治理工作台</a>
   {% else %}
   <p class="hint">当前账号缺少 <code>ai.read</code> 权限，AI 治理页面仍可由管理员控制开放。</p>
   {% endif %}
-</div>
-
-<div class="panel">
-  <h2>报告模板列表</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>标识</th>
-          <th>模板名称</th>
-          <th>默认格式</th>
-          <th>启用</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in outcome_templates %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.format_default }}</td>
-          <td>{{ item.is_active }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="panel">
-  <h2>最近导出任务</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>标识</th>
-          <th>模板</th>
-          <th>格式</th>
-          <th>状态</th>
-          <th>主题</th>
-          <th>创建时间</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in outcome_exports %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.template_id }}</td>
-          <td>{{ item.report_format }}</td>
-          <td>{{ item.status }}</td>
-          <td>{{ item.topic or "-" }}</td>
-          <td>{{ item.created_at }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
 </div>
 
 <div class="hint action-result" id="reports-result" role="status" aria-live="polite"></div>

@@ -70,17 +70,17 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-03-02T02:17:06.2632841Z`
-- current_phase: `phase-36-business-closure-outcomes-consumption.md`
-- phase_status: `READY`
-- last_success_phase: `phase-35-mobile-field-operations.md`
-- current_focus: `Phase 35 is closed; next checkpoint is Phase 36 READY, starting with business closure and outcome-consumption views`
+- updated_at_utc: `2026-03-02T05:06:26.0016159Z`
+- current_phase: `DONE`
+- phase_status: `DONE`
+- last_success_phase: `phase-39-release-adoption-lifecycle.md`
+- current_focus: `Phase 39 is closed; 39-WP1..39-WP6 extended /ui/platform into a release-adoption console with release checks, help center, release notes, and gray-enable guidance. There is no active phase checkpoint now.`
 
 ## Next TODO (Execution Target)
-1. Start from `phase-33-one-map-command-center-v2.md` when implementation resumes.
+1. No active execution phase. Wait for a new blueprint before moving the checkpoint out of `DONE`.
 2. Reuse the Docker Compose regression checklist below for any future changes.
 3. Use `phases/state.md` as the execution SSOT; do not reopen completed phases unless explicitly requested.
-4. Keep all later-phase UI changes at or above the Phase 32 productization baseline; do not allow UX regressions.
+4. Keep all future UI changes at or above the Phase 32 productization baseline; do not allow UX regressions.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -110,4 +110,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=phase-36-business-closure-outcomes-consumption.md，status=READY，last_success_phase=phase-35-mobile-field-operations.md；Phase 35 已完成并关账，按不低于 Phase 32 产品化效果的标准从 36-WP1 开始推进业务闭环与成果消费体验。`
+`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=DONE，status=DONE，last_success_phase=phase-39-release-adoption-lifecycle.md；Phase 39 已完成并关账，所有既定阶段已闭环，如需继续请先提供新的阶段蓝图。`

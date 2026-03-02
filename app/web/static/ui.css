@@ -1730,6 +1730,103 @@ textarea:focus {
   margin-top: 4px;
 }
 
+.panel-subtitle {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.report-stage-card,
+.report-surface,
+.report-case-card,
+.report-topic-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfaf3;
+  padding: 12px;
+}
+
+.report-stage-head,
+.report-case-head {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.report-stage-note,
+.report-case-summary {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-board-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.report-workbench-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.report-topic-grid,
+.report-case-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.report-topic-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.report-case-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.report-topic-card,
+.report-case-card {
+  display: grid;
+  gap: 8px;
+}
+
+.report-topic-count {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.report-secondary-panel {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f6f5ea;
+  padding: 12px;
+}
+
+.report-secondary-panel > summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.report-secondary-panel[open] > summary {
+  margin-bottom: 12px;
+}
+
 @media (max-width: 1280px) {
   .command-mode-summary-grid,
   .command-kpi-grid {
@@ -1742,6 +1839,17 @@ textarea:focus {
 
   .command-map-stage {
     height: 520px;
+  }
+
+  .report-stage-grid,
+  .report-topic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-case-grid,
+  .report-workbench-grid,
+  .report-board-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1760,5 +1868,10 @@ textarea:focus {
 
   .command-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-stage-grid,
+  .report-topic-grid {
+    grid-template-columns: 1fr;
   }
 }

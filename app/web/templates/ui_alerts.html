@@ -3,429 +3,597 @@
 {% block content %}
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>待处理告警</div>
+    <div>统一待办</div>
+    <div class="value">{{ unified_todos|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>待响应告警</div>
     <div class="value">{{ alert_status_counts.get("OPEN", 0) }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>已确认告警</div>
-    <div class="value">{{ alert_status_counts.get("ACKED", 0) }}</div>
+    <div>待审批事项</div>
+    <div class="value">{{ role_priorities[1].count if role_priorities|length > 1 else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>已关闭告警</div>
-    <div class="value">{{ alert_status_counts.get("CLOSED", 0) }}</div>
+    <div>在途任务</div>
+    <div class="value">{{ role_priorities[2].count if role_priorities|length > 2 else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
     <div>值守班次 / 升级策略</div>
     <div class="value">{{ oncall_shifts|length }} / {{ escalation_policies|length }}</div>
   </div>
-</div>
-
-<div class="panel">
-  <div class="ui-section-head">
-      <h2>告警队列</h2>
-    <form method="get" action="/ui/alerts" class="ui-action-row">
-      <input type="hidden" name="token" value="{{ token }}">
-      <select name="alert_status" aria-label="按告警状态筛选">
-        <option value="">全部状态</option>
-        {% for item in alert_status_options %}
-        <option value="{{ item }}" {% if selected_alert_status == item %}selected{% endif %}>{{ item }}</option>
-        {% endfor %}
-      </select>
-      <input name="drone_id" value="{{ selected_alert_drone }}" placeholder="按设备标识筛选（可选）">
-      <button type="submit">筛选告警</button>
-    </form>
-  </div>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>告警 ID</th>
-          <th>设备</th>
-          <th>类型</th>
-          <th>优先级</th>
-          <th>状态</th>
-          <th>最近出现</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in alerts %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.drone_id }}</td>
-          <td>{{ item.alert_type }}</td>
-          <td>{{ item.priority_level }}</td>
-          <td><span class="status-pill">{{ item.status }}</span></td>
-          <td>{{ item.last_seen_at }}</td>
-          <td>
-            <button type="button" class="table-select js-alert-select" data-alert-id="{{ item.id }}">选中</button>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card ui-kpi-card">
+    <div>消息路由</div>
+    <div class="value">{{ routing_rules|length }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <div id="alert-selection-banner" class="selection-banner" style="margin-bottom:12px;">
+  <h2>消息中心与待办中心</h2>
+  <p class="panel-subtitle">把告警、审批、任务放到同一协同面板里，先知道“谁要做、什么时候做、下一步去哪做”。</p>
+  <div class="report-topic-grid">
+    {% for item in collaboration_cards %}
+    <div class="report-topic-card">
+      <div class="report-topic-count">{{ item.value }}</div>
+      <strong>{{ item.label }}</strong>
+      <div class="report-stage-note">{{ item.note }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>统一待办视图</h3>
+          <div class="table-panel-note">按照优先级聚合告警、审批和任务。高优先级事项优先展示，避免多页面切换。</div>
+        </div>
+      </div>
+      {% if unified_todos %}
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>来源</th>
+              <th>事项</th>
+              <th>当前状态</th>
+              <th>优先级</th>
+              <th>最近时间</th>
+              <th>下一步</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in unified_todos %}
+            <tr>
+              <td><span class="status-pill info">{{ item.kind }}</span></td>
+              <td>
+                <div class="cell-main">{{ item.title }}</div>
+                <div class="cell-subtle">{{ item.subtitle }}</div>
+              </td>
+              <td><span class="status-pill{% if item.status_label == "待响应" %} warn{% elif item.status_label in ["执行中", "待接单", "待审批", "待派发"] %} info{% elif item.status_label in ["已关闭", "已归档"] %} muted{% endif %}">{{ item.status_label }}</span></td>
+              <td><span class="status-pill{% if item.priority_label == "高" %} warn{% elif item.priority_label == "中" %} info{% else %} muted{% endif %}">{{ item.priority_label }}</span></td>
+              <td>{{ item.time_label }}</td>
+              <td>
+                {% if item.select_alert_id %}
+                <button
+                  type="button"
+                  class="button-link button-secondary js-alert-select"
+                  data-alert-id="{{ item.select_alert_id }}"
+                >
+                  {{ item.action_label }}
+                </button>
+                {% else %}
+                <a class="button-link button-secondary" href="{{ item.action_href }}">{{ item.action_label }}</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">当前暂无统一待办。新的告警、审批和任务会自动汇入这里。</div>
+      {% endif %}
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>消息中心</h3>
+          <div class="table-panel-note">按时间汇总近期提醒，方便值守、调度和审核角色快速确认最新动态。</div>
+        </div>
+      </div>
+      {% if message_center_items %}
+      <div class="hint-list">
+        {% for item in message_center_items %}
+        <div class="hint-list-item">
+          <strong>{{ item.channel }}</strong>：{{ item.title }}
+          <div class="cell-subtle">{{ item.meta }} · {{ item.time_label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">当前暂无新消息，系统会在有新动作时自动推送到这里。</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>告警处理与催办</h2>
+  <p class="panel-subtitle">统一待办里的告警可直接带入这里，完成确认、关闭、复盘和补充动作。</p>
+  <div id="alert-selection-banner" class="selection-banner stack-gap-md">
     <strong>当前未选中告警</strong>
-    <div class="selection-meta">建议先在上方列表点击“选中”，系统会自动带入当前告警到处理区。</div>
-  </div>
-  <h2>当前告警处理</h2>
-  <div class="grid cols-2">
-    <div>
-      <h3>确认告警</h3>
-      <label>当前告警</label>
-      <input id="alert-ack-id" placeholder="可从上方列表自动带入">
-      <label style="margin-top:8px;">备注</label>
-      <input id="alert-ack-comment" placeholder="可选，填写确认备注">
-      <button id="alert-ack-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>确认告警</button>
-    </div>
-    <div>
-      <h3>关闭告警</h3>
-      <label>当前告警</label>
-      <input id="alert-close-id" placeholder="可从上方列表自动带入">
-      <label style="margin-top:8px;">备注</label>
-      <input id="alert-close-comment" placeholder="可选，填写关闭说明">
-      <button id="alert-close-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>关闭告警</button>
-    </div>
+    <div class="selection-meta">建议先在统一待办或下方告警列表中点击“处理告警”，系统会自动带入当前告警。</div>
   </div>
 
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>创建路由规则</h3>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>告警队列</h3>
+          <div class="table-panel-note">保留原始告警列表，便于按状态和设备快速筛选。</div>
+        </div>
+        <form method="get" action="/ui/alerts" class="ui-action-row">
+          <input type="hidden" name="token" value="{{ token }}">
+          <select name="alert_status" aria-label="按告警状态筛选">
+            <option value="">全部状态</option>
+            {% for item in alert_status_options %}
+            <option value="{{ item }}" {% if selected_alert_status == item %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+          </select>
+          <input name="drone_id" value="{{ selected_alert_drone }}" placeholder="按设备标识筛选（可选）">
+          <button type="submit">筛选告警</button>
+        </form>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>告警 ID</th>
+              <th>设备</th>
+              <th>类型</th>
+              <th>优先级</th>
+              <th>状态</th>
+              <th>最近出现</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in alerts %}
+            <tr>
+              <td><code>{{ item.id }}</code></td>
+              <td>{{ item.drone_id }}</td>
+              <td>{{ item.alert_type }}</td>
+              <td>{{ item.priority_level }}</td>
+              <td><span class="status-pill{% if item.status == "OPEN" %} warn{% elif item.status == "ACKED" %} info{% else %} muted{% endif %}">{{ item.status }}</span></td>
+              <td>{{ item.last_seen_at }}</td>
+              <td>
+                <button type="button" class="table-select js-alert-select" data-alert-id="{{ item.id }}">处理告警</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>当前告警主处理动作</h3>
+          <div class="table-panel-note">确认后可以继续关闭、补充动作或进入复盘。</div>
+        </div>
+      </div>
+      <div class="grid cols-2">
+        <div class="form-stack">
+          <label>当前告警</label>
+          <input id="alert-ack-id" placeholder="可从上方列表自动带入">
+          <label>备注</label>
+          <input id="alert-ack-comment" placeholder="可选，填写确认备注">
+          <button id="alert-ack-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>确认告警</button>
+        </div>
+        <div class="form-stack">
+          <label>当前告警</label>
+          <input id="alert-close-id" placeholder="可从上方列表自动带入">
+          <label>备注</label>
+          <input id="alert-close-comment" placeholder="可选，填写关闭说明">
+          <button id="alert-close-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>关闭告警</button>
+        </div>
+      </div>
+
+      <div class="grid cols-2 stack-gap-md">
+        <div class="form-stack">
+          <label>当前告警</label>
+          <input id="alert-action-id" placeholder="可从上方列表自动带入">
+          <label>补充动作类型</label>
+          <select id="alert-action-type" {% if not can_alert_write %}disabled{% endif %}>
+            {% for item in alert_action_type_options %}
+            <option value="{{ item }}">{{ item }}</option>
+            {% endfor %}
+          </select>
+          <label>说明</label>
+          <input id="alert-action-note" placeholder="可选，填写处理说明" {% if not can_alert_write %}disabled{% endif %}>
+          <button id="alert-action-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>补充处理动作</button>
+        </div>
+        <div class="form-stack">
+          <label>当前告警</label>
+          <input id="alert-review-id" placeholder="可从上方列表自动带入">
+          <div class="ui-action-row">
+            <button id="alert-routes-btn" type="button">查看路由</button>
+            <button id="alert-actions-btn" type="button">查看动作</button>
+            <button id="alert-review-btn" type="button">查看复盘</button>
+          </div>
+          <pre id="alert-review-box" class="result-box">尚未加载协同数据。</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>通知渠道与发送策略</h2>
+  <p class="panel-subtitle">围绕消息路由、值守班次和升级策略配置通知渠道，保持“系统推任务”的协同模式。</p>
+  <div class="report-topic-grid">
+    {% for item in channel_cards %}
+    <div class="report-topic-card">
+      <div class="report-topic-count">{{ item.value }}</div>
+      <strong>{{ item.label }}</strong>
+      <div class="report-stage-note">{{ item.note }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="report-workbench-grid">
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>消息路由配置</h3>
+          <div class="table-panel-note">可视作短信、邮件、企微/钉钉等渠道的统一发送入口。</div>
+        </div>
+      </div>
       <label>优先级</label>
       <select id="routing-priority">
         {% for item in alert_priority_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">告警类型（可选）</label>
+      <label>告警类型（可选）</label>
       <select id="routing-type">
         <option value="">全部类型</option>
         {% for item in alert_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">通知渠道</label>
+      <label>通知渠道</label>
       <select id="routing-channel">
         {% for item in alert_channel_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">目标</label>
+      <label>目标</label>
       <input id="routing-target" placeholder="例如：oncall://active 或用户标识">
-      <button id="routing-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>创建路由规则</button>
+      <button id="routing-create-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>创建路由规则</button>
     </div>
-    <div>
-      <h3>创建值守班次</h3>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>值守班次</h3>
+          <div class="table-panel-note">用于班次交接和通知目标切换，确保不登录系统也能收到提醒。</div>
+        </div>
+      </div>
       <label>班次名称</label>
       <input id="oncall-name" value="day-shift">
-      <label style="margin-top:8px;">目标</label>
+      <label>目标</label>
       <input id="oncall-target" value="oncall://active">
-      <label style="margin-top:8px;">开始时间（ISO）</label>
+      <label>开始时间（ISO）</label>
       <input id="oncall-starts-at" placeholder="2026-03-01T00:00:00Z">
-      <label style="margin-top:8px;">结束时间（ISO）</label>
+      <label>结束时间（ISO）</label>
       <input id="oncall-ends-at" placeholder="2026-03-01T08:00:00Z">
-      <label style="margin-top:8px;">时区</label>
+      <label>时区</label>
       <input id="oncall-timezone" value="UTC">
-      <button id="oncall-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>创建班次</button>
+      <button id="oncall-create-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>创建班次</button>
     </div>
-  </div>
 
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>创建升级策略</h3>
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>升级策略</h3>
+          <div class="table-panel-note">承接超时催办和逐级升级，是协同闭环的关键保障。</div>
+        </div>
+      </div>
       <label>优先级</label>
       <select id="escalation-priority">
         {% for item in alert_priority_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">确认超时（秒）</label>
+      <label>确认超时（秒）</label>
       <input id="escalation-ack-timeout" type="number" min="30" value="1800">
-      <label style="margin-top:8px;">重复阈值</label>
+      <label>重复阈值</label>
       <input id="escalation-repeat-threshold" type="number" min="2" value="3">
-      <label style="margin-top:8px;">最大升级级别</label>
+      <label>最大升级级别</label>
       <input id="escalation-max-level" type="number" min="1" value="1">
-      <label style="margin-top:8px;">通知渠道</label>
+      <label>通知渠道</label>
       <select id="escalation-channel">
         {% for item in alert_channel_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">目标</label>
+      <label>目标</label>
       <input id="escalation-target" value="oncall://active">
-      <button id="escalation-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>创建升级策略</button>
+      <button id="escalation-create-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>创建升级策略</button>
     </div>
-    <div>
-      <h3>升级策略试运行</h3>
+  </div>
+
+  <details class="report-secondary-panel">
+    <summary>查看通知渠道清单（配置治理）</summary>
+    <div class="report-board-grid">
+      <div class="report-surface">
+        <div class="table-panel-head">
+          <div>
+            <h3>路由规则</h3>
+            <div class="table-panel-note">按优先级与类型决定消息去哪。</div>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>标识</th>
+                <th>优先级</th>
+                <th>告警类型</th>
+                <th>渠道</th>
+                <th>目标</th>
+                <th>启用</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in routing_rules %}
+              <tr>
+                <td><code>{{ item.id }}</code></td>
+                <td>{{ item.priority_level }}</td>
+                <td>{{ item.alert_type or "-" }}</td>
+                <td>{{ item.channel }}</td>
+                <td>{{ item.target }}</td>
+                <td>{{ item.is_active }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="report-surface">
+        <div class="table-panel-head">
+          <div>
+            <h3>值守班次</h3>
+            <div class="table-panel-note">值班交接时看这里。</div>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>标识</th>
+                <th>班次名称</th>
+                <th>目标</th>
+                <th>开始</th>
+                <th>结束</th>
+                <th>时区</th>
+                <th>启用</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in oncall_shifts %}
+              <tr>
+                <td><code>{{ item.id }}</code></td>
+                <td>{{ item.shift_name }}</td>
+                <td>{{ item.target }}</td>
+                <td>{{ item.starts_at }}</td>
+                <td>{{ item.ends_at }}</td>
+                <td>{{ item.timezone }}</td>
+                <td>{{ item.is_active }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </details>
+</div>
+
+<div class="panel">
+  <h2>回执、催办与升级跟踪</h2>
+  <p class="panel-subtitle">围绕回执、SLA、批量处理和超时升级形成完整的协同追踪链路。</p>
+  <div class="report-topic-grid">
+    {% for item in escalation_watch_items %}
+    <div class="report-topic-card">
+      <div class="report-topic-count">{{ item.value }}</div>
+      <strong>{{ item.label }}</strong>
+      <div class="report-stage-note">{{ item.note }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="report-workbench-grid">
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>升级策略试运行</h3>
+          <div class="table-panel-note">先演练, 再决定是否正式执行升级。</div>
+        </div>
+      </div>
       <label>演练模式</label>
       <select id="escalation-run-dry">
         <option value="false">正式执行</option>
         <option value="true">演练模式</option>
       </select>
-      <label style="margin-top:8px;">扫描上限</label>
+      <label>扫描上限</label>
       <input id="escalation-run-limit" type="number" min="1" max="1000" value="200">
-      <button id="escalation-run-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>运行升级策略</button>
-      <pre id="escalation-run-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未执行升级策略。</pre>
+      <button id="escalation-run-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>运行升级策略</button>
+      <pre id="escalation-run-box" class="result-box">尚未执行升级策略。</pre>
     </div>
-  </div>
 
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>创建静默规则</h3>
-      <label>规则名称</label>
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>回执与投递状态</h3>
+          <div class="table-panel-note">记录外部发送结果，形成闭环回执。</div>
+        </div>
+      </div>
+      <label>路由日志标识</label>
+      <input id="route-receipt-id" placeholder="请输入路由日志标识" {% if not can_alert_write %}disabled{% endif %}>
+      <label>投递状态</label>
+      <select id="route-receipt-status" {% if not can_alert_write %}disabled{% endif %}>
+        {% for item in alert_delivery_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="route-receipt-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>提交回执</button>
+      <label>值守 SLA 概览</label>
+      <input id="sla-from-ts" placeholder="开始时间（可选 ISO）">
+      <input id="sla-to-ts" placeholder="结束时间（可选 ISO）">
+      <button id="sla-load-btn" type="button">加载值守 SLA</button>
+      <pre id="sla-box" class="result-box">尚无 SLA 数据。</pre>
+    </div>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>批量催办与静默控制</h3>
+          <div class="table-panel-note">适合集中清理一批事项, 同时控制通知噪音。</div>
+        </div>
+      </div>
+      <label>告警标识（每行一个）</label>
+      <textarea id="batch-close-ids" rows="4" placeholder="alert-id-a&#10;alert-id-b" {% if not can_alert_write %}disabled{% endif %}></textarea>
+      <label>备注</label>
+      <input id="batch-close-comment" placeholder="可选，填写批量关闭说明" {% if not can_alert_write %}disabled{% endif %}>
+      <button id="batch-close-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>批量关闭</button>
+      <label>静默规则名称</label>
       <input id="silence-name" value="silent-window">
-      <label style="margin-top:8px;">告警类型（可选）</label>
+      <label>告警类型（可选）</label>
       <select id="silence-type">
         <option value="">全部类型</option>
         {% for item in alert_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">设备标识（可选）</label>
+      <label>设备标识（可选）</label>
       <input id="silence-drone-id" placeholder="请输入设备标识">
-      <label style="margin-top:8px;">开始时间（可选 ISO）</label>
-      <input id="silence-starts-at" placeholder="2026-03-01T00:00:00Z">
-      <label style="margin-top:8px;">结束时间（可选 ISO）</label>
-      <input id="silence-ends-at" placeholder="2026-03-01T08:00:00Z">
-      <button id="silence-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>创建静默规则</button>
-    </div>
-    <div>
-      <h3>创建聚合规则</h3>
-      <label>规则名称</label>
-      <input id="aggregation-name" value="aggregation-rule">
-      <label style="margin-top:8px;">告警类型（可选）</label>
-      <select id="aggregation-type">
-        <option value="">全部类型</option>
-        {% for item in alert_type_options %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
-      <label style="margin-top:8px;">聚合窗口（秒）</label>
-      <input id="aggregation-window" type="number" min="10" value="300">
-      <button id="aggregation-create-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>创建聚合规则</button>
-    </div>
-  </div>
-
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>查看路由 / 动作 / 复盘</h3>
-      <label>当前告警</label>
-      <input id="alert-review-id" placeholder="可从上方列表自动带入">
-      <div class="ui-action-row" style="margin-top:10px;">
-        <button id="alert-routes-btn" type="button">查看路由</button>
-        <button id="alert-actions-btn" type="button">查看动作</button>
-        <button id="alert-review-btn" type="button">查看复盘</button>
-      </div>
-      <pre id="alert-review-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载数据。</pre>
-    </div>
-    <div>
-      <h3>补充处理动作</h3>
-      <label>当前告警</label>
-      <input id="alert-action-id" placeholder="可从上方列表自动带入">
-      <label style="margin-top:8px;">动作类型</label>
-      <select id="alert-action-type" {% if not can_alert_write %}disabled{% endif %}>
-        {% for item in alert_action_type_options %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
-      <label style="margin-top:8px;">说明</label>
-      <input id="alert-action-note" placeholder="可选，填写处理说明" {% if not can_alert_write %}disabled{% endif %}>
-      <button id="alert-action-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>新增动作</button>
-      <label style="margin-top:8px;">路由日志标识</label>
-      <input id="route-receipt-id" placeholder="请输入路由日志标识" {% if not can_alert_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">投递状态</label>
-      <select id="route-receipt-status" {% if not can_alert_write %}disabled{% endif %}>
-        {% for item in alert_delivery_status_options %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
-      <button id="route-receipt-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>提交回执</button>
-    </div>
-  </div>
-
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>值守 SLA 概览</h3>
       <label>开始时间（可选 ISO）</label>
-      <input id="sla-from-ts" placeholder="2026-03-01T00:00:00Z">
-      <label style="margin-top:8px;">结束时间（可选 ISO）</label>
-      <input id="sla-to-ts" placeholder="2026-03-01T08:00:00Z">
-      <button id="sla-load-btn" type="button" style="margin-top:10px;">加载 SLA</button>
-      <pre id="sla-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚无 SLA 数据。</pre>
-    </div>
-    <div>
-      <h3>批量关闭</h3>
-      <label>告警标识（每行一个）</label>
-      <textarea id="batch-close-ids" rows="5" placeholder="alert-id-a&#10;alert-id-b" {% if not can_alert_write %}disabled{% endif %}></textarea>
-      <label style="margin-top:8px;">备注</label>
-      <input id="batch-close-comment" placeholder="可选，填写批量关闭说明" {% if not can_alert_write %}disabled{% endif %}>
-      <button id="batch-close-btn" type="button" style="margin-top:10px;" {% if not can_alert_write %}disabled{% endif %}>批量关闭</button>
-      {% if not can_alert_write %}
-      <p class="hint">当前为只读模式，需要 `alert.write` 权限才能执行写操作。</p>
-      {% endif %}
+      <input id="silence-starts-at" placeholder="2026-03-01T00:00:00Z">
+      <label>结束时间（可选 ISO）</label>
+      <input id="silence-ends-at" placeholder="2026-03-01T08:00:00Z">
+      <button id="silence-create-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>创建静默规则</button>
     </div>
   </div>
 
-  <div class="hint action-result" id="alerts-result" role="status" aria-live="polite"></div>
+  <details class="report-secondary-panel">
+    <summary>静默与聚合规则（噪音治理）</summary>
+    <div class="report-board-grid">
+      <div class="report-surface form-stack">
+        <div class="table-panel-head">
+          <div>
+            <h3>聚合规则</h3>
+            <div class="table-panel-note">把相似告警合并成一次提醒。</div>
+          </div>
+        </div>
+        <label>规则名称</label>
+        <input id="aggregation-name" value="aggregation-rule">
+        <label>告警类型（可选）</label>
+        <select id="aggregation-type">
+          <option value="">全部类型</option>
+          {% for item in alert_type_options %}
+          <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
+        <label>聚合窗口（秒）</label>
+        <input id="aggregation-window" type="number" min="10" value="300">
+        <button id="aggregation-create-btn" type="button" {% if not can_alert_write %}disabled{% endif %}>创建聚合规则</button>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>标识</th>
+                <th>规则名称</th>
+                <th>告警类型</th>
+                <th>窗口（秒）</th>
+                <th>启用</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in aggregation_rules %}
+              <tr>
+                <td><code>{{ item.id }}</code></td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.alert_type or "-" }}</td>
+                <td>{{ item.window_seconds }}</td>
+                <td>{{ item.is_active }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="report-surface">
+        <div class="table-panel-head">
+          <div>
+            <h3>静默规则</h3>
+            <div class="table-panel-note">控制非关键时段的通知噪音。</div>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>标识</th>
+                <th>规则名称</th>
+                <th>告警类型</th>
+                <th>设备</th>
+                <th>生效窗口</th>
+                <th>启用</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in silence_rules %}
+              <tr>
+                <td><code>{{ item.id }}</code></td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.alert_type or "-" }}</td>
+                <td>{{ item.drone_id or "-" }}</td>
+                <td>{{ item.starts_at or "-" }} ~ {{ item.ends_at or "-" }}</td>
+                <td>{{ item.is_active }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </details>
 </div>
 
 <div class="panel">
-  <h2>路由规则</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>标识</th>
-          <th>优先级</th>
-          <th>告警类型</th>
-          <th>通知渠道</th>
-          <th>通知目标</th>
-          <th>启用</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in routing_rules %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.priority_level }}</td>
-          <td>{{ item.alert_type or "-" }}</td>
-          <td>{{ item.channel }}</td>
-          <td>{{ item.target }}</td>
-          <td>{{ item.is_active }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <h2>角色优先级与协同建议</h2>
+  <p class="panel-subtitle">按角色给出当前最值得处理的事项, 让“系统推任务”真正落到日常协同上。</p>
+  <div class="report-topic-grid">
+    {% for item in role_priorities %}
+    <div class="report-topic-card">
+      <div class="report-topic-count">{{ item.count }}</div>
+      <strong>{{ item.role }}</strong>
+      <div class="report-stage-note">{{ item.focus }}</div>
+      <a class="button-link button-secondary" href="{{ item.href }}">进入对应工作台</a>
+    </div>
+    {% endfor %}
   </div>
 </div>
 
-<div class="panel">
-  <h2>值守班次</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>标识</th>
-          <th>班次名称</th>
-          <th>通知目标</th>
-          <th>开始时间</th>
-          <th>结束时间</th>
-          <th>时区</th>
-          <th>启用</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in oncall_shifts %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.shift_name }}</td>
-          <td>{{ item.target }}</td>
-          <td>{{ item.starts_at }}</td>
-          <td>{{ item.ends_at }}</td>
-          <td>{{ item.timezone }}</td>
-          <td>{{ item.is_active }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="panel">
-  <h2>升级策略</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>标识</th>
-          <th>优先级</th>
-          <th>确认超时</th>
-          <th>重复阈值</th>
-          <th>最大级别</th>
-          <th>通知渠道</th>
-          <th>通知目标</th>
-          <th>启用</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in escalation_policies %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.priority_level }}</td>
-          <td>{{ item.ack_timeout_seconds }}</td>
-          <td>{{ item.repeat_threshold }}</td>
-          <td>{{ item.max_escalation_level }}</td>
-          <td>{{ item.escalation_channel }}</td>
-          <td>{{ item.escalation_target }}</td>
-          <td>{{ item.is_active }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="panel">
-  <h2>静默规则</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>标识</th>
-          <th>规则名称</th>
-          <th>告警类型</th>
-          <th>设备</th>
-          <th>生效窗口</th>
-          <th>启用</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in silence_rules %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.alert_type or "-" }}</td>
-          <td>{{ item.drone_id or "-" }}</td>
-          <td>{{ item.starts_at or "-" }} ~ {{ item.ends_at or "-" }}</td>
-          <td>{{ item.is_active }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="panel">
-  <h2>聚合规则</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>标识</th>
-          <th>规则名称</th>
-          <th>告警类型</th>
-          <th>窗口（秒）</th>
-          <th>启用</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in aggregation_rules %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.alert_type or "-" }}</td>
-          <td>{{ item.window_seconds }}</td>
-          <td>{{ item.is_active }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+<div class="hint action-result" id="alerts-result" role="status" aria-live="polite"></div>
 {% endblock %}
 
 {% block scripts %}

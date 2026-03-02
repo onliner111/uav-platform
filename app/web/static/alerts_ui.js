@@ -166,7 +166,7 @@
       alertActionId.value = rowId;
     }
     if (selectionBanner) {
-      selectionBanner.innerHTML = `<strong>当前选中告警：${rowId}</strong><div class="selection-meta">处理区已自动带入当前告警，可直接执行确认、关闭或复盘。</div>`;
+      selectionBanner.innerHTML = `<strong>当前选中告警：${rowId}</strong><div class="selection-meta">协同处理区已自动带入当前告警，可直接执行确认、关闭、补充动作或复盘。</div>`;
     }
   }
 

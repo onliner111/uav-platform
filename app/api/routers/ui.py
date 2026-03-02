@@ -45,6 +45,7 @@ from app.domain.models import (
     OpenAdapterIngressStatus,
     OpenWebhookAuthType,
     OpenWebhookDeliveryStatus,
+    OrgUnitType,
     OutcomeSourceType,
     OutcomeStatus,
     OutcomeType,
@@ -1776,6 +1777,251 @@ def ui_alerts(
     silence_rules = service.list_silence_rules(claims["tenant_id"], is_active=None)
     aggregation_rules = service.list_aggregation_rules(claims["tenant_id"], is_active=None)
     status_counter = Counter([item.status.value for item in alerts])
+    can_mission_read = has_permission(claims, PERM_MISSION_READ)
+    can_approval_read = has_permission(claims, PERM_APPROVAL_READ)
+    task_rows: list[Any] = []
+    approval_rows: list[Any] = []
+    unified_todos: list[dict[str, Any]] = []
+    message_center_items: list[dict[str, Any]] = []
+    collaboration_cards: list[dict[str, Any]] = []
+    channel_cards: list[dict[str, Any]] = []
+    escalation_watch_items: list[dict[str, Any]] = []
+    role_priorities: list[dict[str, Any]] = []
+
+    if can_mission_read:
+        task_rows = TaskCenterService().list_tasks(
+            claims["tenant_id"],
+            viewer_user_id=claims["sub"],
+        )
+    if can_approval_read:
+        approval_rows = ComplianceService().list_approvals(claims["tenant_id"])
+
+    def _task_state_label(value: str) -> str:
+        mapping = {
+            "DRAFT": "待完善",
+            "APPROVAL_PENDING": "待审批",
+            "READY": "待派发",
+            "DISPATCHED": "待接单",
+            "ACCEPTED": "待执行",
+            "IN_PROGRESS": "执行中",
+            "COMPLETED": "待归档",
+            "CANCELED": "已取消",
+            "ARCHIVED": "已归档",
+        }
+        return mapping.get(value, value)
+
+    def _alert_status_label(value: str) -> str:
+        mapping = {
+            AlertStatus.OPEN.value: "待响应",
+            AlertStatus.ACKED.value: "已确认",
+            AlertStatus.CLOSED.value: "已关闭",
+        }
+        return mapping.get(value, value)
+
+    def _alert_priority_label(value: str) -> str:
+        mapping = {
+            AlertPriority.P1.value: "高",
+            AlertPriority.P2.value: "中",
+            AlertPriority.P3.value: "低",
+        }
+        return mapping.get(value, value)
+
+    def _priority_rank(level: str, fallback: int = 9) -> int:
+        order = {
+            "高": 1,
+            "中": 2,
+            "低": 3,
+            "待审批": 2,
+            "待响应": 1,
+            "待派发": 2,
+            "待接单": 2,
+            "待执行": 2,
+            "执行中": 3,
+        }
+        return order.get(level, fallback)
+
+    open_alerts: list[Any] = [item for item in alerts if item.status == AlertStatus.OPEN]
+    active_tasks: list[Any] = [
+        item
+        for item in task_rows
+        if str(getattr(item.state, "value", item.state)) not in {"COMPLETED", "CANCELED", "ARCHIVED"}
+    ]
+    pending_approvals: list[Any] = [item for item in approval_rows if str(item.status).upper() != "APPROVED"]
+
+    for item in open_alerts[:6]:
+        priority_label = _alert_priority_label(item.priority_level.value)
+        unified_todos.append(
+            {
+                "kind": "告警",
+                "title": item.message or "待处理告警",
+                "subtitle": f"{item.alert_type.value} · 设备 {item.drone_id}",
+                "status_label": _alert_status_label(item.status.value),
+                "priority_label": priority_label,
+                "priority_rank": _priority_rank(priority_label),
+                "time_label": item.last_seen_at.strftime("%Y-%m-%d %H:%M"),
+                "action_label": "处理告警",
+                "action_href": "",
+                "select_alert_id": item.id,
+            }
+        )
+        message_center_items.append(
+            {
+                "channel": "系统告警",
+                "title": item.message or "待处理告警",
+                "meta": f"{item.alert_type.value} · {_alert_status_label(item.status.value)}",
+                "time_label": item.last_seen_at.strftime("%Y-%m-%d %H:%M"),
+                "tone": "warn",
+            }
+        )
+
+    for item in pending_approvals[:5]:
+        status_value = str(item.status)
+        unified_todos.append(
+            {
+                "kind": "审批",
+                "title": f"{item.entity_type} 审批待处理",
+                "subtitle": f"对象 {item.entity_id}",
+                "status_label": "待审批" if status_value.upper() != "APPROVED" else "已通过",
+                "priority_label": "中",
+                "priority_rank": 2,
+                "time_label": item.created_at.strftime("%Y-%m-%d %H:%M"),
+                "action_label": "进入合规页",
+                "action_href": f"/ui/compliance?token={resolved_token}",
+                "select_alert_id": "",
+            }
+        )
+        message_center_items.append(
+            {
+                "channel": "审批待办",
+                "title": f"{item.entity_type} 待审批",
+                "meta": f"{item.entity_id} · {status_value}",
+                "time_label": item.created_at.strftime("%Y-%m-%d %H:%M"),
+                "tone": "info",
+            }
+        )
+
+    for item in active_tasks[:5]:
+        state_value = str(getattr(item.state, "value", item.state))
+        unified_todos.append(
+            {
+                "kind": "任务",
+                "title": item.name,
+                "subtitle": f"任务状态 {_task_state_label(state_value)} · 优先级 {item.priority}",
+                "status_label": _task_state_label(state_value),
+                "priority_label": "高" if int(item.priority) >= 8 else "中" if int(item.priority) >= 5 else "低",
+                "priority_rank": 1 if int(item.priority) >= 8 else 2 if int(item.priority) >= 5 else 3,
+                "time_label": item.updated_at.strftime("%Y-%m-%d %H:%M"),
+                "action_label": "进入任务中心",
+                "action_href": f"/ui/task-center?token={resolved_token}",
+                "select_alert_id": "",
+            }
+        )
+        message_center_items.append(
+            {
+                "channel": "任务待办",
+                "title": item.name,
+                "meta": f"{_task_state_label(state_value)} · 优先级 {item.priority}",
+                "time_label": item.updated_at.strftime("%Y-%m-%d %H:%M"),
+                "tone": "muted",
+            }
+        )
+
+    unified_todos = sorted(unified_todos, key=lambda item: (item["priority_rank"], item["time_label"]))[:10]
+    message_center_items = sorted(message_center_items, key=lambda item: item["time_label"], reverse=True)[:8]
+
+    collaboration_cards = [
+        {
+            "label": "统一待办",
+            "value": len(unified_todos),
+            "note": "告警、审批、任务已合并到同一协同清单。",
+            "tone": "info" if unified_todos else "muted",
+        },
+        {
+            "label": "高优先级响应",
+            "value": len([item for item in unified_todos if item["priority_rank"] == 1]),
+            "note": "优先处理高风险或高优先级事项。",
+            "tone": "warn" if len([item for item in unified_todos if item["priority_rank"] == 1]) else "success",
+        },
+        {
+            "label": "待审批事项",
+            "value": len(pending_approvals),
+            "note": "由合规或审核角色集中推进。",
+            "tone": "info" if pending_approvals else "muted",
+        },
+        {
+            "label": "外部触达能力",
+            "value": len(routing_rules) + len(oncall_shifts),
+            "note": "通过路由规则和值守班次承接外部通知。",
+            "tone": "info",
+        },
+    ]
+
+    channel_cards = [
+        {
+            "label": "消息路由",
+            "value": len(routing_rules),
+            "note": "按优先级和类型决定通知去向。",
+        },
+        {
+            "label": "值守班次",
+            "value": len(oncall_shifts),
+            "note": "承接值班人员轮转和目标切换。",
+        },
+        {
+            "label": "升级策略",
+            "value": len(escalation_policies),
+            "note": "用于超时提醒、催办和逐级升级。",
+        },
+        {
+            "label": "静默/聚合",
+            "value": len(silence_rules) + len(aggregation_rules),
+            "note": "控制通知噪音, 保持协同清晰。",
+        },
+    ]
+
+    escalation_watch_items = [
+        {
+            "label": "待响应告警",
+            "value": status_counter.get(AlertStatus.OPEN.value, 0),
+            "note": "需要及时确认和分派。",
+        },
+        {
+            "label": "已确认未闭环",
+            "value": status_counter.get(AlertStatus.ACKED.value, 0),
+            "note": "适合作为催办和跟踪对象。",
+        },
+        {
+            "label": "值守班次覆盖",
+            "value": len(oncall_shifts),
+            "note": "确保关键时段有人接收提醒。",
+        },
+        {
+            "label": "升级策略覆盖",
+            "value": len(escalation_policies),
+            "note": "超时后可自动进入升级链路。",
+        },
+    ]
+
+    role_priorities = [
+        {
+            "role": "值守人员",
+            "focus": "优先确认高优先级告警并提交回执。",
+            "count": len(open_alerts),
+            "href": f"/ui/alerts?token={resolved_token}",
+        },
+        {
+            "role": "合规审核",
+            "focus": "集中处理待审批事项, 避免任务停滞。",
+            "count": len(pending_approvals),
+            "href": f"/ui/compliance?token={resolved_token}",
+        },
+        {
+            "role": "调度执行",
+            "focus": "跟进待派发、待接单和执行中的任务。",
+            "count": len(active_tasks),
+            "href": f"/ui/task-center?token={resolved_token}",
+        },
+    ]
 
     return _render_console(
         request,
@@ -1783,10 +2029,16 @@ def ui_alerts(
         token=resolved_token,
         claims=claims,
         active_nav="alerts",
-        title="告警中心",
-        subtitle="先处理当前告警, 再按需配置值守班次和升级策略。",
+        title="通知协同中心",
+        subtitle="先看统一待办和提醒, 再推进告警处理、催办升级与渠道策略。",
         session_from_query=from_query,
         alerts=alerts,
+        unified_todos=unified_todos,
+        message_center_items=message_center_items,
+        collaboration_cards=collaboration_cards,
+        channel_cards=channel_cards,
+        escalation_watch_items=escalation_watch_items,
+        role_priorities=role_priorities,
         routing_rules=routing_rules,
         oncall_shifts=oncall_shifts,
         escalation_policies=escalation_policies,
@@ -1802,6 +2054,8 @@ def ui_alerts(
         selected_alert_status=alert_status.value if alert_status is not None else "",
         selected_alert_drone=drone_id or "",
         can_alert_write=has_permission(claims, PERM_ALERT_WRITE),
+        can_mission_read=can_mission_read,
+        can_approval_read=can_approval_read,
     )
 
 
@@ -1840,6 +2094,15 @@ def ui_reports(request: Request, token: str | None = Query(default=None)) -> Res
     latest_snapshot: Any = None
     raw_records: list[Any] = []
     outcome_records: list[Any] = []
+    closure_stages: list[dict[str, Any]] = []
+    review_queue: list[dict[str, Any]] = []
+    case_highlights: list[dict[str, Any]] = []
+    topic_summary: list[dict[str, Any]] = []
+    leadership_cards: list[dict[str, str]] = []
+    leadership_focus: list[str] = []
+    outcome_pending_count = 0
+    outcome_verified_count = 0
+    outcome_archived_count = 0
 
     if can_reporting_read:
         reporting_service = ReportingService()
@@ -1860,20 +2123,205 @@ def ui_reports(request: Request, token: str | None = Query(default=None)) -> Res
         raw_records = outcome_service.list_raw_records(claims["tenant_id"], viewer_user_id=claims["sub"])
         outcome_records = outcome_service.list_outcome_records(claims["tenant_id"], viewer_user_id=claims["sub"])
 
+    def _enum_value(value: Any) -> str:
+        raw = getattr(value, "value", value)
+        return str(raw)
+
+    def _source_label(value: str) -> str:
+        mapping = {
+            OutcomeSourceType.INSPECTION_OBSERVATION.value: "巡检发现",
+            OutcomeSourceType.ALERT.value: "告警转入",
+            OutcomeSourceType.MANUAL.value: "人工补录",
+        }
+        return mapping.get(value, value)
+
+    def _type_label(value: str) -> str:
+        mapping = {
+            OutcomeType.DEFECT.value: "缺陷",
+            OutcomeType.HIDDEN_RISK.value: "隐患",
+            OutcomeType.INCIDENT.value: "事件",
+            OutcomeType.OTHER.value: "其他",
+        }
+        return mapping.get(value, value)
+
+    def _status_meta(value: str) -> tuple[str, str]:
+        mapping = {
+            OutcomeStatus.NEW.value: ("已发现", "warn"),
+            OutcomeStatus.IN_REVIEW.value: ("整改中", "info"),
+            OutcomeStatus.VERIFIED.value: ("待归档", "muted"),
+            OutcomeStatus.ARCHIVED.value: ("已闭环", "success"),
+        }
+        return mapping.get(value, (value, "muted"))
+
+    if can_inspection_read:
+        sorted_outcomes = sorted(
+            outcome_records,
+            key=lambda item: getattr(item, "updated_at", getattr(item, "created_at", 0)),
+            reverse=True,
+        )
+        outcome_status_counter = Counter(_enum_value(item.status) for item in sorted_outcomes)
+        outcome_pending_count = (
+            outcome_status_counter.get(OutcomeStatus.NEW.value, 0)
+            + outcome_status_counter.get(OutcomeStatus.IN_REVIEW.value, 0)
+        )
+        outcome_verified_count = outcome_status_counter.get(OutcomeStatus.VERIFIED.value, 0)
+        outcome_archived_count = outcome_status_counter.get(OutcomeStatus.ARCHIVED.value, 0)
+        closure_stages = [
+            {
+                "label": "发现登记",
+                "count": outcome_status_counter.get(OutcomeStatus.NEW.value, 0),
+                "note": "等待安排整改或补充说明。",
+                "tone": "warn",
+            },
+            {
+                "label": "整改推进",
+                "count": outcome_status_counter.get(OutcomeStatus.IN_REVIEW.value, 0),
+                "note": "正在处理, 关注负责人和时效。",
+                "tone": "info",
+            },
+            {
+                "label": "复核确认",
+                "count": outcome_status_counter.get(OutcomeStatus.VERIFIED.value, 0),
+                "note": "处理完成, 等待最终归档。",
+                "tone": "muted",
+            },
+            {
+                "label": "闭环归档",
+                "count": outcome_status_counter.get(OutcomeStatus.ARCHIVED.value, 0),
+                "note": "已形成可复用案例与汇报材料。",
+                "tone": "success",
+            },
+        ]
+
+        for item in sorted_outcomes:
+            payload = item.payload if isinstance(item.payload, dict) else {}
+            summary = payload.get("note") or payload.get("summary") or payload.get("remark") or ""
+            if not isinstance(summary, str):
+                summary = str(summary)
+            summary = summary.strip() or "待补充现场说明。"
+            status_value = _enum_value(item.status)
+            status_label, status_tone = _status_meta(status_value)
+            review_queue.append(
+                {
+                    "id": item.id,
+                    "title": f"{_type_label(_enum_value(item.outcome_type))}事项",
+                    "summary": summary[:64],
+                    "source_label": _source_label(_enum_value(item.source_type)),
+                    "status_label": status_label,
+                    "status_tone": status_tone,
+                    "task_label": item.task_id or "未关联任务",
+                    "updated_at_label": item.updated_at.strftime("%Y-%m-%d %H:%M"),
+                    "task_id": item.task_id or "",
+                }
+            )
+        review_queue = review_queue[:8]
+
+        closed_candidates = [
+            item for item in sorted_outcomes if _enum_value(item.status) in {OutcomeStatus.VERIFIED.value, OutcomeStatus.ARCHIVED.value}
+        ]
+        if not closed_candidates:
+            closed_candidates = sorted_outcomes[:3]
+        for item in closed_candidates[:3]:
+            payload = item.payload if isinstance(item.payload, dict) else {}
+            summary = payload.get("note") or payload.get("summary") or payload.get("remark") or ""
+            if not isinstance(summary, str):
+                summary = str(summary)
+            status_label, status_tone = _status_meta(_enum_value(item.status))
+            case_highlights.append(
+                {
+                    "id": item.id,
+                    "title": f"{_type_label(_enum_value(item.outcome_type))}专题",
+                    "summary": (summary.strip() or "已完成闭环, 可作为复盘案例。")[:88],
+                    "source_label": _source_label(_enum_value(item.source_type)),
+                    "status_label": status_label,
+                    "status_tone": status_tone,
+                    "task_label": item.task_id or "未关联任务",
+                }
+            )
+
+        for outcome_type, count in Counter(_enum_value(item.outcome_type) for item in sorted_outcomes).most_common(4):
+            topic_summary.append(
+                {
+                    "label": _type_label(outcome_type),
+                    "count": count,
+                    "note": f"近阶段累计沉淀 {count} 条相关成果, 可用于专题复盘。",
+                }
+            )
+
+    if can_reporting_read:
+        export_status_counter = Counter(_enum_value(item.status) for item in outcome_exports)
+        latest_export = outcome_exports[0] if outcome_exports else None
+        leadership_cards = [
+            {
+                "label": "当前闭环率",
+                "value": f"{(closure_rate.get('closure_rate', 0.0) or 0.0) * 100:.1f}%",
+                "note": f"已关闭 {closure_rate.get('closed', 0)} / {closure_rate.get('total', 0)} 个缺陷事项。",
+                "tone": "success" if float(closure_rate.get("closure_rate", 0.0) or 0.0) >= 0.8 else "warn",
+            },
+            {
+                "label": "待推进成果",
+                "value": str(outcome_pending_count),
+                "note": "优先安排整改与复核, 避免事项积压。",
+                "tone": "warn" if outcome_pending_count else "success",
+            },
+            {
+                "label": "案例沉淀",
+                "value": str(outcome_archived_count),
+                "note": "已归档的成果可直接用于汇报和培训复盘。",
+                "tone": "info" if outcome_archived_count else "muted",
+            },
+            {
+                "label": "汇报任务",
+                "value": str(len(outcome_exports)),
+                "note": f"已完成 {export_status_counter.get(ReportExportStatus.SUCCEEDED.value, 0)} 条, "
+                f"进行中 {export_status_counter.get(ReportExportStatus.RUNNING.value, 0)} 条。",
+                "tone": "info",
+            },
+        ]
+        leadership_focus = [
+            (
+                f"当前任务覆盖 {overview.get('missions_total', 0)} 个任务批次, "
+                f"累计形成 {len(outcome_records)} 条成果沉淀。"
+            ),
+            (
+                f"待推进成果 {outcome_pending_count} 条, "
+                f"待归档成果 {outcome_verified_count} 条, 建议优先清理复核队列。"
+            ),
+        ]
+        if latest_export is not None:
+            leadership_focus.append(
+                f"最近汇报任务为 {latest_export.id}, 状态 {_enum_value(latest_export.status)}, 主题 {latest_export.topic or '综合复盘'}。"
+            )
+        if latest_snapshot is not None:
+            metrics = latest_snapshot.metrics if isinstance(latest_snapshot.metrics, dict) else {}
+            leadership_focus.append(
+                f"最近经营快照窗口 {getattr(latest_snapshot.window_type, 'value', latest_snapshot.window_type)}, "
+                f"覆盖 {len(metrics)} 项指标, 生成于 {latest_snapshot.generated_at.strftime('%Y-%m-%d %H:%M')}。"
+            )
+
     return _render_console(
         request,
         template_name="ui_reports.html",
         token=resolved_token,
         claims=claims,
         active_nav="reports",
-        title="报表中心",
-        subtitle="以成果消费为主, 按需进入数据与导出操作。",
+        title="业务闭环与汇报",
+        subtitle="先看闭环进度和成果消费, 再按需进入数据调阅与汇报治理。",
         session_from_query=from_query,
         overview=overview,
         closure_rate=closure_rate,
         device_utilization=device_utilization,
         raw_records=raw_records,
         outcome_records=outcome_records,
+        closure_stages=closure_stages,
+        review_queue=review_queue,
+        case_highlights=case_highlights,
+        topic_summary=topic_summary,
+        leadership_cards=leadership_cards,
+        leadership_focus=leadership_focus,
+        outcome_pending_count=outcome_pending_count,
+        outcome_verified_count=outcome_verified_count,
+        outcome_archived_count=outcome_archived_count,
         outcome_templates=outcome_templates,
         outcome_exports=outcome_exports,
         snapshots=snapshots,
@@ -2056,6 +2504,202 @@ def ui_platform(request: Request, token: str | None = Query(default=None)) -> Re
     roles = service.list_roles(claims["tenant_id"])
     org_units = service.list_org_units(claims["tenant_id"])
     role_templates = service.list_role_templates()
+    current_tenant = tenants[0] if tenants else None
+    active_users = len([item for item in users if item.is_active])
+    custom_roles = len([item for item in roles if not getattr(item, "is_system", False)])
+    active_org_units = len([item for item in org_units if item.is_active])
+    onboarding_cards = [
+        {
+            "label": "当前租户",
+            "value": current_tenant.name if current_tenant is not None else "未识别",
+            "note": "先确认交付对象, 再补齐组织、角色和管理员准备。",
+        },
+        {
+            "label": "启动准备",
+            "value": active_org_units,
+            "note": "已启用组织单元数量, 用于判断组织骨架是否完整。",
+        },
+        {
+            "label": "账号准备",
+            "value": active_users,
+            "note": "建议至少保留交付管理员、运维联系人和培训账号。",
+        },
+        {
+            "label": "角色模板复用",
+            "value": len(role_templates),
+            "note": "优先从模板创建角色, 降低重复配置成本。",
+        },
+    ]
+    config_packs = [
+        {
+            "name": "标准交付包",
+            "key": "standard-delivery",
+            "summary": "创建组织骨架、基础管理员角色和演示账号。",
+            "pack_items": "组织骨架 / 管理角色 / 演示账号",
+        },
+        {
+            "name": "培训演示包",
+            "key": "training-pack",
+            "summary": "强调培训账号、演示模式和复盘素材准备。",
+            "pack_items": "培训账号 / 演示模式 / 汇报样板",
+        },
+        {
+            "name": "生产上线包",
+            "key": "production-pack",
+            "summary": "强调生产模式、交接清单和留痕导出。",
+            "pack_items": "生产模式 / 交接清单 / 审计导出",
+        },
+    ]
+    handoff_panels = [
+        {
+            "title": "客户交接",
+            "checklist": [
+                "确认租户名称、管理员账号和组织骨架。",
+                "确认角色来源于标准模板, 避免现场手工配置。",
+                "完成培训模式演示后, 再切到生产模式。",
+            ],
+        },
+        {
+            "title": "运维交接",
+            "checklist": [
+                "保留租户导出与角色模板清单, 便于后续巡检。",
+                "确认平台治理矩阵与权限范围符合交付约束。",
+                "记录演示、培训、生产三种模式的启用口径。",
+            ],
+        },
+    ]
+    release_checklist_cards = [
+        {
+            "key": "tenant-ready",
+            "label": "租户确认",
+            "status_label": "已就绪" if current_tenant is not None else "待处理",
+            "status_tone": "success" if current_tenant is not None else "warn",
+            "summary": "确认交付对象, 租户名称和上线范围, 避免跨租户误操作。",
+        },
+        {
+            "key": "org-ready",
+            "label": "组织骨架",
+            "status_label": "已就绪" if active_org_units else "待处理",
+            "status_tone": "success" if active_org_units else "warn",
+            "summary": "至少保留一个启用组织单元, 确保账号和角色有明确挂载位置。",
+        },
+        {
+            "key": "account-ready",
+            "label": "账号准备",
+            "status_label": "已就绪" if active_users else "待处理",
+            "status_tone": "success" if active_users else "warn",
+            "summary": "至少准备交付管理员, 培训账号或运维联系人, 便于交接和试运行。",
+        },
+        {
+            "key": "role-ready",
+            "label": "角色基线",
+            "status_label": "已就绪" if role_templates else "待处理",
+            "status_tone": "success" if role_templates else "warn",
+            "summary": "优先复用标准模板, 避免现场手工拼装角色造成权限漂移。",
+        },
+    ]
+    help_center_cards = [
+        {
+            "key": "daily-duty",
+            "title": "值守上手指南",
+            "audience": "值班指挥 / 调度",
+            "summary": "用三步完成值守上手: 看态势, 看待办, 看风险, 再决定进入哪个工作台。",
+            "steps": [
+                "先进入工作台, 确认当前角色入口和当班重点。",
+                "在通知协同中心处理高优消息与待办。",
+                "需要追溯时, 从一张图或业务闭环页进入详情。",
+            ],
+        },
+        {
+            "key": "training-drill",
+            "title": "培训演练脚本",
+            "audience": "培训讲师 / 客户管理员",
+            "summary": "把培训模式固定成标准话术, 减少口头传递和临场解释成本。",
+            "steps": [
+                "切换到培训模式, 使用培训账号进行演练。",
+                "按巡检向导和应急向导完整走一遍。",
+                "最后用业务闭环与汇报页完成复盘讲解。",
+            ],
+        },
+        {
+            "key": "go-live",
+            "title": "正式上线说明",
+            "audience": "交付 / 运维",
+            "summary": "正式上线前确认账号、组织、角色、模式和交接清单全部就绪。",
+            "steps": [
+                "完成上线检查清单, 不带着待处理项直接切生产。",
+                "通知关键角色确认使用口径和联系人。",
+                "保留租户导出与发布说明, 便于后续巡检。",
+            ],
+        },
+    ]
+    release_notes = [
+        {
+            "key": "v39-go-live",
+            "version": "v39",
+            "title": "上线保障与版本运营台",
+            "summary": "把上线检查、帮助中心、发布说明和灰度启用收敛到同一页, 减少上线前后页面跳转。",
+            "impact": "交付与运维口径统一",
+            "next_action": "建议先完成上线检查, 再切换生产模式。",
+        },
+        {
+            "key": "v38-onboarding",
+            "version": "v38",
+            "title": "开通运营台基线",
+            "summary": "保留租户开通向导、标准配置包和交接面板, 继续作为上线前准备入口。",
+            "impact": "开通与交接路径不回退",
+            "next_action": "未完成组织、角色和账号准备时, 优先补齐开通动作。",
+        },
+        {
+            "key": "v37-collaboration",
+            "version": "v37",
+            "title": "通知协同中心联动",
+            "summary": "上线后仍建议通过通知协同中心追踪关键消息、待办和升级路径。",
+            "impact": "减少版本切换后的角色混乱",
+            "next_action": "将关键通知口径同步给值守、合规和管理员角色。",
+        },
+    ]
+    feature_flags = [
+        {
+            "key": "guided-workflows",
+            "label": "向导式任务主路径",
+            "recommended_state": "建议开启",
+            "state_tone": "success",
+            "summary": "保持巡检、应急和交付向导作为主路径, 避免回退到手工参数操作。",
+        },
+        {
+            "key": "training-copy",
+            "label": "培训提示与内置帮助",
+            "recommended_state": "建议开启",
+            "state_tone": "info",
+            "summary": "在培训和试运行阶段展示更强的操作提示, 降低新用户上手成本。",
+        },
+        {
+            "key": "gray-release",
+            "label": "灰度启用提示",
+            "recommended_state": "按需开启",
+            "state_tone": "warn",
+            "summary": "正式上线前先让管理员和关键岗位试用, 再逐步扩大可见范围。",
+        },
+    ]
+    risk_panels = [
+        {
+            "title": "上线前巡检",
+            "checklist": [
+                "确认角色工作台与主业务页都保持中文化和向导化体验。",
+                "确认只读角色不会看到管理员高级配置或写入按钮。",
+                "确认培训模式与生产模式的话术、账号和数据边界已区分。",
+            ],
+        },
+        {
+            "title": "版本发布后观察",
+            "checklist": [
+                "重点观察消息中心、工作台首页和平台页是否存在口径冲突。",
+                "发现培训话术和生产话术不一致时, 优先更新内置帮助提示。",
+                "对临时关闭的功能保留明确说明, 避免用户误认为系统故障。",
+            ],
+        },
+    ]
 
     return _render_console(
         request,
@@ -2063,14 +2707,27 @@ def ui_platform(request: Request, token: str | None = Query(default=None)) -> Re
         token=resolved_token,
         claims=claims,
         active_nav="platform",
-        title="平台治理",
-        subtitle="面向管理员查看租户、角色、组织和可见性治理规则。",
+        title="上线保障与版本运营台",
+        subtitle="在开通基线之上继续完成上线检查、培训引导、发布说明和灰度启用。",
         session_from_query=from_query,
         tenants=tenants,
+        current_tenant=current_tenant,
         users=users,
         roles=roles,
         org_units=org_units,
         role_templates=role_templates,
+        active_users=active_users,
+        custom_roles=custom_roles,
+        active_org_units=active_org_units,
+        onboarding_cards=onboarding_cards,
+        config_packs=config_packs,
+        handoff_panels=handoff_panels,
+        release_checklist_cards=release_checklist_cards,
+        help_center_cards=help_center_cards,
+        release_notes=release_notes,
+        feature_flags=feature_flags,
+        risk_panels=risk_panels,
         visibility_matrix=_resolved_ui_visibility_matrix(claims),
         can_identity_write=has_permission(claims, PERM_IDENTITY_WRITE),
+        org_unit_type_options=[item.value for item in OrgUnitType],
     )

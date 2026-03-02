@@ -3,197 +3,670 @@
 {% block content %}
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>租户</div>
-    <div class="value">{{ tenants|length }}</div>
+    <div>当前租户</div>
+    <div class="value">{{ 1 if current_tenant else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>用户</div>
-    <div class="value">{{ users|length }}</div>
+    <div>启用账号</div>
+    <div class="value">{{ active_users }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>角色</div>
-    <div class="value">{{ roles|length }}</div>
+    <div>自定义角色</div>
+    <div class="value">{{ custom_roles }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>组织单元</div>
-    <div class="value">{{ org_units|length }}</div>
+    <div>启用组织单元</div>
+    <div class="value">{{ active_org_units }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>标准模板</div>
+    <div class="value">{{ role_templates|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>上线检查</div>
+    <div class="value">{{ release_checklist_cards|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>发布提醒</div>
+    <div class="value">{{ release_notes|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>交接面板</div>
+    <div class="value">{{ handoff_panels|length }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>租户</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in tenants %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.created_at }}</td>
-        </tr>
+  <h2>租户开通向导</h2>
+  <p class="panel-subtitle">围绕“确认租户 → 创建组织 → 生成角色 → 准备账号”完成标准开通，减少重复手工配置。</p>
+  <div class="report-topic-grid">
+    {% for item in onboarding_cards %}
+    <div class="report-topic-card">
+      <div class="report-topic-count">{{ item.value }}</div>
+      <strong>{{ item.label }}</strong>
+      <div class="report-stage-note">{{ item.note }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="wizard-shell">
+    <div class="wizard-summary-card">
+      <strong>开通步骤</strong>
+      <ol class="wizard-step-list">
+        <li class="wizard-step-item is-active">1. 确认交付租户与上线目标</li>
+        <li class="wizard-step-item">2. 建立组织骨架</li>
+        <li class="wizard-step-item">3. 从模板创建角色</li>
+        <li class="wizard-step-item">4. 创建并绑定启动账号</li>
+      </ol>
+      <div id="platform-wizard-status" class="result-surface">尚未执行开通动作。建议先创建组织骨架，再生成角色和账号。</div>
+    </div>
+
+    <div class="wizard-panel">
+      <div class="report-workbench-grid">
+        <div class="report-surface form-stack">
+          <div class="table-panel-head">
+            <div>
+              <h3>步骤 1：交付对象确认</h3>
+              <div class="table-panel-note">交付团队先确认当前租户及其使用目标，不在这里暴露底层配置明细。</div>
+            </div>
+          </div>
+          <label>当前租户名称</label>
+          <input id="platform-tenant-name" value="{{ current_tenant.name if current_tenant else '' }}" disabled>
+          <label>当前租户标识</label>
+          <input id="platform-tenant-id" value="{{ current_tenant.id if current_tenant else '' }}" disabled>
+          <label>上线目标</label>
+          <select id="platform-onboarding-goal">
+            <option value="STANDARD">标准交付</option>
+            <option value="TRAINING">培训演示</option>
+            <option value="PRODUCTION">生产上线</option>
+          </select>
+          <label>交付说明</label>
+          <input id="platform-onboarding-note" placeholder="例如：区县巡检一期上线">
+        </div>
+
+        <div class="report-surface form-stack">
+          <div class="table-panel-head">
+            <div>
+              <h3>步骤 2：组织骨架</h3>
+              <div class="table-panel-note">先建组织单元，让后续账号和角色有明确挂载位置。</div>
+            </div>
+          </div>
+          <label>组织名称</label>
+          <input id="platform-org-name" placeholder="例如：交付运营中心" {% if not can_identity_write %}disabled{% endif %}>
+          <label>组织编码</label>
+          <input id="platform-org-code" placeholder="delivery-ops" {% if not can_identity_write %}disabled{% endif %}>
+          <label>组织类型</label>
+          <select id="platform-org-type" {% if not can_identity_write %}disabled{% endif %}>
+            {% for item in org_unit_type_options %}
+            <option value="{{ item }}">{{ item }}</option>
+            {% endfor %}
+          </select>
+          <button id="platform-org-create-btn" type="button" {% if not can_identity_write %}disabled{% endif %}>创建组织骨架</button>
+        </div>
+
+        <div class="report-surface form-stack">
+          <div class="table-panel-head">
+            <div>
+              <h3>步骤 3：标准角色</h3>
+              <div class="table-panel-note">优先从模板创建角色，避免现场逐条配置权限。</div>
+            </div>
+          </div>
+          <label>角色模板</label>
+          <select id="platform-role-template" {% if not can_identity_write %}disabled{% endif %}>
+            <option value="">请选择模板</option>
+            {% for item in role_templates %}
+            <option value="{{ item.key }}">{{ item.name }}</option>
+            {% endfor %}
+          </select>
+          <label>角色名称（可选）</label>
+          <input id="platform-role-name" placeholder="留空则使用模板名称" {% if not can_identity_write %}disabled{% endif %}>
+          <button id="platform-role-create-btn" type="button" {% if not can_identity_write %}disabled{% endif %}>生成标准角色</button>
+          <div id="platform-role-context" class="result-surface">尚未创建角色。创建后可直接用于账号绑定。</div>
+        </div>
+      </div>
+
+      <div class="report-board-grid">
+        <div class="report-surface form-stack">
+          <div class="table-panel-head">
+            <div>
+              <h3>步骤 4：启动账号</h3>
+              <div class="table-panel-note">创建交付、培训或运维联系人账号，并直接绑定到当前组织与角色。</div>
+            </div>
+          </div>
+          <label>账号名</label>
+          <input id="platform-user-name" placeholder="例如：delivery_admin" {% if not can_identity_write %}disabled{% endif %}>
+          <label>初始密码</label>
+          <input id="platform-user-password" placeholder="例如：delivery-pass" {% if not can_identity_write %}disabled{% endif %}>
+          <label>账号用途</label>
+          <select id="platform-user-purpose" {% if not can_identity_write %}disabled{% endif %}>
+            <option value="DELIVERY">交付管理员</option>
+            <option value="TRAINING">培训账号</option>
+            <option value="OPS">运维联系人</option>
+          </select>
+          <button id="platform-user-create-btn" type="button" {% if not can_identity_write %}disabled{% endif %}>创建并绑定账号</button>
+          <div id="platform-user-context" class="result-surface">尚未创建账号。建议在组织和角色准备好后再执行。</div>
+        </div>
+
+        <div class="report-surface">
+          <div class="table-panel-head">
+            <div>
+              <h3>开通结果摘要</h3>
+              <div class="table-panel-note">交付人员可在这里确认当前租户的标准开通是否完成。</div>
+            </div>
+          </div>
+          <div id="platform-onboarding-summary" class="hint-list">
+            <div class="hint-list-item">当前租户：{{ current_tenant.name if current_tenant else "未识别" }}</div>
+            <div class="hint-list-item">组织骨架：待创建或继续完善</div>
+            <div class="hint-list-item">标准角色：待从模板生成</div>
+            <div class="hint-list-item">启动账号：待创建并绑定</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>标准配置包与模板中心</h2>
+  <p class="panel-subtitle">把高频交付动作沉淀成标准包，避免每个客户重复手工搭建。</p>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>推荐配置包</h3>
+          <div class="table-panel-note">按交付场景选择一套标准包，再执行对应模式和交接动作。</div>
+        </div>
+      </div>
+      <div class="report-case-grid">
+        {% for item in config_packs %}
+        <div class="report-case-card">
+          <div class="report-case-head">
+            <strong>{{ item.name }}</strong>
+            <span class="status-pill info">{{ item.key }}</span>
+          </div>
+          <div class="report-case-summary">{{ item.summary }}</div>
+          <div class="cell-subtle">{{ item.pack_items }}</div>
+          <button
+            type="button"
+            class="button-link button-secondary js-platform-pack"
+            data-pack-key="{{ item.key }}"
+            data-pack-name="{{ item.name }}"
+          >
+            采用此配置包
+          </button>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>角色模板中心</h3>
+          <div class="table-panel-note">展示现有模板，支持直接带入上方开通向导。</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>模板</th>
+              <th>说明</th>
+              <th>权限数量</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in role_templates %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.name }}</div>
+                <div class="cell-subtle">{{ item.key }}</div>
+              </td>
+              <td>{{ item.description }}</td>
+              <td>{{ item.permissions|length }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="button-link button-secondary js-platform-template"
+                  data-template-key="{{ item.key }}"
+                  data-template-name="{{ item.name }}"
+                >
+                  用于开通
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>用户</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Username</th>
-          <th>Active</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in users %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.username }}</td>
-          <td>{{ item.is_active }}</td>
-          <td>{{ item.created_at }}</td>
-        </tr>
+  <h2>模式切换与交付交接</h2>
+  <p class="panel-subtitle">将演示、培训、生产三种模式明确定义，避免交付和上线口径混乱。</p>
+  <div class="report-board-grid">
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>运行模式切换</h3>
+          <div class="table-panel-note">当前阶段先做前台可视切换与口径提醒，不引入新的后台状态机。</div>
+        </div>
+      </div>
+      <label>当前模式</label>
+      <select id="platform-mode-select">
+        <option value="DEMO">演示模式</option>
+        <option value="TRAINING">培训模式</option>
+        <option value="PRODUCTION">生产模式</option>
+      </select>
+      <button id="platform-mode-apply-btn" type="button">切换模式</button>
+      <div id="platform-mode-status" class="result-surface">当前为演示模式：适合方案演示和领导参观，不建议录入正式生产数据。</div>
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>交接面板</h3>
+          <div class="table-panel-note">把客户交接和运维交接拆成明确清单，减少口头传递成本。</div>
+        </div>
+      </div>
+      {% for panel in handoff_panels %}
+      <div class="stack-gap-md">
+        <strong>{{ panel.title }}</strong>
+        <div class="hint-list">
+          {% for item in panel.checklist %}
+          <div class="hint-list-item">{{ item }}</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+      <div id="platform-handoff-status" class="result-surface">尚未生成交接摘要。选择模式或执行开通动作后，系统会在这里更新当前建议。</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>上线检查清单与巡检面板</h2>
+  <p class="panel-subtitle">上线前先完成可执行检查项，再切换到正式生产，避免靠口头确认推进。</p>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>当前检查项</h3>
+          <div class="table-panel-note">逐项核对交付、组织、账号和角色基线。这里强调动作闭环，不要求阅读底层日志。</div>
+        </div>
+      </div>
+      <div class="report-case-grid">
+        {% for item in release_checklist_cards %}
+        <div class="report-case-card">
+          <div class="report-case-head">
+            <strong>{{ item.label }}</strong>
+            <span class="status-pill {{ item.status_tone }}">{{ item.status_label }}</span>
+          </div>
+          <div class="report-case-summary">{{ item.summary }}</div>
+          <button
+            type="button"
+            class="button-link button-secondary js-platform-release-item"
+            data-release-key="{{ item.key }}"
+            data-release-label="{{ item.label }}"
+          >
+            标记已核对
+          </button>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+    </div>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>上线状态</h3>
+          <div class="table-panel-note">完成所有关键检查后，再切换到生产模式并开始客户正式使用。</div>
+        </div>
+      </div>
+      <div id="platform-release-status" class="result-surface">尚未完成上线检查。建议从“租户确认”和“组织骨架”开始核对。</div>
+      <div id="platform-release-summary" class="hint-list">
+        <div class="hint-list-item">租户信息、组织骨架、账号和角色模板是上线前四项基础检查。</div>
+        <div class="hint-list-item">检查通过后，再切换到生产模式并完成客户交接。</div>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>角色</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Description</th>
-          <th>System</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in roles %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.description or "-" }}</td>
-          <td>{{ item.is_system }}</td>
-        </tr>
+  <h2>内置帮助中心与培训模式</h2>
+  <p class="panel-subtitle">把培训话术、上手路径和角色指引内置到系统里，减少上线后的口头支持成本。</p>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>帮助主题</h3>
+          <div class="table-panel-note">按角色给出可直接使用的上手路径，优先讲“下一步做什么”。</div>
+        </div>
+      </div>
+      <div class="report-case-grid">
+        {% for item in help_center_cards %}
+        <div class="report-case-card">
+          <div class="report-case-head">
+            <strong>{{ item.title }}</strong>
+            <span class="status-pill info">{{ item.audience }}</span>
+          </div>
+          <div class="report-case-summary">{{ item.summary }}</div>
+          <div class="hint-list">
+            {% for step in item.steps %}
+            <div class="hint-list-item">{{ step }}</div>
+            {% endfor %}
+          </div>
+          <button
+            type="button"
+            class="button-link button-secondary js-platform-help-card"
+            data-guide-key="{{ item.key }}"
+            data-guide-title="{{ item.title }}"
+          >
+            用于当前培训
+          </button>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+    </div>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>帮助与培训摘要</h3>
+          <div class="table-panel-note">切到培训模式时，这里会同步给出当前推荐讲解路径。</div>
+        </div>
+      </div>
+      <div id="platform-help-status" class="result-surface">尚未选择帮助主题。建议先使用“培训演练脚本”统一现场培训口径。</div>
+      <div id="platform-help-summary" class="hint-list">
+        <div class="hint-list-item">新用户优先从角色工作台、通知协同中心和业务闭环页理解主路径。</div>
+        <div class="hint-list-item">正式上线前，建议至少做一轮完整演练。</div>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>组织单元</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Parent</th>
-          <th>Active</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in org_units %}
-        <tr>
-          <td><code>{{ item.id }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.node_type }}</td>
-          <td>{{ item.parent_id or "-" }}</td>
-          <td>{{ item.is_active }}</td>
-        </tr>
+  <h2>发布说明与升级引导</h2>
+  <p class="panel-subtitle">把版本变化和下一步动作收成统一口径，避免上线后靠群消息解释差异。</p>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>版本说明</h3>
+          <div class="table-panel-note">优先展示对业务、交付和运维有影响的变化，以及推荐跟进动作。</div>
+        </div>
+      </div>
+      <div class="report-case-grid">
+        {% for item in release_notes %}
+        <div class="report-case-card">
+          <div class="report-case-head">
+            <strong>{{ item.title }}</strong>
+            <span class="status-pill muted">{{ item.version }}</span>
+          </div>
+          <div class="report-case-summary">{{ item.summary }}</div>
+          <div class="cell-main">{{ item.impact }}</div>
+          <div class="cell-subtle">{{ item.next_action }}</div>
+          <button
+            type="button"
+            class="button-link button-secondary js-platform-release-note"
+            data-note-key="{{ item.key }}"
+            data-note-title="{{ item.title }}"
+          >
+            设为当前发布重点
+          </button>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+    </div>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>升级引导</h3>
+          <div class="table-panel-note">为客户管理员和一线用户提供一致的升级解释与过渡动作。</div>
+        </div>
+      </div>
+      <div id="platform-release-note-status" class="result-surface">尚未选择发布重点。建议先强调本轮最直接影响上线节奏的版本说明。</div>
+      <div id="platform-release-note-summary" class="hint-list">
+        <div class="hint-list-item">先说明变化，再说明影响，最后说明下一步动作。</div>
+        <div class="hint-list-item">对未开放能力要保留明确提示，避免用户误解为故障。</div>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>角色模板</h2>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>Template Key</th>
-          <th>Name</th>
-          <th>Description</th>
-          <th>Permissions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in role_templates %}
-        <tr>
-          <td><code>{{ item.template_key }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.description or "-" }}</td>
-          <td>{{ item.permission_names|length }}</td>
-        </tr>
+  <h2>功能开关与灰度启用</h2>
+  <p class="panel-subtitle">用清晰的启用状态和灰度口径控制版本扩散速度，减少角色混乱和误触发。</p>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>推荐开关</h3>
+          <div class="table-panel-note">当前阶段先做前台可视控制和灰度提示，不引入新的后台特性开关系统。</div>
+        </div>
+      </div>
+      <div class="report-case-grid">
+        {% for item in feature_flags %}
+        <div class="report-case-card">
+          <div class="report-case-head">
+            <strong>{{ item.label }}</strong>
+            <span id="platform-flag-pill-{{ item.key }}" class="status-pill {{ item.state_tone }}">{{ item.recommended_state }}</span>
+          </div>
+          <div class="report-case-summary">{{ item.summary }}</div>
+          <button
+            type="button"
+            class="button-link button-secondary js-platform-flag-toggle"
+            data-flag-key="{{ item.key }}"
+            data-flag-label="{{ item.label }}"
+          >
+            切换启用状态
+          </button>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+    </div>
+
+    <div class="report-surface form-stack">
+      <div class="table-panel-head">
+        <div>
+          <h3>灰度与风险摘要</h3>
+          <div class="table-panel-note">优先让管理员和关键岗位先用，再逐步扩大可见范围。</div>
+        </div>
+      </div>
+      <div id="platform-flag-status" class="result-surface">尚未调整功能开关。建议保持向导式主路径和培训提示默认开启。</div>
+      {% for panel in risk_panels %}
+      <div class="stack-gap-md">
+        <strong>{{ panel.title }}</strong>
+        <div class="hint-list">
+          {% for item in panel.checklist %}
+          <div class="hint-list-item">{{ item }}</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>RBAC 可见性矩阵</h2>
-  <p class="hint">该页是管理员工具，用于查看页面级和动作级可见性规则，不面向普通业务用户。</p>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>Group</th>
-          <th>Page</th>
-          <th>Route</th>
-          <th>Page Permission</th>
-          <th>Write Permission</th>
-          <th>Write Actions</th>
-          <th>View</th>
-          <th>Write</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in visibility_matrix %}
-        <tr>
-          <td>{{ item.group }}</td>
-          <td>{{ item.page }}</td>
-          <td><code>{{ item.route }}</code></td>
-          <td><code>{{ item.page_permission }}</code></td>
-          <td><code>{{ item.write_permission }}</code></td>
-          <td>{{ item.write_actions }}</td>
-          <td><span class="status-pill {% if not item.can_view %}danger{% endif %}">{% if item.can_view %}ALLOW{% else %}DENY{% endif %}</span></td>
-          <td><span class="status-pill {% if item.can_write %}warn{% else %}danger{% endif %}">{% if item.can_write %}ALLOW{% else %}DENY{% endif %}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <h2>数据字典与治理总览</h2>
+  <p class="panel-subtitle">把基础对象留在同一页里，便于交付团队校验当前租户是否已完成基础配置。</p>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>租户与账号</h3>
+          <div class="table-panel-note">确认交付对象和已准备账号。</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>租户</th>
+              <th>创建时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in tenants %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.name }}</div>
+                <div class="cell-subtle">{{ item.id }}</div>
+              </td>
+              <td>{{ item.created_at }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="table-scroll stack-gap-md">
+        <table>
+          <thead>
+            <tr>
+              <th>账号</th>
+              <th>启用</th>
+              <th>创建时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in users %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.username }}</div>
+                <div class="cell-subtle">{{ item.id }}</div>
+              </td>
+              <td><span class="status-pill{% if item.is_active %} info{% else %} muted{% endif %}">{{ "启用" if item.is_active else "停用" }}</span></td>
+              <td>{{ item.created_at }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>角色与组织</h3>
+          <div class="table-panel-note">确认标准角色和组织骨架是否到位。</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>角色</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in roles %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.name }}</div>
+                <div class="cell-subtle">{{ item.id }}</div>
+              </td>
+              <td>{{ item.description or "-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="table-scroll stack-gap-md">
+        <table>
+          <thead>
+            <tr>
+              <th>组织单元</th>
+              <th>类型</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in org_units %}
+            <tr>
+              <td>
+                <div class="cell-main">{{ item.name }}</div>
+                <div class="cell-subtle">{{ item.code }}</div>
+              </td>
+              <td>{{ item.unit_type }}</td>
+              <td><span class="status-pill{% if item.is_active %} info{% else %} muted{% endif %}">{{ "启用" if item.is_active else "停用" }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
-<div class="panel">
-  <h2>治理快捷入口</h2>
-  <div class="hero-actions">
-    <a class="button-link ghost-link" href="/api/identity/role-templates" target="_blank" rel="noopener noreferrer">角色模板 API</a>
-    <a class="button-link ghost-link" href="/api/identity/permissions" target="_blank" rel="noopener noreferrer">权限 API</a>
-    <a class="button-link ghost-link" href="/api/tenants/{{ tenant_id }}/export" target="_blank" rel="noopener noreferrer">租户导出</a>
+<details class="report-secondary-panel">
+  <summary>管理员高级治理（矩阵与导出）</summary>
+  <div class="report-board-grid">
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>RBAC 可见性矩阵</h3>
+          <div class="table-panel-note">管理员高级工具，不作为交付主路径。</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>分组</th>
+              <th>页面</th>
+              <th>路由</th>
+              <th>查看</th>
+              <th>写入</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in visibility_matrix %}
+            <tr>
+              <td>{{ item.group }}</td>
+              <td>{{ item.page }}</td>
+              <td><code>{{ item.route }}</code></td>
+              <td><span class="status-pill {% if not item.can_view %}danger{% endif %}">{% if item.can_view %}ALLOW{% else %}DENY{% endif %}</span></td>
+              <td><span class="status-pill {% if item.can_write %}warn{% else %}danger{% endif %}">{% if item.can_write %}ALLOW{% else %}DENY{% endif %}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="report-surface">
+      <div class="table-panel-head">
+        <div>
+          <h3>治理快捷入口</h3>
+          <div class="table-panel-note">导出和 API 入口保留在高级区，供管理员补充使用。</div>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <a class="button-link ghost-link" href="/api/identity/role-templates" target="_blank" rel="noopener noreferrer">角色模板 API</a>
+        <a class="button-link ghost-link" href="/api/identity/permissions" target="_blank" rel="noopener noreferrer">权限 API</a>
+        {% if current_tenant %}
+        <a class="button-link ghost-link" href="/api/tenants/{{ current_tenant.id }}/export" target="_blank" rel="noopener noreferrer">租户导出</a>
+        {% endif %}
+      </div>
+      {% if can_identity_write %}
+      <p class="hint">当前账号拥有 <code>identity.write</code> 权限，可执行开通和治理写操作。</p>
+      {% endif %}
+    </div>
   </div>
-  {% if can_identity_write %}
-  <p class="hint">当前账号拥有 <code>identity.write</code> 权限，可执行平台治理写操作。</p>
-  {% endif %}
-</div>
+</details>
+
+<div class="hint action-result" id="platform-result" role="status" aria-live="polite"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_IDENTITY_WRITE = {{ can_identity_write | tojson }};
+</script>
+<script src="/static/platform_ui.js"></script>
 {% endblock %}
