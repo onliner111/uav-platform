@@ -6,14 +6,22 @@
 > Execution SSOT: `phases/state.md`
 
 ## 1. Current Focus（当前焦点）
-- Current Phase: phase-31-observability-reliability-ops-console.md (READY; from phases/state.md)
-- Current Sub-Phase / Blueprint: Phase 30 closed as DONE (`30-WP1`..`30-WP6`) with full gate pass and report.
-- Next Target: start Phase 31 sequence `P0 -> P1 -> P2 -> 31-WP6`
+- Current Phase: READY (phase-36-business-closure-outcomes-consumption.md next; from phases/state.md)
+- Current Sub-Phase / Blueprint: Phase 35 is closed. `35-WP1`..`35-WP6` delivered mobile-first field workbenches, weak-network retry guidance, and on-site simplified execution actions.
+- Next Target: start `36-WP1` / `36-WP2` (business closure boards and outcome-consumption views) while preserving or exceeding the Phase 32 productization baseline.
 
 ## 2. Gate Status（门禁状态）
 > 最近一次门禁结果（必须可复现）
-> Last verified at (UTC): 2026-03-01T13:19:33Z
+> Last verified at (UTC): 2026-03-02T02:17:06.2632841Z
 > Note: host `make` is unavailable in current environment; equivalent Docker Compose commands were executed directly.
+> Closeout note (2026-03-02T02:17:06.2632841Z): Phase 35 closed as DONE. Delivered mobile-first field execution pages for inspection-task detail and defects, weak-network retry guidance, on-site note/media placeholders, and replayable demo `demo_phase35_mobile_field_operations.py`; checkpoint moved to `phase-36-business-closure-outcomes-consumption.md` with status `READY`.
+> Closeout note (2026-03-02T01:25:53.0815787Z): Phase 34 closed as DONE. Delivered guided inspection and emergency workflows, compliance approval-flow visualization, inline correction guidance, template recommendation/prefill hints, and replayable demo `demo_phase34_guided_task_workflow_usability.py`; checkpoint moved to `phase-35-mobile-field-operations.md` with status `READY`.
+> Phase note (2026-03-02T01:08:48.7731190Z): Phase 34 moved to `RUNNING`. Delivered `34-WP1` and `34-WP2` by rebuilding `/ui/inspection` as a three-step inspection-task wizard (`选择模板 -> 填写信息 -> 确认创建`) and `/ui/emergency` as a three-step incident wizard (`地图选点 -> 创建事件 -> 联动任务`). Targeted checks passed (`node --check app/web/static/inspection_list.js`, `node --check app/web/static/emergency.js`, `pytest -q tests/test_ui_console.py`).
+> Closeout note (2026-03-01T22:32:30.9158060Z): Phase 33 closed as DONE. Delivered `33-WP3` timeline linkage, `33-WP4` mode-summary refinement, `33-WP5` focus-card quick actions/status explanation, and replayable demo `demo_phase33_one_map_command_center_v2.py`; checkpoint moved to `phase-34-guided-task-workflow-usability.md` with status `READY`.
+> Phase note (2026-03-01T22:11:18.9975027Z): Phase 33 continued with `33-WP3` delivered. Added timeline-ready timestamps to map-layer detail payloads, introduced an `事件时间轴` panel in `/ui/command-center`, and wired timeline clicks back to map focus objects with automatic layer reveal. Targeted checks passed (`node --check app/web/static/command_center.js`, `ruff`, `mypy`, `pytest -q tests/test_map.py tests/test_ui_console.py`).
+> Phase note (2026-03-01T20:00:54.6013494Z): Phase 33 moved to `RUNNING`. Delivered `33-WP1` and `33-WP2` with six-layer map overview (`resources / tasks / airspace / alerts / events / outcomes`), command-center v2 duty-mode shell, mode switching, and map-object focus linkage. Targeted checks passed (`ruff`, `mypy`, `pytest -q tests/test_map.py tests/test_ui_console.py`).
+> Closeout note (2026-03-01T19:34:11.7919520Z): Phase 32 closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase32_role_workbench_productization.py`), and checkpoint moved to `phase-33-one-map-command-center-v2.md` with status `READY`.
+> Closeout note (2026-03-01T15:27:20.3577101Z): Phase 31 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`, `demo_phase30_commercial_platform_ops_ui.py`, `demo_phase31_observability_reliability_ops_console.py`), and checkpoint moved to `DONE`.
 > Closeout note (2026-03-01T13:19:33Z): Phase 30 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`, `demo_phase30_commercial_platform_ops_ui.py`), and checkpoint moved to `phase-31-observability-reliability-ops-console.md` with status `READY`.
 > Closeout note (2026-03-01T12:40:32Z): Phase 29 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`), and checkpoint moved to `phase-30-commercial-platform-ops-ui.md` with status `READY`.
 > Closeout note (2026-03-01T12:03:03Z): Phase 28 full closeout passed (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic upgrade head`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase28_compliance_alert_operations_workbench.py`), and checkpoint moved to `phase-29-data-ai-governance-ui.md` with status `READY`.
@@ -45,6 +53,14 @@
 - phase28 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase28_compliance_alert_operations_workbench.py`)
 - phase29 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`)
 - phase30 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`, `demo_phase30_commercial_platform_ops_ui.py`)
+- phase31 full closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `alembic`, OpenAPI export, `demo_e2e`, `verify_smoke`, `verify_phase08_integration`, `demo_phase25_observability_reliability.py`, `demo_phase29_data_ai_governance_ui.py`, `demo_phase30_commercial_platform_ops_ui.py`, `demo_phase31_observability_reliability_ops_console.py`)
+- phase32 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase32_role_workbench_productization.py`)
+- phase33 wp1/wp2 targeted checks: PASS (`ruff` on changed files, `mypy` map/ui modules, `pytest -q tests/test_map.py tests/test_ui_console.py`)
+- phase33 wp3 targeted checks: PASS (`node --check app/web/static/command_center.js`, `ruff check app/services/map_service.py tests/test_map.py tests/test_ui_console.py`, `mypy app/services/map_service.py app/api/routers/ui.py app/api/routers/map_router.py`, `pytest -q tests/test_map.py tests/test_ui_console.py`)
+- phase33 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase33_one_map_command_center_v2.py`)
+- phase34 wp1/wp2 targeted checks: PASS (`node --check app/web/static/inspection_list.js`, `node --check app/web/static/emergency.js`, `pytest -q tests/test_ui_console.py`)
+- phase34 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase34_guided_task_workflow_usability.py`)
+- phase35 closeout chain: PASS (`ruff`, `mypy`, full `pytest -q`, `up --build -d`, `demo_phase35_mobile_field_operations.py`)
 
 ## 3. Evidence（证据 / 可复现命令）
 > 所有结论必须能用这些命令复现
@@ -70,6 +86,7 @@
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase28_compliance_alert_operations_workbench.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase29_data_ai_governance_ui.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase30_commercial_platform_ops_ui.py
+  - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase31_observability_reliability_ops_console.py
   - docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/verify_phase08_integration.py
   - docker compose -f infra/docker-compose.yml run --rm --build app pytest -q tests/test_billing.py
   - docker compose -f infra/docker-compose.yml run --rm --build app pytest -q tests/test_observability.py
@@ -116,12 +133,25 @@
 - phase-28-compliance-alert-operations-workbench.md: DONE
 - phase-29-data-ai-governance-ui.md: DONE
 - phase-30-commercial-platform-ops-ui.md: DONE
+- phase-31-observability-reliability-ops-console.md: DONE
+- phase-32-role-workbench-productization.md: DONE
+- phase-33-one-map-command-center-v2.md: DONE
+- phase-34-guided-task-workflow-usability.md: DONE
+- phase-35-mobile-field-operations.md: DONE
 
 ## 4.2 Planned Next Phases（后续规划阶段）
-- phase-31-observability-reliability-ops-console.md: READY
+- phase-36-business-closure-outcomes-consumption.md: READY
+- phase-37-notification-collaboration-hub.md: PLANNED
+- phase-38-delivery-onboarding-operations.md: PLANNED
+- phase-39-release-adoption-lifecycle.md: PLANNED
 
 ## 4.1 Supplemental Progress Notes（补充进展）
 > 非 checkpoint 条目，仅作日志参考，不覆盖 phases/state.md。
+- 35-WP1..WP6 artifacts are present: mobile-first field execution pages (`app/web/templates/inspection_task_detail.html`, `app/web/templates/defects.html`), field-side retry and note/media interactions (`app/web/static/inspection_task.js`, `app/web/static/defects.js`), mobile field layout primitives (`app/web/static/ui.css`), UI regression updates (`tests/test_ui_console.py`), and replay demo (`infra/scripts/demo_phase35_mobile_field_operations.py`).
+- 34-WP1..WP6 artifacts are present: guided inspection/emergency/compliance workflow productization (`app/web/templates/inspection_list.html`, `app/web/templates/emergency.html`, `app/web/templates/ui_compliance.html`, `app/web/static/inspection_list.js`, `app/web/static/emergency.js`, `app/web/static/compliance_ui.js`), shared wizard primitives (`app/web/static/ui.css`), UI regression updates (`tests/test_ui_console.py`), and replay demo (`infra/scripts/demo_phase34_guided_task_workflow_usability.py`).
+- 33-WP1..WP6 artifacts are present: one-map command-center v2 shell and refinements (`app/web/templates/command_center.html`, `app/web/static/command_center.js`, `app/web/static/ui.css`), six-layer map aggregation and timeline-ready detail payloads (`app/services/map_service.py`, `app/api/routers/map_router.py`, `app/domain/models.py`), expanded map/UI regression coverage (`tests/test_map.py`, `tests/test_ui_console.py`), and replay demo (`infra/scripts/demo_phase33_one_map_command_center_v2.py`).
+- 32-WP1..WP6 artifacts are present: role-based console + workbench routes (`app/api/routers/ui.py`), role home/workbench templates (`app/web/templates/ui_console.html`, `app/web/templates/ui_role_workbench.html`), cross-page productization updates across task/assets/alerts/compliance/reports/emergency and admin-special pages (`app/web/templates/*.html`, `app/web/static/*.js`, `app/web/static/ui.css`), expanded UI localization baseline (`app/web/static/ui_action_helpers.js`), phase32 UI regression additions (`tests/test_ui_console.py`), and replay demo (`infra/scripts/demo_phase32_role_workbench_productization.py`).
+- 31-WP1..WP6 artifacts are present: observability/reliability UI pages (`app/web/templates/ui_observability.html`, `app/web/templates/ui_reliability.html`), workbench scripts (`app/web/static/observability_ui.js`, `app/web/static/reliability_ui.js`), UI router/nav/matrix extensions (`app/api/routers/ui.py`), phase31 UI RBAC regression (`tests/test_ui_console.py::test_ui_phase31_observability_reliability_write_visibility`), and replay demo (`infra/scripts/demo_phase31_observability_reliability_ops_console.py`).
 - 30-WP1..WP6 artifacts are present: commercial ops/open-platform pages and scripts (`app/web/templates/ui_commercial_ops.html`, `app/web/templates/ui_open_platform.html`, `app/web/static/commercial_ops_ui.js`, `app/web/static/open_platform_ui.js`), UI router/nav/matrix extensions (`app/api/routers/ui.py`), phase30 UI RBAC regression (`tests/test_ui_console.py::test_ui_phase30_commercial_open_platform_write_visibility`), and replay demo (`infra/scripts/demo_phase30_commercial_platform_ops_ui.py`).
 - 29-WP1..WP6 artifacts are present: reporting/data/ai governance UI closure (`app/web/templates/ui_reports.html`, `app/web/templates/ui_ai_governance.html`), workbench scripts (`app/web/static/reports_ui.js`, `app/web/static/ai_governance_ui.js`), UI router/action gating updates (`app/api/routers/ui.py`), reporting export-list API (`app/api/routers/reporting.py`, `app/services/reporting_service.py`), replay demo (`infra/scripts/demo_phase29_data_ai_governance_ui.py`), and phase29 UI RBAC regression (`tests/test_ui_console.py::test_ui_phase29_data_ai_workbench_write_visibility`).
 - 27-WP1..WP6 artifacts are present: operations deep-page UI updates (`app/web/templates/{ui_task_center,ui_assets,inspection_list,inspection_task_detail,defects,emergency}.html`), unified action scripts (`app/web/static/{task_center_ui,assets_ui,inspection_list,inspection_task,defects,emergency}.js`), phase27 demo (`infra/scripts/demo_phase27_operations_ui_closure.py`), and UI RBAC regression addition (`tests/test_ui_console.py::test_ui_execute_pages_readonly_mode_hides_write_actions`).

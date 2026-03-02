@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,13 +11,14 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="console-body">
-  <a class="skip-link" href="#console-main">Skip to main content</a>
+  <a class="skip-link" href="#console-main">跳到主要内容</a>
   <div class="page-glow page-glow-a"></div>
   <div class="page-glow page-glow-b"></div>
   <div class="console-app">
     <header class="console-topbar">
-      <div>
-        <div class="console-title">UAV SaaS Console</div>
+      <div class="topbar-brand">
+        <div class="console-title">低空运营平台</div>
+        <div class="console-title-note">统一界面，按角色进入高频工作</div>
         <div class="console-breadcrumbs">
           {% for crumb in breadcrumbs %}
           <span>{{ crumb }}</span>
@@ -30,24 +31,24 @@
           id="global-search"
           class="console-search"
           type="search"
-          placeholder="Search navigation and quick entries"
-          aria-label="Search navigation entries"
+          placeholder="搜索导航、快捷入口或页面"
+          aria-label="搜索导航入口"
           autocomplete="off"
         >
-        <button id="nav-toggle" type="button" class="ghost nav-toggle" aria-controls="console-sidebar" aria-expanded="false">Menu</button>
-        <a class="console-link" href="/ui/login?switch=1&next={{ request.url.path }}">Switch Tenant</a>
-        <span class="console-meta">Tenant: {{ tenant_id }}</span>
-        <span class="console-meta">User: {{ user_id }}</span>
+        <button id="nav-toggle" type="button" class="ghost nav-toggle" aria-controls="console-sidebar" aria-expanded="false">菜单</button>
+        <a class="console-link" href="/ui/login?switch=1&next={{ request.url.path }}">切换租户</a>
+        <span class="console-meta">租户：{{ tenant_id }}</span>
+        <span class="console-meta">用户：{{ user_id }}</span>
         <form action="/ui/logout" method="post">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit" class="ghost">Sign Out</button>
+          <button type="submit" class="ghost">退出登录</button>
         </form>
       </div>
     </header>
 
     <div class="console-frame" id="console-frame">
       <aside class="console-sidebar" id="console-sidebar" aria-label="Primary navigation">
-        <div class="console-sidebar-title">Navigation</div>
+        <div class="console-sidebar-title">主导航</div>
         {% for group in nav_groups %}
         <section class="console-nav-group">
           <div class="console-nav-group-title">{{ group.label }}</div>
@@ -62,9 +63,26 @@
           </ul>
         </section>
         {% endfor %}
-        <div class="console-sidebar-title">Quick Access</div>
+        {% if secondary_nav_groups %}
+        <div class="console-sidebar-title">管理员专项</div>
+        {% for group in secondary_nav_groups %}
+        <section class="console-nav-group">
+          <div class="console-nav-group-title">{{ group.label }}</div>
+          <p class="console-nav-group-hint">{{ group.description }}</p>
+          <ul class="console-nav">
+            {% for item in group["items"] %}
+            <li class="console-nav-item {% if item.active %}active{% endif %}" data-nav-item data-nav-label="{{ item.label | lower }}">
+              <a href="{{ item.href }}" data-nav-link>{{ item.label }}</a>
+              <span class="status-pill muted">专项</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+        {% endif %}
+        <div class="console-sidebar-title">快捷入口</div>
         <ul id="quick-access" class="console-quick-list" aria-label="Quick access favorites">
-          <li class="hint">Use "Fav" to pin entries.</li>
+          <li class="hint">点击 “Fav” 可固定常用入口。</li>
         </ul>
       </aside>
 

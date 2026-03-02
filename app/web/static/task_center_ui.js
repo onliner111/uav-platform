@@ -47,6 +47,7 @@
   const historyId = document.getElementById("task-history-id");
   const historyLoadBtn = document.getElementById("task-history-load-btn");
   const historyBox = document.getElementById("task-history-box");
+  const selectionBanner = document.getElementById("task-selection-banner");
 
   if (!token || !resultNode) {
     return;
@@ -64,7 +65,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败，请稍后重试。");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -87,7 +88,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -101,7 +102,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -121,6 +122,35 @@
     return rows.map(formatter).join("\n");
   }
 
+  function setSelectedTask(taskId, taskName, taskState, assignedTo) {
+    const safeTaskId = String(taskId || "").trim();
+    if (!safeTaskId) {
+      return;
+    }
+    [transitionTaskId, dispatchTaskId, submitApprovalId, approveId, commentId, commentsId, historyId].forEach((node) => {
+      if (node) {
+        node.value = safeTaskId;
+      }
+    });
+    if (selectionBanner) {
+      selectionBanner.innerHTML = [
+        `<strong>当前选中任务：${safeTaskId}</strong>`,
+        `<div class="selection-meta">任务名称：${taskName || "-"} | 当前状态：${taskState || "-"} | 处理人：${assignedTo || "-"}</div>`,
+      ].join("");
+    }
+  }
+
+  document.querySelectorAll(".js-task-select").forEach((button) => {
+    button.addEventListener("click", () => {
+      const taskId = button.getAttribute("data-task-id") || "";
+      const taskName = button.getAttribute("data-task-name") || "";
+      const taskState = button.getAttribute("data-task-state") || "";
+      const assignedTo = button.getAttribute("data-task-assigned") || "";
+      setSelectedTask(taskId, taskName, taskState, assignedTo);
+      showResult("success", `已选中任务：${taskId}`);
+    });
+  });
+
   if (createBtn && createType && createName) {
     createBtn.addEventListener("click", async () => {
       const taskTypeId = (createType.value || "").trim();
@@ -129,10 +159,10 @@
       const priority = parseIntOrDefault(createPriority ? createPriority.value : "", 5);
       const riskLevel = parseIntOrDefault(createRisk ? createRisk.value : "", 3);
       if (!taskTypeId || !name) {
-        showResult("warn", "Task type and task name are required.");
+        showResult("warn", "请选择任务类型并填写任务名称。");
         return;
       }
-      await withBusyButton(createBtn, "Creating...", async () => {
+      await withBusyButton(createBtn, "创建中...", async () => {
         try {
           const payload = {
             task_type_id: taskTypeId,
@@ -145,7 +175,8 @@
             payload.template_id = templateId;
           }
           const row = await post("/api/task-center/tasks", payload);
-          showResult("success", `Task created: ${row.id}`);
+          setSelectedTask(row.id, row.name || name, row.state || "", row.assigned_to || "-");
+          showResult("success", `已创建任务：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -159,16 +190,17 @@
       const targetState = transitionState.value || "";
       const note = (transitionNote && transitionNote.value ? transitionNote.value : "").trim();
       if (!taskId || !targetState) {
-        showResult("warn", "Task ID and target state are required.");
+        showResult("warn", "请先选择任务，并指定目标状态。");
         return;
       }
-      await withBusyButton(transitionBtn, "Transitioning...", async () => {
+      await withBusyButton(transitionBtn, "更新中...", async () => {
         try {
           const body = await post(`/api/task-center/tasks/${taskId}/transition`, {
             target_state: targetState,
             note: note || null,
           });
-          showResult("success", `Transitioned: ${body.id} -> ${body.state}`);
+          setSelectedTask(body.id, body.name || "", body.state || "", body.assigned_to || "-");
+          showResult("success", `任务已更新：${body.id} -> ${body.state}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -182,16 +214,17 @@
       const assignedTo = (dispatchUser.value || "").trim();
       const note = (dispatchNote && dispatchNote.value ? dispatchNote.value : "").trim();
       if (!taskId || !assignedTo) {
-        showResult("warn", "Task ID and assigned user are required.");
+        showResult("warn", "请先选择任务，并填写处理人。");
         return;
       }
-      await withBusyButton(dispatchBtn, "Dispatching...", async () => {
+      await withBusyButton(dispatchBtn, "派发中...", async () => {
         try {
           const body = await post(`/api/task-center/tasks/${taskId}/dispatch`, {
             assigned_to: assignedTo,
             note: note || null,
           });
-          showResult("success", `Dispatched: ${body.id} -> ${body.assigned_to || "-"}`);
+          setSelectedTask(body.id, body.name || "", body.state || "", body.assigned_to || "-");
+          showResult("success", `已派发任务：${body.id} -> ${body.assigned_to || "-"}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -204,15 +237,16 @@
       const taskId = (submitApprovalId.value || "").trim();
       const note = (submitApprovalNote && submitApprovalNote.value ? submitApprovalNote.value : "").trim();
       if (!taskId) {
-        showResult("warn", "Task ID is required.");
+        showResult("warn", "请先选择任务。");
         return;
       }
-      await withBusyButton(submitApprovalBtn, "Submitting...", async () => {
+      await withBusyButton(submitApprovalBtn, "提交中...", async () => {
         try {
           const body = await post(`/api/task-center/tasks/${taskId}/submit-approval`, {
             note: note || null,
           });
-          showResult("success", `Submitted for approval: ${body.id} -> ${body.state}`);
+          setSelectedTask(body.id, body.name || "", body.state || "", body.assigned_to || "-");
+          showResult("success", `已提交审批：${body.id} -> ${body.state}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -226,16 +260,17 @@
       const decision = (approveDecision.value || "").trim();
       const note = (approveNote && approveNote.value ? approveNote.value : "").trim();
       if (!taskId || !decision) {
-        showResult("warn", "Task ID and decision are required.");
+        showResult("warn", "请先选择任务，并指定审批结果。");
         return;
       }
-      await withBusyButton(approveBtn, "Applying...", async () => {
+      await withBusyButton(approveBtn, "处理中...", async () => {
         try {
           const body = await post(`/api/task-center/tasks/${taskId}/approve`, {
             decision,
             note: note || null,
           });
-          showResult("success", `Approval applied: ${body.id} -> ${body.state}`);
+          setSelectedTask(body.id, body.name || "", body.state || "", body.assigned_to || "-");
+          showResult("success", `已应用审批结果：${body.id} -> ${body.state}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -248,13 +283,13 @@
       const taskId = (commentId.value || "").trim();
       const content = (commentContent.value || "").trim();
       if (!taskId || !content) {
-        showResult("warn", "Task ID and comment content are required.");
+        showResult("warn", "请先选择任务，并填写评论内容。");
         return;
       }
-      await withBusyButton(commentBtn, "Posting...", async () => {
+      await withBusyButton(commentBtn, "提交中...", async () => {
         try {
           await post(`/api/task-center/tasks/${taskId}/comments`, { content });
-          showResult("success", `Comment added for task ${taskId}.`);
+          showResult("success", `已为任务 ${taskId} 添加评论。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -271,7 +306,7 @@
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
       if (!taskTypeId || !names.length) {
-        showResult("warn", "Task type and at least one task name are required.");
+        showResult("warn", "请选择任务类型，并至少填写一个任务名称。");
         return;
       }
       const tasks = names.map((name) => {
@@ -285,10 +320,10 @@
         }
         return row;
       });
-      await withBusyButton(batchBtn, "Creating...", async () => {
+      await withBusyButton(batchBtn, "创建中...", async () => {
         try {
           const body = await post("/api/task-center/tasks:batch-create", { tasks });
-          showResult("success", `Batch created ${body.total} tasks.`);
+          showResult("success", `已批量创建 ${body.total} 个任务。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -300,18 +335,18 @@
     commentsLoadBtn.addEventListener("click", async () => {
       const taskId = (commentsId.value || "").trim();
       if (!taskId) {
-        showResult("warn", "Task ID is required.");
+        showResult("warn", "请先选择任务。");
         return;
       }
-      await withBusyButton(commentsLoadBtn, "Loading...", async () => {
+      await withBusyButton(commentsLoadBtn, "加载中...", async () => {
         try {
           const rows = await get(`/api/task-center/tasks/${taskId}/comments`);
           commentsBox.textContent = renderRows(
             rows,
             (item) => `[${item.created_at}] ${item.created_by}: ${item.content}`,
-            "No comments.",
+            "暂无评论。",
           );
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} comments.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条评论。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -323,19 +358,19 @@
     historyLoadBtn.addEventListener("click", async () => {
       const taskId = (historyId.value || "").trim();
       if (!taskId) {
-        showResult("warn", "Task ID is required.");
+        showResult("warn", "请先选择任务。");
         return;
       }
-      await withBusyButton(historyLoadBtn, "Loading...", async () => {
+      await withBusyButton(historyLoadBtn, "加载中...", async () => {
         try {
           const rows = await get(`/api/task-center/tasks/${taskId}/history`);
           historyBox.textContent = renderRows(
             rows,
             (item) =>
               `[${item.created_at}] ${item.action} ${item.from_state || "-"} -> ${item.to_state || "-"} (${item.actor_id || "-"})`,
-            "No history.",
+            "暂无历史记录。",
           );
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} history events.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条历史记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }

@@ -126,6 +126,43 @@ def _create_incident(client: TestClient, token: str, *, title: str, point_wkt: s
     return response.json()["id"]
 
 
+def _create_airspace_zone(client: TestClient, token: str, *, name: str, area_code: str) -> str:
+    response = client.post(
+        "/api/compliance/zones",
+        json={
+            "name": name,
+            "zone_type": "NO_FLY",
+            "policy_layer": "TENANT",
+            "policy_effect": "DENY",
+            "area_code": area_code,
+            "geom_wkt": "POLYGON((114.00 30.00,114.02 30.00,114.02 30.02,114.00 30.02,114.00 30.00))",
+            "is_active": True,
+            "detail": {},
+        },
+        headers=_auth_header(token),
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def _create_outcome(client: TestClient, token: str, *, source_id: str, lat: float, lon: float) -> str:
+    response = client.post(
+        "/api/outcomes/records",
+        json={
+            "source_type": "MANUAL",
+            "source_id": source_id,
+            "outcome_type": "DEFECT",
+            "status": "VERIFIED",
+            "point_lat": lat,
+            "point_lon": lon,
+            "payload": {"source": "map-test"},
+        },
+        headers=_auth_header(token),
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 def _ingest_telemetry(
     client: TestClient,
     token: str,
@@ -169,6 +206,8 @@ def test_map_overview_and_layers_are_tenant_scoped(map_client: TestClient) -> No
     mission_b = _create_mission(map_client, token_b, name="mission-b")
     incident_a = _create_incident(map_client, token_a, title="incident-a", point_wkt="POINT(114.0 30.0)")
     incident_b = _create_incident(map_client, token_b, title="incident-b", point_wkt="POINT(115.0 31.0)")
+    zone_a = _create_airspace_zone(map_client, token_a, name="zone-a", area_code="A-01")
+    outcome_a = _create_outcome(map_client, token_a, source_id="map-outcome-a", lat=30.01, lon=114.01)
 
     now = datetime.now(UTC)
     _ingest_telemetry(map_client, token_a, drone_id=drone_a, lat=30.0, lon=114.0, ts=now, battery_percent=10.0)
@@ -179,8 +218,10 @@ def test_map_overview_and_layers_are_tenant_scoped(map_client: TestClient) -> No
     overview_body = overview.json()
     assert overview_body["resources_total"] == 2
     assert overview_body["tasks_total"] == 2
+    assert overview_body["airspace_total"] == 1
     assert overview_body["alerts_total"] == 1
     assert overview_body["events_total"] >= 1
+    assert overview_body["outcomes_total"] == 1
 
     resources_layer = map_client.get("/api/map/layers/resources", headers=_auth_header(token_a))
     assert resources_layer.status_code == 200
@@ -203,6 +244,18 @@ def test_map_overview_and_layers_are_tenant_scoped(map_client: TestClient) -> No
     alert_items = alerts_layer.json()["items"]
     assert len(alert_items) == 1
     assert alert_items[0]["detail"]["drone_id"] == drone_a
+
+    airspace_layer = map_client.get("/api/map/layers/airspace", headers=_auth_header(token_a))
+    assert airspace_layer.status_code == 200
+    airspace_items = airspace_layer.json()["items"]
+    assert len(airspace_items) == 1
+    assert airspace_items[0]["id"] == zone_a
+
+    outcomes_layer = map_client.get("/api/map/layers/outcomes", headers=_auth_header(token_a))
+    assert outcomes_layer.status_code == 200
+    outcome_items = outcomes_layer.json()["items"]
+    assert len(outcome_items) == 1
+    assert outcome_items[0]["id"] == outcome_a
 
 
 def test_map_track_replay_supports_sampling_and_tenant_boundary(map_client: TestClient) -> None:

@@ -1,104 +1,133 @@
 {% extends "console_base.html" %}
 
 {% block content %}
+<div class="selection-banner admin-rail">
+  <strong>管理员技术页：</strong>此页面面向平台管理员和集成配置角色，不作为普通业务人员的日常入口。
+</div>
+<div class="stack-gap-md"></div>
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>管理员关联入口</h2>
+    <p class="table-panel-note">当前位置：外部集成分组。可在开放平台、商业运营和平台治理之间切换。</p>
+  </div>
+  <div class="admin-link-grid">
+    <a class="admin-link-card active" href="/ui/open-platform?token={{ token }}">
+      <span class="admin-link-title">开放平台</span>
+      <span class="admin-link-desc">管理凭据、Webhook 和接入测试。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/commercial-ops?token={{ token }}">
+      <span class="admin-link-title">商业运营</span>
+      <span class="admin-link-desc">处理套餐、订阅和账单。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/platform?token={{ token }}">
+      <span class="admin-link-title">平台治理</span>
+      <span class="admin-link-desc">查看租户、角色和平台配置。</span>
+    </a>
+  </div>
+</div>
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>Credentials</div>
+    <div>凭证</div>
     <div class="value">{{ credentials|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Webhooks</div>
+    <div>Webhook 回调</div>
     <div class="value">{{ webhooks|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Adapter Events</div>
+    <div>适配器事件</div>
     <div class="value">{{ adapter_events|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Write Access</div>
-    <div class="value">{{ "YES" if can_open_platform_write else "NO" }}</div>
+    <div>写入权限</div>
+    <div class="value">{{ "已开启" if can_open_platform_write else "只读" }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Open Platform Access + Webhook Ops</h2>
+  <h2>开放平台访问与 Webhook 管理</h2>
   <div class="grid cols-2">
-    <div>
-      <h3>Credentials</h3>
-      <label>Key ID (optional)</label>
+    <div class="form-stack">
+      <h3>访问凭证</h3>
+      <label>接入标识（可选）</label>
       <input id="open-credential-key-id" placeholder="phase30-key" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">API Key (optional)</label>
+      <label class="stack-gap-sm">API 密钥（可选）</label>
       <input id="open-credential-api-key" placeholder="api-..." {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Signing Secret (optional)</label>
+      <label class="stack-gap-sm">签名密钥（可选）</label>
       <input id="open-credential-signing-secret" placeholder="sig-..." {% if not can_open_platform_write %}disabled{% endif %}>
-      <button id="open-credential-create-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Create Credential</button>
-      <button id="open-credential-list-btn" type="button" style="margin-top:10px;">Load Credentials</button>
-      <pre id="open-credential-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No credential result.</pre>
+      <button id="open-credential-create-btn" type="button" class="stack-gap-sm" {% if not can_open_platform_write %}disabled{% endif %}>创建凭证</button>
+      <button id="open-credential-list-btn" type="button" class="stack-gap-sm">查看凭证</button>
+      <pre id="open-credential-box" class="hint pre-box result-surface stack-gap-sm">尚未执行凭证查询。</pre>
     </div>
-    <div>
-      <h3>Webhook Endpoints</h3>
-      <label>Name</label>
+    <div class="form-stack">
+      <h3>Webhook 回调端点</h3>
+      <label>端点名称</label>
       <input id="open-webhook-name" placeholder="phase30-hook" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Endpoint URL</label>
+      <label class="stack-gap-sm">回调地址</label>
       <input id="open-webhook-url" placeholder="https://example.invalid/hook" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Event Type</label>
+      <label class="stack-gap-sm">事件类型</label>
       <input id="open-webhook-event-type" value="workorder.upsert" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Credential ID (optional)</label>
-      <input id="open-webhook-credential-id" placeholder="credential id" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Auth Type</label>
+      <label class="stack-gap-sm">绑定凭据标识（可选）</label>
+      <input id="open-webhook-credential-id" placeholder="可留空" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">鉴权方式</label>
       <select id="open-webhook-auth-type" {% if not can_open_platform_write %}disabled{% endif %}>
         {% for item in open_webhook_auth_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <button id="open-webhook-create-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Create Webhook</button>
-      <button id="open-webhook-list-btn" type="button" style="margin-top:10px;">Load Webhooks</button>
-      <pre id="open-webhook-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No webhook result.</pre>
+      <button id="open-webhook-create-btn" type="button" class="stack-gap-sm" {% if not can_open_platform_write %}disabled{% endif %}>创建 Webhook 回调</button>
+      <button id="open-webhook-list-btn" type="button" class="stack-gap-sm">查看 Webhook 回调</button>
+      <pre id="open-webhook-box" class="hint pre-box result-surface stack-gap-sm">尚未执行 Webhook 回调查询。</pre>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Dispatch + Adapter Ingress</h2>
+  <h2>派发与适配器接入</h2>
   <div class="grid cols-2">
-    <div>
-      <h3>Dispatch Test</h3>
-      <label>Endpoint ID</label>
-      <input id="open-dispatch-endpoint-id" placeholder="endpoint id" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Payload JSON</label>
+    <div class="form-stack">
+      <h3>派发测试</h3>
+      <label>端点标识</label>
+      <input id="open-dispatch-endpoint-id" placeholder="输入待测试的端点标识" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">请求载荷（JSON，高级配置）</label>
       <textarea id="open-dispatch-payload" rows="3" {% if not can_open_platform_write %}disabled{% endif %}>{"ticket_id":"PH30-001"}</textarea>
-      <button id="open-webhook-dispatch-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Dispatch Test</button>
-      <pre id="open-dispatch-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No dispatch result.</pre>
+      <p class="hint admin-note stack-gap-sm">仅用于管理员验证回调链路；业务用户无需手动填写此类测试载荷。</p>
+      <button id="open-webhook-dispatch-btn" type="button" class="stack-gap-sm" {% if not can_open_platform_write %}disabled{% endif %}>执行派发测试</button>
+      <pre id="open-dispatch-box" class="hint pre-box result-surface stack-gap-sm">尚未执行派发测试。</pre>
     </div>
-    <div>
-      <h3>Adapter Event Ingest Test</h3>
-      <label>Key ID</label>
-      <input id="open-adapter-key-id" placeholder="credential key id" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">API Key</label>
-      <input id="open-adapter-api-key" placeholder="credential api key" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Signing Secret</label>
-      <input id="open-adapter-signing-secret" placeholder="credential signing secret" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Event Type</label>
+    <div class="form-stack">
+      <h3>适配器事件接入测试</h3>
+      <label>接入标识</label>
+      <input id="open-adapter-key-id" placeholder="来自凭据配置" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">API 密钥</label>
+      <input id="open-adapter-api-key" placeholder="来自凭据配置" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">签名密钥</label>
+      <input id="open-adapter-signing-secret" placeholder="来自凭据配置" {% if not can_open_platform_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">事件类型</label>
       <input id="open-adapter-event-type" value="workorder.upsert" {% if not can_open_platform_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Payload JSON</label>
+      <label class="stack-gap-sm">事件载荷（JSON，高级配置）</label>
       <textarea id="open-adapter-payload" rows="3" {% if not can_open_platform_write %}disabled{% endif %}>{"ticket_id":"PH30-001"}</textarea>
-      <button id="open-adapter-ingest-btn" type="button" style="margin-top:10px;" {% if not can_open_platform_write %}disabled{% endif %}>Ingest Adapter Event</button>
-      <button id="open-adapter-events-btn" type="button" style="margin-top:10px;">Load Adapter Events</button>
-      <pre id="open-adapter-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No adapter action result.</pre>
+      <p class="hint admin-note stack-gap-sm">仅用于联调第三方事件接入；建议在测试环境下使用。</p>
+      <button id="open-adapter-ingest-btn" type="button" class="stack-gap-sm" {% if not can_open_platform_write %}disabled{% endif %}>写入适配器事件</button>
+      <button id="open-adapter-events-btn" type="button" class="stack-gap-sm">查看适配器事件</button>
+      <pre id="open-adapter-box" class="hint pre-box result-surface stack-gap-sm">尚未执行适配器动作。</pre>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Webhook Catalog</h2>
+  <div class="table-panel-head">
+    <h2>Webhook 回调目录</h2>
+    <p class="table-panel-note">统一查看当前已登记的回调端点、事件类型与凭据绑定关系。</p>
+  </div>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>Endpoint ID</th>
-          <th>Name</th>
-          <th>Event Type</th>
-          <th>Credential</th>
+          <th>端点标识</th>
+          <th>名称</th>
+          <th>事件类型</th>
+          <th>凭据</th>
         </tr>
       </thead>
       <tbody>
@@ -106,8 +135,20 @@
         <tr>
           <td><code>{{ item.id }}</code></td>
           <td>{{ item.name }}</td>
-          <td>{{ item.event_type }}</td>
-          <td><code>{{ item.credential_id or "-" }}</code></td>
+          <td>
+            <span class="cell-main">
+              {{ "工单更新" if item.event_type == "workorder.upsert" else "任务更新" if item.event_type == "task.updated" else "平台事件" }}
+            </span>
+            <code class="cell-subtle">{{ item.event_type }}</code>
+          </td>
+          <td>
+            {% if item.credential_id %}
+            <span class="cell-main">已绑定凭据</span>
+            <code class="cell-subtle">{{ item.credential_id }}</code>
+            {% else %}
+            <span class="status-pill muted">未绑定</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -115,7 +156,7 @@
   </div>
 </div>
 
-<pre id="open-platform-result" class="hint" style="min-height:22px;"></pre>
+<pre id="open-platform-result" class="hint pre-box action-result result-box result-surface"></pre>
 {% endblock %}
 
 {% block scripts %}

@@ -187,13 +187,21 @@
 - `phases/phase-08-one-net-unified-flight-planning.md`（Phase 08-15）
 - `phases/phase-16-saas-console-ui.md` ... `phases/phase-25-observability-reliability.md`（Phase 16-25）
 - `phases/phase-26-ui-information-architecture-design-system.md` ... `phases/phase-31-observability-reliability-ops-console.md`（Phase 26-31）
+- `phases/phase-32-role-workbench-productization.md` ... `phases/phase-39-release-adoption-lifecycle.md`（Phase 32-39）
 
 该组蓝图定义了：
 - Phase 08-31 的目标、范围、验收与退出标准
 - A-J 能力映射到阶段的落地顺序
 - M2/M3/M4/M5/M6 里程碑分组与执行顺序
+- Phase 32-39 面向“正式交付给非技术业务人员长期使用”的产品化交付路线
+
+新增 M7-M10 产品化交付阶段分组：
+- M7（Phase 32-33）：角色化工作台 + 一张图主界面
+- M8（Phase 34-35）：流程向导化 + 移动端现场执行
+- M9（Phase 36-37）：业务闭环消费 + 通知协同与待办
+- M10（Phase 38-39）：客户交付开通 + 上线保障与版本运营
 
 执行建议：
-- 从 `phases/state.md -> current_phase` 启动（当前为 `phase-26-ui-information-architecture-design-system.md`，状态 `DONE`，等待显式指令后再进入 `phase-27`）
-- 按 `phases/index.md` 顺序推进至 `phase-31-observability-reliability-ops-console.md`
+- 从 `phases/state.md -> current_phase` 启动（当前为 `DONE`，表示 Phase 31 已关账，等待显式指令后再进入后续新阶段）
+- 按 `phases/index.md` 顺序推进至 `phase-39-release-adoption-lifecycle.md`
 - 每阶段执行时继续遵循 `phases/reporting.md` 与 `governance/AGENTS.md`

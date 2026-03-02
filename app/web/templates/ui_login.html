@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Console Login</title>
+  <title>平台登录</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
@@ -12,8 +12,8 @@
 <body class="auth-body">
   <div class="auth-shell">
     <div class="auth-panel">
-      <h1>UAV SaaS Console</h1>
-      <p>Sign in with tenant context to enter the unified console.</p>
+      <h1>低空运营平台</h1>
+      <p>选择租户并登录后，即可进入统一工作台。</p>
 
       {% if error_message %}
       <div class="auth-error">{{ error_message }}</div>
@@ -24,27 +24,27 @@
         <input type="hidden" name="next" value="{{ next_path }}">
 
         {% if tenant_options %}
-        <label for="tenant_id">Tenant</label>
+        <label for="tenant_id">租户</label>
         <select id="tenant_id" name="tenant_id" required>
-          <option value="">Select tenant</option>
+          <option value="">请选择租户</option>
           {% for tenant in tenant_options %}
           <option value="{{ tenant.id }}" {% if selected_tenant == tenant.id %}selected{% endif %}>{{ tenant.name }} ({{ tenant.id }})</option>
           {% endfor %}
         </select>
         {% else %}
-        <label for="tenant_id">Tenant ID</label>
-        <input id="tenant_id" name="tenant_id" value="{{ selected_tenant }}" required placeholder="tenant id">
+        <label for="tenant_id">租户 ID</label>
+        <input id="tenant_id" name="tenant_id" value="{{ selected_tenant }}" required placeholder="请输入租户 ID">
         {% endif %}
 
-        <label for="username">Username</label>
-        <input id="username" name="username" value="{{ username }}" required autocomplete="username" placeholder="username">
+        <label for="username">用户名</label>
+        <input id="username" name="username" value="{{ username }}" required autocomplete="username" placeholder="请输入用户名">
 
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="password">
+        <label for="password">密码</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="请输入密码">
 
-        <button type="submit">Sign In</button>
+        <button type="submit">登录</button>
       </form>
-      <div class="hint">Session is cookie-based and UI auth actions enforce CSRF token validation.</div>
+      <div class="hint">当前界面使用 Cookie 会话，并对所有 UI 写操作执行 CSRF 校验。</div>
     </div>
   </div>
 </body>

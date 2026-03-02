@@ -10,7 +10,7 @@
   const availabilityRegion = document.getElementById("asset-availability-region");
   const availabilityBtn = document.getElementById("asset-availability-btn");
 
-  const healthId = document.getElementById("asset-health-id");
+  const healthId = document.getElementById("asset-availability-id");
   const healthStatus = document.getElementById("asset-health-status");
   const healthScore = document.getElementById("asset-health-score");
   const healthBtn = document.getElementById("asset-health-btn");
@@ -32,6 +32,8 @@
   const mwHistoryId = document.getElementById("mw-history-id");
   const mwHistoryBtn = document.getElementById("mw-history-btn");
   const mwHistoryBox = document.getElementById("mw-history-box");
+  const assetSelectionBanner = document.getElementById("asset-selection-banner");
+  const workorderSelectionBanner = document.getElementById("workorder-selection-banner");
 
   if (!token || !resultNode) {
     return;
@@ -49,7 +51,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败，请稍后重试。");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -72,7 +74,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -86,7 +88,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -99,23 +101,58 @@
     return parsed;
   }
 
+  function setSelectedAsset(assetId, assetCode, assetType, regionCode) {
+    const region = (regionCode || "").trim();
+    if (availabilityId) {
+      availabilityId.value = assetId;
+    }
+    if (mwCreateAssetId) {
+      mwCreateAssetId.value = assetId;
+    }
+    if (availabilityRegion && region) {
+      availabilityRegion.value = region;
+    }
+    if (assetSelectionBanner) {
+      assetSelectionBanner.innerHTML = `<strong>当前资产：</strong>${assetCode || assetId}（${assetType || "未标注类型"}），资产 ID：<code>${assetId}</code>${region ? `，区域：${region}` : ""}`;
+    }
+  }
+
+  function setSelectedWorkorder(workorderId, assetId, status, assignedTo) {
+    if (mwTransitionId) {
+      mwTransitionId.value = workorderId;
+    }
+    if (mwHistoryId) {
+      mwHistoryId.value = workorderId;
+    }
+    if (mwCreateAssetId && assetId) {
+      mwCreateAssetId.value = assetId;
+    }
+    if (mwTransitionAssignedTo && assignedTo) {
+      mwTransitionAssignedTo.value = assignedTo;
+    }
+    if (workorderSelectionBanner) {
+      workorderSelectionBanner.innerHTML = `<strong>当前工单：</strong><code>${workorderId}</code>，状态：${status || "-"}${assignedTo ? `，处理人：${assignedTo}` : ""}`;
+    }
+  }
+
   if (availabilityBtn && availabilityId && availabilityStatus) {
     availabilityBtn.addEventListener("click", async () => {
       const assetId = (availabilityId.value || "").trim();
       const status = availabilityStatus.value || "";
       const region = (availabilityRegion && availabilityRegion.value ? availabilityRegion.value : "").trim();
       if (!assetId || !status) {
-        showResult("warn", "Asset ID and availability status are required.");
+        showResult("warn", "请先选择资产，并确认可用状态。");
         return;
       }
       const payload = { availability_status: status };
       if (region) {
         payload.region_code = region;
       }
-      await withBusyButton(availabilityBtn, "Applying...", async () => {
+      await withBusyButton(availabilityBtn, "提交中...", async () => {
         try {
           const body = await post(`/api/assets/${assetId}/availability`, payload);
-          showResult("success", `Availability updated: ${body.id} -> ${body.availability_status}`);
+          setSelectedAsset(body.id, "", "", body.region_code || region);
+          showResult("success", `已更新资产可用状态：${body.id} -> ${body.availability_status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -129,7 +166,7 @@
       const status = healthStatus.value || "";
       const scoreRaw = (healthScore && healthScore.value ? healthScore.value : "").trim();
       if (!assetId || !status) {
-        showResult("warn", "Asset ID and health status are required.");
+        showResult("warn", "请先选择资产，并确认健康状态。");
         return;
       }
       const payload = {
@@ -139,10 +176,10 @@
       if (scoreRaw) {
         payload.health_score = Number(scoreRaw);
       }
-      await withBusyButton(healthBtn, "Applying...", async () => {
+      await withBusyButton(healthBtn, "提交中...", async () => {
         try {
           const body = await post(`/api/assets/${assetId}/health`, payload);
-          showResult("success", `Health updated: ${body.id} -> ${body.health_status} (${body.health_score ?? "-"})`);
+          showResult("success", `已更新健康状态：${body.id} -> ${body.health_status}（${body.health_score ?? "-"}）`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -158,10 +195,10 @@
       const assignedTo = (mwCreateAssignedTo && mwCreateAssignedTo.value ? mwCreateAssignedTo.value : "").trim();
       const note = (mwCreateNote && mwCreateNote.value ? mwCreateNote.value : "").trim();
       if (!assetId || !title) {
-        showResult("warn", "Asset ID and title are required.");
+        showResult("warn", "请先选择资产，并填写工单标题。");
         return;
       }
-      await withBusyButton(mwCreateBtn, "Creating...", async () => {
+      await withBusyButton(mwCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             asset_id: assetId,
@@ -175,7 +212,8 @@
             payload.note = note;
           }
           const body = await post("/api/assets/maintenance/workorders", payload);
-          showResult("success", `Workorder created: ${body.id}`);
+          setSelectedWorkorder(body.id, body.asset_id, body.status, body.assigned_to || "");
+          showResult("success", `已创建维护工单：${body.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -191,10 +229,10 @@
         (mwTransitionAssignedTo && mwTransitionAssignedTo.value ? mwTransitionAssignedTo.value : "").trim();
       const note = (mwTransitionNote && mwTransitionNote.value ? mwTransitionNote.value : "").trim();
       if (!workorderId || !status) {
-        showResult("warn", "Workorder ID and target status are required.");
+        showResult("warn", "请先选择工单，并确认目标状态。");
         return;
       }
-      await withBusyButton(mwTransitionBtn, "Applying...", async () => {
+      await withBusyButton(mwTransitionBtn, "提交中...", async () => {
         try {
           const payload = { status };
           if (assignedTo) {
@@ -204,7 +242,8 @@
             payload.note = note;
           }
           const body = await post(`/api/assets/maintenance/workorders/${workorderId}/transition`, payload);
-          showResult("success", `Workorder transitioned: ${body.id} -> ${body.status}`);
+          setSelectedWorkorder(body.id, body.asset_id || "", body.status, body.assigned_to || assignedTo);
+          showResult("success", `已更新工单状态：${body.id} -> ${body.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -217,15 +256,16 @@
       const workorderId = (mwTransitionId.value || "").trim();
       const note = (mwTransitionNote && mwTransitionNote.value ? mwTransitionNote.value : "").trim();
       if (!workorderId) {
-        showResult("warn", "Workorder ID is required.");
+        showResult("warn", "请先选择工单。");
         return;
       }
-      await withBusyButton(mwCloseBtn, "Closing...", async () => {
+      await withBusyButton(mwCloseBtn, "关闭中...", async () => {
         try {
           const body = await post(`/api/assets/maintenance/workorders/${workorderId}/close`, {
             note: note || null,
           });
-          showResult("success", `Workorder closed: ${body.id} -> ${body.status}`);
+          setSelectedWorkorder(body.id, body.asset_id || "", body.status, body.assigned_to || "");
+          showResult("success", `已关闭工单：${body.id} -> ${body.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -237,27 +277,52 @@
     mwHistoryBtn.addEventListener("click", async () => {
       const workorderId = (mwHistoryId.value || "").trim();
       if (!workorderId) {
-        showResult("warn", "Workorder ID is required.");
+        showResult("warn", "请先选择工单。");
         return;
       }
-      await withBusyButton(mwHistoryBtn, "Loading...", async () => {
+      await withBusyButton(mwHistoryBtn, "加载中...", async () => {
         try {
           const rows = await get(`/api/assets/maintenance/workorders/${workorderId}/history`);
           if (!Array.isArray(rows) || !rows.length) {
-            mwHistoryBox.textContent = "No history.";
+            mwHistoryBox.textContent = "暂无工单历史。";
           } else {
             mwHistoryBox.textContent = rows
               .map(
                 (item) =>
-                  `[${item.created_at}] ${item.action} ${item.from_status || "-"} -> ${item.to_status || "-"} (${item.actor_id || "-"})`,
+                  `[${item.created_at}] ${item.action} ${item.from_status || "-"} -> ${item.to_status || "-"}（${item.actor_id || "-"}）`,
               )
               .join("\n");
           }
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} history rows.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条工单历史。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
       });
     });
   }
+
+  document.querySelectorAll(".js-select-asset").forEach((button) => {
+    button.addEventListener("click", () => {
+      const assetId = button.getAttribute("data-asset-id") || "";
+      const assetCode = button.getAttribute("data-asset-code") || "";
+      const assetType = button.getAttribute("data-asset-type") || "";
+      const regionCode = button.getAttribute("data-region-code") || "";
+      setSelectedAsset(assetId, assetCode, assetType, regionCode);
+      showResult("success", `已选中资产：${assetCode || assetId}`);
+    });
+  });
+
+  document.querySelectorAll(".js-select-workorder").forEach((button) => {
+    button.addEventListener("click", () => {
+      const workorderId = button.getAttribute("data-workorder-id") || "";
+      const assetId = button.getAttribute("data-asset-id") || "";
+      const status = button.getAttribute("data-status") || "";
+      const assignedTo = button.getAttribute("data-assigned-to") || "";
+      setSelectedWorkorder(workorderId, assetId, status, assignedTo);
+      if (assetId) {
+        setSelectedAsset(assetId, "", "", availabilityRegion ? availabilityRegion.value : "");
+      }
+      showResult("success", `已选中工单：${workorderId}`);
+    });
+  });
 })();

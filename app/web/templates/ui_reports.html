@@ -3,11 +3,11 @@
 {% block content %}
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>Missions</div>
+    <div>任务总量</div>
     <div class="value">{{ overview.missions_total if can_reporting_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Defect Closure</div>
+    <div>缺陷闭环率</div>
     <div class="value">
       {% if can_reporting_read %}
       {{ "%.1f"|format((closure_rate.closure_rate or 0) * 100) }}%
@@ -17,231 +17,236 @@
     </div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Raw Records</div>
+    <div>原始记录</div>
     <div class="value">{{ raw_records|length if can_inspection_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Outcome Records</div>
+    <div>成果记录</div>
     <div class="value">{{ outcome_records|length if can_inspection_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Report Templates</div>
+    <div>报告模板</div>
     <div class="value">{{ outcome_templates|length if can_reporting_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Export Tasks</div>
+    <div>导出任务</div>
     <div class="value">{{ outcome_exports|length if can_reporting_read else 0 }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Data Outcomes Workbench</h2>
+  <h2>成果数据工作区</h2>
   {% if can_inspection_read %}
   <div class="grid cols-2">
     <div>
-      <h3>Raw Data Filters</h3>
-      <label>Task ID</label>
-      <input id="raw-filter-task-id" placeholder="task id">
-      <label style="margin-top:8px;">Mission ID</label>
-      <input id="raw-filter-mission-id" placeholder="mission id">
-      <label style="margin-top:8px;">Data Type</label>
+      <h3>原始数据筛选</h3>
+      <label>任务标识</label>
+      <input id="raw-filter-task-id" placeholder="可选，按任务过滤">
+      <label style="margin-top:8px;">任务批次标识</label>
+      <input id="raw-filter-mission-id" placeholder="可选，按批次过滤">
+      <label style="margin-top:8px;">数据类型</label>
       <select id="raw-filter-type">
-        <option value="">ALL</option>
+        <option value="">全部类型</option>
         {% for item in raw_data_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <button id="raw-filter-btn" type="button" style="margin-top:10px;">Load Raw</button>
-      <label style="margin-top:8px;">Raw ID</label>
-      <input id="raw-storage-id" placeholder="raw id" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Access Tier</label>
+      <button id="raw-filter-btn" type="button" style="margin-top:10px;">加载原始数据</button>
+      <label style="margin-top:8px;">当前原始记录</label>
+      <input id="raw-storage-id" placeholder="请选择或填写原始记录标识" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">访问层级</label>
       <select id="raw-storage-tier" {% if not can_inspection_write %}disabled{% endif %}>
         {% for item in raw_access_tier_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Storage Region (optional)</label>
+      <label style="margin-top:8px;">存储区域（可选）</label>
       <input id="raw-storage-region" placeholder="local" {% if not can_inspection_write %}disabled{% endif %}>
-      <button id="raw-storage-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>Transition Storage</button>
-      <pre id="raw-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No raw query result.</pre>
+      <button id="raw-storage-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>调整存储层级</button>
+      <pre id="raw-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载原始数据。</pre>
     </div>
     <div>
-      <h3>Outcome Records</h3>
-      <label>Task ID</label>
-      <input id="outcome-filter-task-id" placeholder="task id">
-      <label style="margin-top:8px;">Mission ID</label>
-      <input id="outcome-filter-mission-id" placeholder="mission id">
-      <label style="margin-top:8px;">Source Type</label>
+      <h3>成果记录筛选</h3>
+      <label>任务标识</label>
+      <input id="outcome-filter-task-id" placeholder="可选，按任务过滤">
+      <label style="margin-top:8px;">任务批次标识</label>
+      <input id="outcome-filter-mission-id" placeholder="可选，按批次过滤">
+      <label style="margin-top:8px;">来源类型</label>
       <select id="outcome-filter-source">
-        <option value="">ALL</option>
+        <option value="">全部来源</option>
         {% for item in outcome_source_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Outcome Type</label>
+      <label style="margin-top:8px;">成果类型</label>
       <select id="outcome-filter-type">
-        <option value="">ALL</option>
+        <option value="">全部类型</option>
         {% for item in outcome_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Status</label>
+      <label style="margin-top:8px;">状态</label>
       <select id="outcome-filter-status">
-        <option value="">ALL</option>
+        <option value="">全部状态</option>
         {% for item in outcome_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <button id="outcome-filter-btn" type="button" style="margin-top:10px;">Load Outcomes</button>
-      <pre id="outcome-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No outcome query result.</pre>
+      <button id="outcome-filter-btn" type="button" style="margin-top:10px;">加载成果记录</button>
+      <pre id="outcome-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载成果记录。</pre>
     </div>
   </div>
 
   <div class="grid cols-2" style="margin-top:12px;">
     <div>
-      <h3>Create Outcome Record</h3>
-      <label>Source Type</label>
+      <h3>创建成果记录</h3>
+      <label>来源类型</label>
       <select id="outcome-create-source" {% if not can_inspection_write %}disabled{% endif %}>
         {% for item in outcome_source_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Source ID</label>
-      <input id="outcome-create-source-id" placeholder="source id" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Outcome Type</label>
+      <label style="margin-top:8px;">来源对象标识</label>
+      <input id="outcome-create-source-id" placeholder="请输入来源对象标识" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">成果类型</label>
       <select id="outcome-create-type" {% if not can_inspection_write %}disabled{% endif %}>
         {% for item in outcome_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Task ID (optional)</label>
-      <input id="outcome-create-task-id" placeholder="task id" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Mission ID (optional)</label>
-      <input id="outcome-create-mission-id" placeholder="mission id" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Payload JSON</label>
-      <textarea id="outcome-create-payload" rows="3" placeholder='{"note":"manual outcome"}' {% if not can_inspection_write %}disabled{% endif %}></textarea>
-      <button id="outcome-create-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>Create Outcome</button>
+      <label style="margin-top:8px;">关联任务（可选）</label>
+      <input id="outcome-create-task-id" placeholder="可选，关联任务标识" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">关联批次（可选）</label>
+      <input id="outcome-create-mission-id" placeholder="可选，关联批次标识" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">补充说明（高级配置）</label>
+      <textarea id="outcome-create-payload" rows="3" placeholder='{"note":"补充说明"}' {% if not can_inspection_write %}disabled{% endif %}></textarea>
+      <button id="outcome-create-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>创建成果记录</button>
     </div>
     <div>
-      <h3>Lifecycle + Versions</h3>
-      <label>Outcome ID</label>
-      <input id="outcome-status-id" placeholder="outcome id" {% if not can_inspection_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Target Status</label>
+      <h3>状态与版本</h3>
+      <label>当前成果</label>
+      <input id="outcome-status-id" placeholder="请选择或填写成果标识" {% if not can_inspection_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">目标状态</label>
       <select id="outcome-status-target" {% if not can_inspection_write %}disabled{% endif %}>
         {% for item in outcome_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Note (optional)</label>
-      <input id="outcome-status-note" placeholder="status note" {% if not can_inspection_write %}disabled{% endif %}>
-      <button id="outcome-status-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>Update Status</button>
-      <label style="margin-top:8px;">Versions Outcome ID</label>
-      <input id="outcome-versions-id" placeholder="outcome id">
-      <button id="outcome-versions-btn" type="button" style="margin-top:10px;">Load Versions</button>
-      <pre id="outcome-versions-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No version data.</pre>
+      <label style="margin-top:8px;">说明（可选）</label>
+      <input id="outcome-status-note" placeholder="可选，填写状态说明" {% if not can_inspection_write %}disabled{% endif %}>
+      <button id="outcome-status-btn" type="button" style="margin-top:10px;" {% if not can_inspection_write %}disabled{% endif %}>更新成果状态</button>
+      <label style="margin-top:8px;">版本查询对象</label>
+      <input id="outcome-versions-id" placeholder="请输入成果标识">
+      <button id="outcome-versions-btn" type="button" style="margin-top:10px;">加载版本记录</button>
+      <pre id="outcome-versions-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载版本记录。</pre>
     </div>
   </div>
   {% else %}
-  <p class="hint">This account lacks <code>inspection:read</code>; outcome datasets are hidden.</p>
+  <p class="hint">当前账号缺少 <code>inspection:read</code> 权限，成果数据区已隐藏。</p>
   {% endif %}
 </div>
 
 <div class="panel">
-  <h2>Reporting Center</h2>
+  <h2>报告导出中心</h2>
   {% if can_reporting_read %}
   <div class="grid cols-2">
     <div>
-      <h3>Create Template</h3>
-      <label>Name</label>
-      <input id="report-template-name" placeholder="template name" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Default Format</label>
+      <h3>创建报告模板</h3>
+      <label>模板名称</label>
+      <input id="report-template-name" placeholder="请输入模板名称" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">默认格式</label>
       <select id="report-template-format" {% if not can_reporting_write %}disabled{% endif %}>
         {% for item in report_format_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Title Template</label>
-      <input id="report-template-title" value="Outcome Report count={count}" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Body Template</label>
+      <label style="margin-top:8px;">标题模板</label>
+      <input id="report-template-title" value="成果报告 count={count}" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">正文模板</label>
       <textarea id="report-template-body" rows="3" placeholder="task={task_id} topic={topic}" {% if not can_reporting_write %}disabled{% endif %}></textarea>
-      <button id="report-template-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>Create Template</button>
+      <button id="report-template-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>创建模板</button>
     </div>
     <div>
-      <h3>Create Export Task</h3>
-      <label>Template ID</label>
-      <input id="report-export-template-id" placeholder="template id" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Format</label>
+      <h3>创建导出任务</h3>
+      <label>报告模板</label>
+      <select id="report-export-template-id" {% if not can_reporting_write %}disabled{% endif %}>
+        <option value="">请选择模板</option>
+        {% for item in outcome_templates %}
+        <option value="{{ item.id }}">{{ item.name }} ({{ item.id }})</option>
+        {% endfor %}
+      </select>
+      <label style="margin-top:8px;">导出格式</label>
       <select id="report-export-format" {% if not can_reporting_write %}disabled{% endif %}>
-        <option value="">DEFAULT</option>
+        <option value="">默认模板格式</option>
         {% for item in report_format_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Task ID (optional)</label>
-      <input id="report-export-task-id" placeholder="task id" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Topic (optional)</label>
+      <label style="margin-top:8px;">关联任务（可选）</label>
+      <input id="report-export-task-id" placeholder="可选，按任务标识导出" {% if not can_reporting_write %}disabled{% endif %}>
+      <label style="margin-top:8px;">主题（可选）</label>
       <input id="report-export-topic" placeholder="defect" {% if not can_reporting_write %}disabled{% endif %}>
-      <button id="report-export-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>Create Export</button>
-      <pre id="report-export-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No export action result.</pre>
+      <button id="report-export-create-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>创建导出任务</button>
+      <pre id="report-export-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未创建导出任务。</pre>
     </div>
   </div>
 
   <div class="grid cols-2" style="margin-top:12px;">
     <div>
-      <h3>Export Task Tracking</h3>
-      <label>Status</label>
+      <h3>导出任务跟踪</h3>
+      <label>状态</label>
       <select id="report-exports-status">
-        <option value="">ALL</option>
+          <option value="">全部</option>
         {% for item in report_export_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Limit</label>
+      <label style="margin-top:8px;">加载数量</label>
       <input id="report-exports-limit" type="number" min="1" max="200" value="20">
-      <button id="report-exports-load-btn" type="button" style="margin-top:10px;">Load Exports</button>
-      <label style="margin-top:8px;">Export ID</label>
-      <input id="report-export-id" placeholder="export id">
-      <button id="report-export-get-btn" type="button" style="margin-top:10px;">Load Detail</button>
-      <pre id="report-export-detail-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No export detail.</pre>
+      <button id="report-exports-load-btn" type="button" style="margin-top:10px;">加载导出列表</button>
+      <label style="margin-top:8px;">导出任务</label>
+      <input id="report-export-id" placeholder="请输入导出任务标识">
+      <button id="report-export-get-btn" type="button" style="margin-top:10px;">加载详情</button>
+      <pre id="report-export-detail-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未加载导出详情。</pre>
     </div>
     <div>
-      <h3>Retention Lifecycle</h3>
-      <label>Retention Days</label>
+      <h3>保留期治理</h3>
+      <label>保留天数</label>
       <input id="report-retention-days" type="number" min="1" value="30" {% if not can_reporting_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Dry Run</label>
+      <label style="margin-top:8px;">演练模式</label>
       <select id="report-retention-dry" {% if not can_reporting_write %}disabled{% endif %}>
         <option value="true">true</option>
         <option value="false">false</option>
       </select>
-      <button id="report-retention-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>Run Retention</button>
-      <pre id="report-retention-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No retention result.</pre>
+      <button id="report-retention-btn" type="button" style="margin-top:10px;" {% if not can_reporting_write %}disabled{% endif %}>执行保留期治理</button>
+      <pre id="report-retention-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">尚未执行保留期治理。</pre>
     </div>
   </div>
   {% else %}
-  <p class="hint">This account lacks <code>reporting.read</code>; reporting datasets are hidden.</p>
+  <p class="hint">当前账号缺少 <code>reporting.read</code> 权限，报告导出区已隐藏。</p>
   {% endif %}
 </div>
 
 <div class="panel">
-  <h2>AI Governance Entry</h2>
+  <h2>AI 治理入口</h2>
   {% if can_ai_read %}
-  <p class="hint">Use the dedicated AI governance workbench for model/version governance and evidence replay.</p>
-  <a class="button-link" href="/ui/ai-governance?token={{ token }}">Open AI Governance Workbench</a>
+  <p class="hint">需要模型治理时，进入专门的 AI 治理工作台，不把复杂模型操作堆在报表页。</p>
+  <a class="button-link" href="/ui/ai-governance?token={{ token }}">进入 AI 治理工作台</a>
   {% else %}
-  <p class="hint">This account lacks <code>ai.read</code>; AI governance page is hidden from navigation.</p>
+  <p class="hint">当前账号缺少 <code>ai.read</code> 权限，AI 治理页面仍可由管理员控制开放。</p>
   {% endif %}
 </div>
 
 <div class="panel">
-  <h2>Report Templates</h2>
+  <h2>报告模板列表</h2>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Default Format</th>
-          <th>Active</th>
+          <th>标识</th>
+          <th>模板名称</th>
+          <th>默认格式</th>
+          <th>启用</th>
         </tr>
       </thead>
       <tbody>
@@ -259,17 +264,17 @@
 </div>
 
 <div class="panel">
-  <h2>Recent Export Tasks</h2>
+  <h2>最近导出任务</h2>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Template</th>
-          <th>Format</th>
-          <th>Status</th>
-          <th>Topic</th>
-          <th>Created</th>
+          <th>标识</th>
+          <th>模板</th>
+          <th>格式</th>
+          <th>状态</th>
+          <th>主题</th>
+          <th>创建时间</th>
         </tr>
       </thead>
       <tbody>

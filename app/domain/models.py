@@ -5152,8 +5152,10 @@ class DashboardStatsRead(BaseModel):
 class MapLayerName(StrEnum):
     RESOURCES = "resources"
     TASKS = "tasks"
+    AIRSPACE = "airspace"
     ALERTS = "alerts"
     EVENTS = "events"
+    OUTCOMES = "outcomes"
 
 
 class MapPointRead(BaseModel):
@@ -5182,8 +5184,10 @@ class MapOverviewRead(BaseModel):
     generated_at: datetime
     resources_total: int
     tasks_total: int
+    airspace_total: int
     alerts_total: int
     events_total: int
+    outcomes_total: int
     layers: list[MapLayerRead]
 
 

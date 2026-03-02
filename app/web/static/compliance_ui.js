@@ -13,6 +13,21 @@
   const zoneBox = document.getElementById("zone-box");
   const preflightBox = document.getElementById("preflight-box");
   const decisionBox = document.getElementById("decision-box");
+  const approvalSelectionBanner = document.getElementById("approval-selection-banner");
+  const flowSelectionBanner = document.getElementById("flow-selection-banner");
+  const zoneSelectionBanner = document.getElementById("zone-selection-banner");
+  const preflightSelectionBanner = document.getElementById("preflight-selection-banner");
+  const approvalFlowGuidance = document.getElementById("approval-flow-guidance");
+  const approvalFlowStageEntity = document.getElementById("approval-flow-state-entity");
+  const approvalFlowStageApproval = document.getElementById("approval-flow-state-approval");
+  const approvalFlowStageInstance = document.getElementById("approval-flow-state-instance");
+  const approvalFlowStageClose = document.getElementById("approval-flow-state-close");
+  const approvalFlowState = {
+    entitySelected: false,
+    approvalRecorded: false,
+    flowStarted: false,
+    flowStatus: "",
+  };
 
   if (!token || !resultNode) {
     return;
@@ -30,7 +45,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败，请稍后重试。");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -53,7 +68,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -67,7 +82,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -91,6 +106,117 @@
     }
     const parsed = Number.parseFloat(text);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function setFlowStage(node, text, tone) {
+    if (!node) {
+      return;
+    }
+    node.textContent = text;
+    node.className = `status-pill ${tone || "muted"}`;
+  }
+
+  function refreshApprovalFlowVisualization() {
+    const flowStatus = String(approvalFlowState.flowStatus || "").toUpperCase();
+    const flowDone = flowStatus.includes("APPROVED") || flowStatus.includes("DONE") || flowStatus.includes("COMPLETE");
+    setFlowStage(
+      approvalFlowStageEntity,
+      approvalFlowState.entitySelected ? "已选中" : "待选择",
+      approvalFlowState.entitySelected ? "success" : "muted",
+    );
+    setFlowStage(
+      approvalFlowStageApproval,
+      approvalFlowState.approvalRecorded ? "已登记" : "待处理",
+      approvalFlowState.approvalRecorded ? "success" : (approvalFlowState.entitySelected ? "warn" : "muted"),
+    );
+    setFlowStage(
+      approvalFlowStageInstance,
+      approvalFlowState.flowStarted ? "已发起" : "待创建",
+      approvalFlowState.flowStarted ? "success" : (approvalFlowState.approvalRecorded ? "warn" : "muted"),
+    );
+    setFlowStage(
+      approvalFlowStageClose,
+      flowDone ? "已完成" : (approvalFlowState.flowStarted ? "推进中" : "待完成"),
+      flowDone ? "success" : (approvalFlowState.flowStarted ? "warn" : "muted"),
+    );
+    if (!approvalFlowGuidance) {
+      return;
+    }
+    if (!approvalFlowState.entitySelected) {
+      approvalFlowGuidance.innerHTML = "<strong>流程提示：</strong>请先从审批记录中选中业务对象，再继续后续动作。";
+      return;
+    }
+    if (!approvalFlowState.approvalRecorded) {
+      approvalFlowGuidance.innerHTML = "<strong>流程提示：</strong>业务对象已选中，建议先登记审批结果，再发起流程实例。";
+      return;
+    }
+    if (!approvalFlowState.flowStarted) {
+      approvalFlowGuidance.innerHTML = "<strong>流程提示：</strong>审批结果已记录，下一步可直接发起审批流程。";
+      return;
+    }
+    if (flowDone) {
+      approvalFlowGuidance.innerHTML = "<strong>流程提示：</strong>当前流程已达到完成状态，可导出审计记录或切换到下一个对象。";
+      return;
+    }
+    approvalFlowGuidance.innerHTML = "<strong>流程提示：</strong>流程正在推进中，可继续提交动作或查看流程详情。";
+  }
+
+  function setSelectedEntity(entityType, entityId) {
+    if (approvalCreateEntityType) {
+      approvalCreateEntityType.value = entityType;
+    }
+    if (approvalCreateEntityId) {
+      approvalCreateEntityId.value = entityId;
+    }
+    if (flowInstanceEntityType) {
+      flowInstanceEntityType.value = entityType;
+    }
+    if (flowInstanceEntityId) {
+      flowInstanceEntityId.value = entityId;
+    }
+    if (entityType === "MISSION" && preflightMissionId) {
+      preflightMissionId.value = entityId;
+    }
+    if (approvalSelectionBanner) {
+      approvalSelectionBanner.innerHTML = `<strong>当前业务对象：</strong>${entityType || "-"} / <code>${entityId || "-"}</code>`;
+    }
+    approvalFlowState.entitySelected = Boolean(entityType && entityId);
+    approvalFlowState.approvalRecorded = false;
+    approvalFlowState.flowStarted = false;
+    approvalFlowState.flowStatus = "";
+    refreshApprovalFlowVisualization();
+  }
+
+  function setSelectedFlowInstance(instanceId, status) {
+    if (flowActionInstanceId) {
+      flowActionInstanceId.value = instanceId;
+    }
+    if (flowSelectionBanner) {
+      flowSelectionBanner.innerHTML = `<strong>当前流程实例：</strong><code>${instanceId || "-"}</code>${status ? `，状态：${status}` : ""}`;
+    }
+    approvalFlowState.flowStarted = Boolean(instanceId);
+    approvalFlowState.flowStatus = status || "";
+    refreshApprovalFlowVisualization();
+  }
+
+  function setSelectedZone(zoneId, zoneName, zoneType, zoneLayer) {
+    if (zoneSelectionBanner) {
+      zoneSelectionBanner.innerHTML =
+        `<strong>当前空域规则：</strong>${zoneName || "未命名规则"}（<code>${zoneId || "-"}</code>）` +
+        `${zoneType ? `，类型：${zoneType}` : ""}` +
+        `${zoneLayer ? `，层级：${zoneLayer}` : ""}`;
+    }
+  }
+
+  function setSelectedPreflightTemplate(templateId, templateName, templateVersion) {
+    if (preflightTemplateId) {
+      preflightTemplateId.value = templateId;
+    }
+    if (preflightSelectionBanner) {
+      preflightSelectionBanner.innerHTML =
+        `<strong>当前模板：</strong>${templateName || "未命名模板"}（<code>${templateId || "-"}</code>）` +
+        `${templateVersion ? `，版本：${templateVersion}` : ""}`;
+    }
   }
 
   const approvalFilterEntityType = document.getElementById("approval-filter-entity-type");
@@ -121,15 +247,15 @@
 
   if (approvalFilterBtn && approvalBox) {
     approvalFilterBtn.addEventListener("click", async () => {
-      await withBusyButton(approvalFilterBtn, "Loading...", async () => {
+      await withBusyButton(approvalFilterBtn, "加载中...", async () => {
         try {
           const params = selectedApprovalFilters();
           const query = params.toString();
           const rows = await get(`/api/approvals${query ? `?${query}` : ""}`);
           approvalBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No approvals."
+            ? "暂无审批记录。"
             : rows.map((item) => `${item.id} ${item.entity_type} ${item.entity_id} ${item.status}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} approvals.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条审批记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -139,13 +265,13 @@
 
   if (approvalExportBtn) {
     approvalExportBtn.addEventListener("click", async () => {
-      await withBusyButton(approvalExportBtn, "Exporting...", async () => {
+      await withBusyButton(approvalExportBtn, "导出中...", async () => {
         try {
           const body = await get("/api/approvals/audit-export");
           if (approvalBox) {
             approvalBox.textContent = `audit_export_path: ${body.file_path}`;
           }
-          showResult("success", `Approval audit exported: ${body.file_path}`);
+          showResult("success", `已导出审批审计：${body.file_path}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -156,24 +282,27 @@
   if (approvalCreateBtn && approvalCreateEntityType && approvalCreateEntityId && approvalCreateStatus) {
     approvalCreateBtn.addEventListener("click", async () => {
       if (!canApprovalWrite) {
-        showResult("warn", "Read-only mode: approval write actions are disabled.");
+        showResult("warn", "当前为只读模式，审批写入已禁用。");
         return;
       }
       const entityType = (approvalCreateEntityType.value || "").trim();
       const entityId = (approvalCreateEntityId.value || "").trim();
       const status = (approvalCreateStatus.value || "").trim();
       if (!entityType || !entityId || !status) {
-        showResult("warn", "Entity type, entity id and status are required.");
+        showResult("warn", "请先确认业务对象类型、业务对象 ID 和审批状态。");
         return;
       }
-      await withBusyButton(approvalCreateBtn, "Creating...", async () => {
+      await withBusyButton(approvalCreateBtn, "提交中...", async () => {
         try {
           const row = await post("/api/approvals", {
             entity_type: entityType,
             entity_id: entityId,
             status,
           });
-          showResult("success", `Approval created: ${row.id}`);
+          setSelectedEntity(entityType, entityId);
+          approvalFlowState.approvalRecorded = true;
+          refreshApprovalFlowVisualization();
+          showResult("success", `已登记审批结果：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -184,7 +313,7 @@
   if (approvalBatchCreateBtn && approvalBatchEntityType && approvalBatchStatus && approvalBatchEntityIds) {
     approvalBatchCreateBtn.addEventListener("click", async () => {
       if (!canApprovalWrite) {
-        showResult("warn", "Read-only mode: approval write actions are disabled.");
+        showResult("warn", "当前为只读模式，审批写入已禁用。");
         return;
       }
       const entityType = (approvalBatchEntityType.value || "").trim();
@@ -194,10 +323,10 @@
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
       if (!entityType || !status || !ids.length) {
-        showResult("warn", "Entity type, status and at least one entity id are required.");
+        showResult("warn", "请填写业务对象类型、审批状态，并至少提供一个业务对象 ID。");
         return;
       }
-      await withBusyButton(approvalBatchCreateBtn, "Creating...", async () => {
+      await withBusyButton(approvalBatchCreateBtn, "提交中...", async () => {
         let success = 0;
         const failures = [];
         for (const entityId of ids) {
@@ -209,10 +338,10 @@
           }
         }
         if (!failures.length) {
-          showResult("success", `Batch approvals created: ${success}/${ids.length}`);
+          showResult("success", `批量审批已完成：${success}/${ids.length}`);
           return;
         }
-        showResult("warn", `Batch partial: ${success}/${ids.length}. ${failures.join(" | ")}`);
+        showResult("warn", `批量审批部分完成：${success}/${ids.length}。${failures.join(" | ")}`);
       });
     });
   }
@@ -239,20 +368,20 @@
   if (flowTemplateCreateBtn && flowTemplateName && flowTemplateEntityType && flowTemplateSteps) {
     flowTemplateCreateBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，流程配置写入已禁用。");
         return;
       }
       const name = (flowTemplateName.value || "").trim();
       const entityType = (flowTemplateEntityType.value || "").trim();
       if (!name || !entityType) {
-        showResult("warn", "Template name and entity type are required.");
+        showResult("warn", "请填写模板名称和业务对象类型。");
         return;
       }
-      await withBusyButton(flowTemplateCreateBtn, "Creating...", async () => {
+      await withBusyButton(flowTemplateCreateBtn, "创建中...", async () => {
         try {
           const steps = parseJsonOrDefault(flowTemplateSteps.value, []);
           if (!Array.isArray(steps) || !steps.length) {
-            showResult("warn", "Steps JSON must be a non-empty array.");
+            showResult("warn", "流程步骤 JSON 不能为空，且必须是数组。");
             return;
           }
           const row = await post("/api/compliance/approval-flows/templates", {
@@ -264,7 +393,10 @@
           if (flowBox) {
             flowBox.textContent = `flow_template_id: ${row.id}`;
           }
-          showResult("success", `Flow template created: ${row.id}`);
+          if (flowInstanceTemplateId) {
+            flowInstanceTemplateId.value = row.id;
+          }
+          showResult("success", `已创建流程模板：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -275,17 +407,17 @@
   if (flowInstanceCreateBtn && flowInstanceTemplateId && flowInstanceEntityType && flowInstanceEntityId) {
     flowInstanceCreateBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，流程写入已禁用。");
         return;
       }
       const templateId = (flowInstanceTemplateId.value || "").trim();
       const entityType = (flowInstanceEntityType.value || "").trim();
       const entityId = (flowInstanceEntityId.value || "").trim();
       if (!templateId || !entityType || !entityId) {
-        showResult("warn", "Template id, entity type and entity id are required.");
+        showResult("warn", "请先确认模板 ID、业务对象类型和业务对象 ID。");
         return;
       }
-      await withBusyButton(flowInstanceCreateBtn, "Creating...", async () => {
+      await withBusyButton(flowInstanceCreateBtn, "创建中...", async () => {
         try {
           const row = await post("/api/compliance/approval-flows/instances", {
             template_id: templateId,
@@ -295,10 +427,10 @@
           if (flowBox) {
             flowBox.textContent = `flow_instance_id: ${row.id}\nstatus: ${row.status}`;
           }
-          if (flowActionInstanceId) {
-            flowActionInstanceId.value = row.id;
-          }
-          showResult("success", `Flow instance created: ${row.id}`);
+          setSelectedFlowInstance(row.id, row.status);
+          approvalFlowState.approvalRecorded = true;
+          refreshApprovalFlowVisualization();
+          showResult("success", `已发起审批流程：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -309,15 +441,15 @@
   if (flowActionBtn && flowActionInstanceId && flowActionType) {
     flowActionBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，流程写入已禁用。");
         return;
       }
       const instanceId = (flowActionInstanceId.value || "").trim();
       if (!instanceId) {
-        showResult("warn", "Flow instance id is required.");
+        showResult("warn", "请先选择流程实例。");
         return;
       }
-      await withBusyButton(flowActionBtn, "Applying...", async () => {
+      await withBusyButton(flowActionBtn, "提交中...", async () => {
         try {
           const row = await post(`/api/compliance/approval-flows/instances/${instanceId}/actions`, {
             action: flowActionType.value,
@@ -331,7 +463,8 @@
               `history_count: ${Array.isArray(row.action_history) ? row.action_history.length : 0}`,
             ].join("\n");
           }
-          showResult("success", `Flow action applied: ${row.status}`);
+          setSelectedFlowInstance(row.id, row.status);
+          showResult("success", `已提交流程动作：${row.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -343,10 +476,10 @@
     flowLoadBtn.addEventListener("click", async () => {
       const instanceId = (flowActionInstanceId.value || "").trim();
       if (!instanceId) {
-        showResult("warn", "Flow instance id is required.");
+        showResult("warn", "请先选择流程实例。");
         return;
       }
-      await withBusyButton(flowLoadBtn, "Loading...", async () => {
+      await withBusyButton(flowLoadBtn, "加载中...", async () => {
         try {
           const row = await get(`/api/compliance/approval-flows/instances/${instanceId}`);
           if (flowBox) {
@@ -358,7 +491,8 @@
               `history_count: ${Array.isArray(row.action_history) ? row.action_history.length : 0}`,
             ].join("\n");
           }
-          showResult("success", "Flow instance loaded.");
+          setSelectedFlowInstance(row.id, row.status);
+          showResult("success", "已加载流程详情。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -369,7 +503,7 @@
   if (flowBatchActionBtn && flowBatchInstanceIds && flowBatchAction) {
     flowBatchActionBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，流程写入已禁用。");
         return;
       }
       const ids = (flowBatchInstanceIds.value || "")
@@ -377,10 +511,10 @@
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
       if (!ids.length) {
-        showResult("warn", "At least one flow instance id is required.");
+        showResult("warn", "请至少提供一个流程实例 ID。");
         return;
       }
-      await withBusyButton(flowBatchActionBtn, "Applying...", async () => {
+      await withBusyButton(flowBatchActionBtn, "提交中...", async () => {
         let success = 0;
         const failures = [];
         for (const id of ids) {
@@ -394,10 +528,10 @@
           }
         }
         if (!failures.length) {
-          showResult("success", `Batch flow actions applied: ${success}/${ids.length}`);
+          showResult("success", `批量流程处理已完成：${success}/${ids.length}`);
           return;
         }
-        showResult("warn", `Batch partial: ${success}/${ids.length}. ${failures.join(" | ")}`);
+        showResult("warn", `批量流程处理部分完成：${success}/${ids.length}。${failures.join(" | ")}`);
       });
     });
   }
@@ -420,16 +554,16 @@
   if (zoneCreateBtn && zoneCreateName && zoneCreateType && zoneCreateLayer && zoneCreateEffect && zoneCreateWkt) {
     zoneCreateBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，规则写入已禁用。");
         return;
       }
       const name = (zoneCreateName.value || "").trim();
       const geomWkt = (zoneCreateWkt.value || "").trim();
       if (!name || !geomWkt) {
-        showResult("warn", "Zone name and polygon WKT are required.");
+        showResult("warn", "请填写规则名称和多边形 WKT。");
         return;
       }
-      await withBusyButton(zoneCreateBtn, "Creating...", async () => {
+      await withBusyButton(zoneCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             name,
@@ -453,7 +587,8 @@
             payload.max_alt_m = maxAlt;
           }
           const row = await post("/api/compliance/zones", payload);
-          showResult("success", `Zone created: ${row.id}`);
+          setSelectedZone(row.id, row.name || name, row.zone_type || payload.zone_type, row.policy_layer || payload.policy_layer);
+          showResult("success", `已创建空域规则：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -463,7 +598,7 @@
 
   if (zoneFilterBtn && zoneBox) {
     zoneFilterBtn.addEventListener("click", async () => {
-      await withBusyButton(zoneFilterBtn, "Loading...", async () => {
+      await withBusyButton(zoneFilterBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const zoneType = (zoneFilterType && zoneFilterType.value ? zoneFilterType.value : "").trim();
@@ -481,9 +616,9 @@
           const query = params.toString();
           const rows = await get(`/api/compliance/zones${query ? `?${query}` : ""}`);
           zoneBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No zones."
+            ? "暂无空域规则。"
             : rows.map((item) => `${item.id} ${item.zone_type} ${item.policy_layer} ${item.policy_effect}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} zones.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条空域规则。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -512,19 +647,19 @@
   if (preflightTemplateCreateBtn && preflightTemplateName && preflightTemplateItems && preflightTemplateEvidence) {
     preflightTemplateCreateBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，模板写入已禁用。");
         return;
       }
       const name = (preflightTemplateName.value || "").trim();
       if (!name) {
-        showResult("warn", "Template name is required.");
+        showResult("warn", "请填写模板名称。");
         return;
       }
-      await withBusyButton(preflightTemplateCreateBtn, "Creating...", async () => {
+      await withBusyButton(preflightTemplateCreateBtn, "创建中...", async () => {
         try {
           const items = parseJsonOrDefault(preflightTemplateItems.value, []);
           if (!Array.isArray(items) || !items.length) {
-            showResult("warn", "Template items JSON must be a non-empty array.");
+            showResult("warn", "检查项 JSON 不能为空，且必须是数组。");
             return;
           }
           const evidenceRequirements = parseJsonOrDefault(preflightTemplateEvidence.value, {});
@@ -541,7 +676,8 @@
             require_approval_before_run: true,
             is_active: true,
           });
-          showResult("success", `Preflight template created: ${row.id}`);
+          setSelectedPreflightTemplate(row.id, row.name || name, row.template_version || "v1");
+          showResult("success", `已创建起飞前检查模板：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -556,15 +692,15 @@
   if (preflightInitBtn && preflightMissionId) {
     preflightInitBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，任务检查写入已禁用。");
         return;
       }
       const missionId = currentMissionId();
       if (!missionId) {
-        showResult("warn", "Mission ID is required.");
+        showResult("warn", "请先填写任务 ID。");
         return;
       }
-      await withBusyButton(preflightInitBtn, "Initializing...", async () => {
+      await withBusyButton(preflightInitBtn, "初始化中...", async () => {
         try {
           const payload = {};
           const templateId = (preflightTemplateId && preflightTemplateId.value ? preflightTemplateId.value : "").trim();
@@ -577,9 +713,9 @@
           }
           const row = await post(`/api/compliance/missions/${missionId}/preflight/init`, payload);
           if (preflightBox) {
-            preflightBox.textContent = `status: ${row.status}\nrequired_items: ${row.required_items.length}`;
+            preflightBox.textContent = `当前状态: ${row.status}\n必检项数量: ${row.required_items.length}`;
           }
-          showResult("success", `Preflight initialized: ${row.status}`);
+          showResult("success", `已初始化起飞前检查：${row.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -591,19 +727,19 @@
     preflightLoadBtn.addEventListener("click", async () => {
       const missionId = currentMissionId();
       if (!missionId) {
-        showResult("warn", "Mission ID is required.");
+        showResult("warn", "请先填写任务 ID。");
         return;
       }
-      await withBusyButton(preflightLoadBtn, "Loading...", async () => {
+      await withBusyButton(preflightLoadBtn, "加载中...", async () => {
         try {
           const row = await get(`/api/compliance/missions/${missionId}/preflight`);
           preflightBox.textContent = [
-            `status: ${row.status}`,
-            `required_items: ${Array.isArray(row.required_items) ? row.required_items.length : 0}`,
-            `completed_items: ${Array.isArray(row.completed_items) ? row.completed_items.length : 0}`,
-            `completed_at: ${row.completed_at || "-"}`,
+            `当前状态: ${row.status}`,
+            `必检项数量: ${Array.isArray(row.required_items) ? row.required_items.length : 0}`,
+            `已完成数量: ${Array.isArray(row.completed_items) ? row.completed_items.length : 0}`,
+            `完成时间: ${row.completed_at || "-"}`,
           ].join("\n");
-          showResult("success", "Loaded mission preflight.");
+          showResult("success", "已加载任务起飞前检查。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -614,16 +750,16 @@
   if (preflightCheckBtn && preflightMissionId && preflightItemCode && preflightItemChecked) {
     preflightCheckBtn.addEventListener("click", async () => {
       if (!canMissionWrite) {
-        showResult("warn", "Read-only mode: mission write actions are disabled.");
+        showResult("warn", "当前为只读模式，任务检查写入已禁用。");
         return;
       }
       const missionId = currentMissionId();
       const itemCode = (preflightItemCode.value || "").trim();
       if (!missionId || !itemCode) {
-        showResult("warn", "Mission ID and item code are required.");
+        showResult("warn", "请先填写任务 ID 和检查项编码。");
         return;
       }
-      await withBusyButton(preflightCheckBtn, "Submitting...", async () => {
+      await withBusyButton(preflightCheckBtn, "提交中...", async () => {
         try {
           const payload = {
             item_code: itemCode,
@@ -634,12 +770,12 @@
           const row = await post(`/api/compliance/missions/${missionId}/preflight/check-item`, payload);
           if (preflightBox) {
             preflightBox.textContent = [
-              `status: ${row.status}`,
-              `required_items: ${Array.isArray(row.required_items) ? row.required_items.length : 0}`,
-              `completed_items: ${Array.isArray(row.completed_items) ? row.completed_items.length : 0}`,
+              `当前状态: ${row.status}`,
+              `必检项数量: ${Array.isArray(row.required_items) ? row.required_items.length : 0}`,
+              `已完成数量: ${Array.isArray(row.completed_items) ? row.completed_items.length : 0}`,
             ].join("\n");
           }
-          showResult("success", `Preflight item updated: ${row.status}`);
+          showResult("success", `已更新检查项：${row.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -672,15 +808,15 @@
 
   if (decisionFilterBtn && decisionBox) {
     decisionFilterBtn.addEventListener("click", async () => {
-      await withBusyButton(decisionFilterBtn, "Loading...", async () => {
+      await withBusyButton(decisionFilterBtn, "加载中...", async () => {
         try {
           const params = decisionQueryParams();
           const query = params.toString();
           const rows = await get(`/api/compliance/decision-records${query ? `?${query}` : ""}`);
           decisionBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No decision records."
+            ? "暂无决策留痕。"
             : rows.map((item) => `${item.id} ${item.source} ${item.entity_type}/${item.entity_id} ${item.decision}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} decision records.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条决策留痕。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -690,13 +826,13 @@
 
   if (decisionExportBtn && decisionBox) {
     decisionExportBtn.addEventListener("click", async () => {
-      await withBusyButton(decisionExportBtn, "Exporting...", async () => {
+      await withBusyButton(decisionExportBtn, "导出中...", async () => {
         try {
           const params = decisionQueryParams();
           const query = params.toString();
           const body = await get(`/api/compliance/decision-records/export${query ? `?${query}` : ""}`);
           decisionBox.textContent = `decision_export_path: ${body.file_path}`;
-          showResult("success", `Decision records exported: ${body.file_path}`);
+          showResult("success", `已导出决策留痕：${body.file_path}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -708,25 +844,39 @@
     button.addEventListener("click", () => {
       const entityType = button.getAttribute("data-entity-type") || "";
       const entityId = button.getAttribute("data-entity-id") || "";
-      if (approvalCreateEntityType) {
-        approvalCreateEntityType.value = entityType;
-      }
-      if (approvalCreateEntityId) {
-        approvalCreateEntityId.value = entityId;
-      }
-      if (flowInstanceEntityType) {
-        flowInstanceEntityType.value = entityType;
-      }
-      if (flowInstanceEntityId) {
-        flowInstanceEntityId.value = entityId;
-      }
-      showResult("success", `Selected entity: ${entityType}/${entityId}`);
+      setSelectedEntity(entityType, entityId);
+      showResult("success", `已选中业务对象：${entityType}/${entityId}`);
     });
   });
 
+  document.querySelectorAll(".js-select-zone").forEach((button) => {
+    button.addEventListener("click", () => {
+      setSelectedZone(
+        button.getAttribute("data-zone-id") || "",
+        button.getAttribute("data-zone-name") || "",
+        button.getAttribute("data-zone-type") || "",
+        button.getAttribute("data-zone-layer") || "",
+      );
+      showResult("success", "已选中空域规则。");
+    });
+  });
+
+  document.querySelectorAll(".js-select-preflight-template").forEach((button) => {
+    button.addEventListener("click", () => {
+      setSelectedPreflightTemplate(
+        button.getAttribute("data-template-id") || "",
+        button.getAttribute("data-template-name") || "",
+        button.getAttribute("data-template-version") || "",
+      );
+      showResult("success", "已选中起飞前检查模板。");
+    });
+  });
+
+  refreshApprovalFlowVisualization();
+
   if (!canApprovalWrite && !canMissionWrite) {
-    showResult("warn", "Read-only mode: write actions are disabled.");
+    showResult("warn", "当前为只读模式，写入动作已禁用。");
   } else if (!canMissionRead) {
-    showResult("warn", "Mission compliance datasets are hidden because mission.read is missing.");
+    showResult("warn", "当前缺少 mission.read，任务合规数据已隐藏。");
   }
 })();

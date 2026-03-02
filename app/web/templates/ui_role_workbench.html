@@ -1,0 +1,121 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="panel hero-panel">
+  <div class="hero-head">
+    <div>
+      <span class="status-pill">{{ workbench.badge }}</span>
+      <h2>{{ workbench.label }}</h2>
+      <p>{{ workbench.summary }}</p>
+    </div>
+    <div class="hero-actions">
+      <a class="button-link" href="/ui/console">返回总工作台</a>
+      {% if workbench.module_entries|length > 0 %}
+      <a class="button-link ghost-link" href="{{ workbench.module_entries[0].href }}">打开{{ workbench.module_entries[0].label }}</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>适用角色</div>
+    <div class="value role-metric">{{ workbench.audience }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>工作入口</div>
+    <div class="value">{{ workbench.module_entries|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>实时告警</div>
+    <div class="value">{{ stats.realtime_alerts }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>待看缺陷</div>
+    <div class="value">{{ stats.defects_total }}</div>
+  </div>
+</div>
+
+<div class="section-split">
+  <div class="panel">
+    <div class="ui-section-head">
+      <div>
+        <h2>今日关注</h2>
+        <p class="ui-section-subtitle">把高频动作压缩成当前班次最值得先做的几件事。</p>
+      </div>
+    </div>
+    <div class="worklist">
+      {% for item in workbench.daily_focus %}
+      <article class="worklist-item">
+        <span class="worklist-icon">{{ loop.index }}</span>
+        <div>
+          <h3>重点 {{ loop.index }}</h3>
+          <p>{{ item }}</p>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ui-section-head">
+      <div>
+        <h2>风险提醒</h2>
+        <p class="ui-section-subtitle">保持班次内注意力集中在会影响响应时效的事项上。</p>
+      </div>
+    </div>
+    <div class="risk-grid">
+      {% for item in workbench.risk_watch %}
+      <article class="risk-card warn">
+        <h3>注意</h3>
+        <p>{{ item }}</p>
+      </article>
+      {% endfor %}
+      {% for item in attention_items %}
+      <article class="risk-card {{ item.tone }}">
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.detail }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="ui-section-head">
+    <div>
+      <h2>核心入口</h2>
+      <p class="ui-section-subtitle">只保留该角色最相关的页面，减少多余干扰。</p>
+    </div>
+  </div>
+  <div class="module-grid">
+    {% for item in workbench.module_entries %}
+    <a class="module-card" href="{{ item.href }}">
+      <h4>{{ item.label }}</h4>
+      <p>{{ item.description }}</p>
+      <span class="module-cta">立即进入</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="ui-section-head">
+    <div>
+      <h2>建议下一步</h2>
+      <p class="ui-section-subtitle">让新用户也能快速理解当前该做什么。</p>
+    </div>
+  </div>
+  <div class="worklist">
+    {% for item in next_steps %}
+    <article class="worklist-item">
+      <span class="worklist-icon">{{ loop.index }}</span>
+      <div>
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.detail }}</p>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

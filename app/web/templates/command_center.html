@@ -2,142 +2,186 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-  .map-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
-    gap: 12px;
-    align-items: start;
-  }
-  #live-map { height: calc(100vh - 300px); min-height: 460px; }
-  .side-panel .panel { margin-top: 0; }
-  .control-list {
-    display: grid;
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .control-list label {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    font-weight: 600;
-  }
-  .replay-row {
-    display: grid;
-    grid-template-columns: 1fr 88px;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .replay-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .replay-actions button { flex: 1; }
-  .video-slots {
-    display: grid;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .video-slot {
-    border: 1px dashed #b7c8ba;
-    border-radius: 10px;
-    padding: 8px;
-    background: #f8fbf8;
-  }
-  .video-slot .title {
-    display: flex;
-    justify-content: space-between;
-    font-weight: 700;
-    font-size: 13px;
-  }
-  .video-slot .meta {
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 4px;
-  }
-  .alert-list {
-    margin: 8px 0 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    gap: 6px;
-  }
-  .alert-item {
-    border-left: 4px solid var(--danger);
-    background: #fff7f7;
-    border-radius: 8px;
-    padding: 6px 8px;
-    font-size: 13px;
-  }
-  .alert-item small {
-    color: var(--muted);
-    display: block;
-    margin-top: 2px;
-  }
-  .card.alert-hot {
-    box-shadow: 0 0 0 2px rgba(188, 71, 73, 0.3);
-    border-color: #bc4749;
-  }
-  @media (max-width: 1100px) {
-    .map-grid { grid-template-columns: 1fr; }
-    #live-map { height: 460px; }
-  }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="cards">
-  <div class="card"><div>Online Devices</div><div id="stat-online" class="value">{{ stats.online_devices }}</div></div>
-  <div class="card"><div>Today Inspections</div><div id="stat-inspection" class="value">{{ stats.today_inspections }}</div></div>
-  <div class="card"><div>Defects</div><div id="stat-defect" class="value">{{ stats.defects_total }}</div></div>
-  <div class="card" id="card-alert"><div>Realtime Alerts</div><div id="stat-alert" class="value">{{ stats.realtime_alerts }}</div></div>
-</div>
-<div class="map-grid">
-  <div class="panel">
-    <div id="live-map"></div>
-  </div>
-  <div class="side-panel">
-    <div class="panel">
-      <h3 style="margin:0;">Layer Switch</h3>
-      <ul class="control-list">
-        <li><label><input id="layer-resources" type="checkbox" checked> Resources</label></li>
-        <li><label><input id="layer-tasks" type="checkbox" checked> Tasks</label></li>
-        <li><label><input id="layer-alerts" type="checkbox" checked> Alerts</label></li>
-        <li><label><input id="layer-events" type="checkbox"> Events</label></li>
-      </ul>
+<section class="panel command-mode-shell">
+  <div class="command-mode-bar">
+    <div>
+      <div class="table-panel-head">
+        <h2>一张图值守模式</h2>
+        <p class="table-panel-note">把设备、任务、空域、告警、事件与成果统一拉回地图主界面，值守时不再依赖频繁切页。</p>
+      </div>
+      <div class="command-mode-copy">
+        <strong id="command-mode-title">当前模式：值守模式</strong>
+        <p id="command-mode-desc">优先关注实时态势、活跃告警和当前高风险对象，适合日常值班与联动处置。</p>
+      </div>
     </div>
-    <div class="panel">
-      <h3 style="margin:0;">Track Replay</h3>
+    <div class="command-mode-actions" role="tablist" aria-label="指挥模式切换">
+      <button type="button" class="mode-switch active" data-command-mode="ops">值守模式</button>
+      <button type="button" class="mode-switch" data-command-mode="executive">领导模式</button>
+      <button type="button" class="mode-switch" data-command-mode="demo">演示模式</button>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="table-panel-head">
+    <h2>当前模式摘要</h2>
+    <p class="table-panel-note">把值守、领导、演示三种使用方式明确区分，避免同一张地图承担同一种阅读负担。</p>
+  </div>
+  <div class="command-mode-summary-grid">
+    <div class="command-mode-summary-card">
+      <span class="hint">适用对象</span>
+      <strong id="command-mode-audience">值守席位</strong>
+    </div>
+    <div class="command-mode-summary-card">
+      <span class="hint">优先关注</span>
+      <strong id="command-mode-priority">实时告警与高风险对象</strong>
+    </div>
+    <div class="command-mode-summary-card">
+      <span class="hint">观察窗口</span>
+      <strong id="command-mode-window">近 15 分钟动态</strong>
+    </div>
+  </div>
+</section>
+
+<div class="cards ui-kpi-grid command-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>在线设备</div>
+    <div id="stat-online" class="value">{{ stats.online_devices }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>今日巡检</div>
+    <div id="stat-inspection" class="value">{{ stats.today_inspections }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>缺陷数量</div>
+    <div id="stat-defect" class="value">{{ stats.defects_total }}</div>
+  </div>
+  <div class="card ui-kpi-card alert-hot" id="card-alert">
+    <div>实时告警</div>
+    <div id="stat-alert" class="value">{{ stats.realtime_alerts }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>空域规则</div>
+    <div id="stat-airspace" class="value">--</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>成果点位</div>
+    <div id="stat-outcome" class="value">--</div>
+  </div>
+</div>
+
+<div class="command-map-grid">
+  <section class="panel command-map-panel">
+    <div class="command-panel-head">
+      <div class="table-panel-head">
+        <h2>统一态势地图</h2>
+        <p class="table-panel-note">地图对象即业务对象。点击任一点位后，右侧会同步显示当前焦点与建议入口。</p>
+      </div>
+      <div class="command-map-hint">实时流：<code>/ws/dashboard</code> + <code>/api/map/*</code></div>
+    </div>
+    <div id="live-map" class="command-map-stage"></div>
+  </section>
+
+  <aside class="command-side-stack">
+    <section class="panel">
+      <div class="table-panel-head">
+        <h2>图层开关</h2>
+        <p class="table-panel-note">按值守重点切换展示，不影响数据刷新。</p>
+      </div>
+      <ul class="command-toggle-list">
+        <li><label><input id="layer-resources" type="checkbox" checked> 设备与资产</label></li>
+        <li><label><input id="layer-tasks" type="checkbox" checked> 任务与事件单</label></li>
+        <li><label><input id="layer-airspace" type="checkbox" checked> 空域规则</label></li>
+        <li><label><input id="layer-alerts" type="checkbox" checked> 实时告警</label></li>
+        <li><label><input id="layer-events" type="checkbox"> 事件流水</label></li>
+        <li><label><input id="layer-outcomes" type="checkbox" checked> 成果点位</label></li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <div class="table-panel-head">
+        <h2>当前焦点对象</h2>
+        <p class="table-panel-note">从地图点击对象后，系统会提供更合适的下一步入口。</p>
+      </div>
+      <div id="command-focus-empty" class="empty-state">当前未选中对象。建议先点击地图上的高亮点位。</div>
+      <div id="command-focus-card" class="command-focus-card" hidden>
+        <div class="command-focus-head">
+          <strong id="command-focus-title">未选中</strong>
+          <span id="command-focus-status" class="status-pill muted">待选择</span>
+        </div>
+        <div id="command-focus-meta" class="hint">暂无对象信息。</div>
+        <div id="command-focus-explain" class="hint">选中对象后会显示状态解释和建议动作。</div>
+        <div id="command-focus-actions" class="command-focus-actions">
+          <a id="command-focus-link" class="button-link" href="/ui/command-center">保持当前页面</a>
+          <a id="command-focus-secondary" class="button-link" href="/ui/command-center" hidden>查看相关页面</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="table-panel-head">
+        <h2>事件时间轴</h2>
+        <p class="table-panel-note">按时间倒序查看关键事件、告警与结果更新，点击后可回到地图对应对象。</p>
+      </div>
+      <ol id="command-timeline" class="command-timeline-list">
+        <li class="hint">正在等待态势数据。</li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <div class="table-panel-head">
+        <h2>值守节奏</h2>
+        <p class="table-panel-note">按当前模式调整关注点，帮助不同角色保持统一工作节奏。</p>
+      </div>
+      <ul id="command-rhythm-list" class="hint-list">
+        <li class="hint-list-item">优先确认实时告警是否形成积压。</li>
+        <li class="hint-list-item">再查看任务和现场事件是否存在阻塞。</li>
+        <li class="hint-list-item">最后复核成果与空域限制是否影响后续排班。</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <div class="table-panel-head">
+        <h2>轨迹回放</h2>
+        <p class="table-panel-note">用于快速复盘设备轨迹与经过路径。</p>
+      </div>
       <select id="replay-drone">
-        <option value="">Select drone</option>
+        <option value="">请选择设备</option>
       </select>
-      <div class="replay-row">
+      <div class="command-replay-row">
         <input id="replay-step" type="number" min="1" max="20" value="1">
-        <button id="replay-refresh" type="button">Load</button>
+        <button id="replay-refresh" type="button">刷新图层</button>
       </div>
-      <div class="replay-actions">
-        <button id="replay-play" type="button">Play</button>
-        <button id="replay-stop" type="button" class="danger">Stop</button>
+      <div class="command-replay-actions">
+        <button id="replay-play" type="button">开始回放</button>
+        <button id="replay-stop" type="button" class="danger">停止回放</button>
       </div>
-      <div id="replay-status" class="hint" style="margin-top:8px;">Replay idle.</div>
-    </div>
-    <div class="panel">
-      <h3 style="margin:0;">Alert Highlight</h3>
-      <ul id="alert-list" class="alert-list">
-        <li class="hint">No active alerts.</li>
+      <div id="replay-status" class="hint command-replay-status">当前未开始回放。</div>
+    </section>
+
+    <section class="panel">
+      <div class="table-panel-head">
+        <h2>告警高亮</h2>
+        <p class="table-panel-note">展示当前最需要优先复核的告警。</p>
+      </div>
+      <ul id="alert-list" class="command-alert-list">
+        <li class="hint">当前没有活跃告警。</li>
       </ul>
-    </div>
-    <div class="panel">
-      <h3 style="margin:0;">Video Slots</h3>
-      <div id="video-slots" class="video-slots"></div>
-      <div class="hint" style="margin-top:8px;">Powered by <code>/api/integration/video-streams</code>.</div>
-    </div>
-  </div>
+    </section>
+
+    <section class="panel">
+      <div class="table-panel-head">
+        <h2>视频槽位</h2>
+        <p class="table-panel-note">显示已配置的视频流状态，便于和地图态势一起联看。</p>
+      </div>
+      <div id="video-slots" class="command-video-slots"></div>
+      <div class="hint">数据来源：<code>/api/integration/video-streams</code></div>
+    </section>
+  </aside>
 </div>
-<div class="hint">Streams: <code>/ws/dashboard</code> + <code>/api/map/*</code> + <code>/api/integration/*</code></div>
 {% endblock %}
 
 {% block scripts %}

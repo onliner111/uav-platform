@@ -23,7 +23,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -66,7 +66,7 @@
     });
     const body = await response.json();
     if (!response.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败");
     }
     return body;
   }
@@ -82,16 +82,16 @@
   if (billingPlanCreateBtn && billingPlanCode && billingPlanName && billingPlanCycle) {
     billingPlanCreateBtn.addEventListener("click", async () => {
       if (!canBillingWrite) {
-        showResult("warn", "billing.write is required.");
+        showResult("warn", "需要 billing.write 权限。");
         return;
       }
       const planCode = (billingPlanCode.value || "").trim();
       const displayName = (billingPlanName.value || "").trim();
       if (!planCode || !displayName) {
-        showResult("warn", "Plan code and display name are required.");
+        showResult("warn", "必须填写套餐编码和显示名称。");
         return;
       }
-      await withBusyButton(billingPlanCreateBtn, "Creating...", async () => {
+      await withBusyButton(billingPlanCreateBtn, "创建中...", async () => {
         try {
           const row = await request("/api/billing/plans", "POST", {
             plan_code: planCode,
@@ -101,7 +101,7 @@
             currency: (billingPlanCurrency && billingPlanCurrency.value ? billingPlanCurrency.value : "CNY").trim() || "CNY",
             quotas: parseJsonOrDefault(billingPlanQuotasJson && billingPlanQuotasJson.value, []),
           });
-          showResult("success", `Plan created: ${row.id}`);
+          showResult("success", `套餐已创建: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -120,15 +120,15 @@
   if (billingSubscriptionCreateBtn && billingSubscriptionPlanId && billingSubscriptionStatus) {
     billingSubscriptionCreateBtn.addEventListener("click", async () => {
       if (!canBillingWrite) {
-        showResult("warn", "billing.write is required.");
+        showResult("warn", "需要 billing.write 权限。");
         return;
       }
       const planId = (billingSubscriptionPlanId.value || "").trim();
       if (!planId) {
-        showResult("warn", "Plan ID is required.");
+        showResult("warn", "必须填写套餐 ID。");
         return;
       }
-      await withBusyButton(billingSubscriptionCreateBtn, "Creating...", async () => {
+      await withBusyButton(billingSubscriptionCreateBtn, "创建中...", async () => {
         try {
           const row = await request(`/api/billing/tenants/${tenantId}/subscriptions`, "POST", {
             plan_id: planId,
@@ -139,7 +139,7 @@
           if (billingSubscriptionBox) {
             billingSubscriptionBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Subscription created: ${row.id}`);
+          showResult("success", `订阅已创建: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -150,10 +150,10 @@
   if (billingOverrideUpsertBtn && billingOverridesJson) {
     billingOverrideUpsertBtn.addEventListener("click", async () => {
       if (!canBillingWrite) {
-        showResult("warn", "billing.write is required.");
+        showResult("warn", "需要 billing.write 权限。");
         return;
       }
-      await withBusyButton(billingOverrideUpsertBtn, "Submitting...", async () => {
+      await withBusyButton(billingOverrideUpsertBtn, "提交中...", async () => {
         try {
           const rows = await request(`/api/billing/tenants/${tenantId}/quotas/overrides`, "PUT", {
             overrides: parseJsonOrDefault(billingOverridesJson.value, []),
@@ -161,7 +161,7 @@
           if (billingSubscriptionBox) {
             billingSubscriptionBox.textContent = JSON.stringify(rows, null, 2);
           }
-          showResult("success", `Quota overrides upserted: ${Array.isArray(rows) ? rows.length : 0}`);
+          showResult("success", `已更新 ${Array.isArray(rows) ? rows.length : 0} 条配额覆盖规则。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -180,16 +180,16 @@
   if (billingUsageIngestBtn && billingUsageMeterKey && billingUsageQuantity && billingUsageSourceEventId) {
     billingUsageIngestBtn.addEventListener("click", async () => {
       if (!canBillingWrite) {
-        showResult("warn", "billing.write is required.");
+        showResult("warn", "需要 billing.write 权限。");
         return;
       }
       const meterKey = (billingUsageMeterKey.value || "").trim();
       const sourceEventId = (billingUsageSourceEventId.value || "").trim();
       if (!meterKey || !sourceEventId) {
-        showResult("warn", "Meter key and source event id are required.");
+        showResult("warn", "必须填写计量项标识和来源事件 ID。");
         return;
       }
-      await withBusyButton(billingUsageIngestBtn, "Submitting...", async () => {
+      await withBusyButton(billingUsageIngestBtn, "提交中...", async () => {
         try {
           const row = await request("/api/billing/usage:ingest", "POST", {
             meter_key: meterKey,
@@ -200,7 +200,7 @@
           if (billingUsageBox) {
             billingUsageBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Usage event accepted: ${row.event.id}`);
+          showResult("success", `用量事件已接收: ${row.event.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -210,7 +210,7 @@
 
   if (billingUsageSummaryBtn && billingUsageMeterKey) {
     billingUsageSummaryBtn.addEventListener("click", async () => {
-      await withBusyButton(billingUsageSummaryBtn, "Loading...", async () => {
+      await withBusyButton(billingUsageSummaryBtn, "加载中...", async () => {
         try {
           const meterKey = (billingUsageMeterKey.value || "").trim();
           const query = meterKey ? `?meter_key=${encodeURIComponent(meterKey)}` : "";
@@ -218,7 +218,7 @@
           if (billingUsageBox) {
             billingUsageBox.textContent = JSON.stringify(rows, null, 2);
           }
-          showResult("success", `Usage summary rows: ${Array.isArray(rows) ? rows.length : 0}`);
+          showResult("success", `用量汇总记录: ${Array.isArray(rows) ? rows.length : 0} 条。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -228,11 +228,11 @@
 
   if (billingQuotaCheckBtn && billingUsageMeterKey && billingUsageQuantity) {
     billingQuotaCheckBtn.addEventListener("click", async () => {
-      await withBusyButton(billingQuotaCheckBtn, "Checking...", async () => {
+      await withBusyButton(billingQuotaCheckBtn, "校验中...", async () => {
         try {
           const meterKey = (billingUsageMeterKey.value || "").trim();
           if (!meterKey) {
-            showResult("warn", "Meter key is required.");
+            showResult("warn", "必须填写计量项标识。");
             return;
           }
           const row = await request(`/api/billing/tenants/${tenantId}/quotas:check`, "POST", {
@@ -242,7 +242,7 @@
           if (billingUsageBox) {
             billingUsageBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Quota check: allowed=${row.allowed} reason=${row.reason}`);
+          showResult("success", `配额校验结果: 允许=${row.allowed}，原因=${row.reason}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -278,10 +278,10 @@
   if (billingInvoiceGenerateBtn && billingInvoicePeriodStart && billingInvoicePeriodEnd) {
     billingInvoiceGenerateBtn.addEventListener("click", async () => {
       if (!canBillingWrite) {
-        showResult("warn", "billing.write is required.");
+        showResult("warn", "需要 billing.write 权限。");
         return;
       }
-      await withBusyButton(billingInvoiceGenerateBtn, "Generating...", async () => {
+      await withBusyButton(billingInvoiceGenerateBtn, "生成中...", async () => {
         try {
           const row = await request("/api/billing/invoices:generate", "POST", {
             tenant_id: tenantId,
@@ -297,7 +297,7 @@
           if (billingInvoiceBox) {
             billingInvoiceBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Invoice generated: ${row.id}`);
+          showResult("success", `账单已生成: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -309,16 +309,16 @@
     billingInvoiceDetailBtn.addEventListener("click", async () => {
       const invoiceId = (billingInvoiceId.value || "").trim();
       if (!invoiceId) {
-        showResult("warn", "Invoice ID is required.");
+        showResult("warn", "必须填写账单 ID。");
         return;
       }
-      await withBusyButton(billingInvoiceDetailBtn, "Loading...", async () => {
+      await withBusyButton(billingInvoiceDetailBtn, "加载中...", async () => {
         try {
           const row = await request(`/api/billing/invoices/${invoiceId}`, "GET");
           if (billingInvoiceBox) {
             billingInvoiceBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Invoice detail loaded: ${invoiceId}`);
+          showResult("success", `已加载账单详情: ${invoiceId}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -329,23 +329,23 @@
   if (billingInvoiceCloseBtn && billingInvoiceId) {
     billingInvoiceCloseBtn.addEventListener("click", async () => {
       if (!canBillingWrite) {
-        showResult("warn", "billing.write is required.");
+        showResult("warn", "需要 billing.write 权限。");
         return;
       }
       const invoiceId = (billingInvoiceId.value || "").trim();
       if (!invoiceId) {
-        showResult("warn", "Invoice ID is required.");
+        showResult("warn", "必须填写账单 ID。");
         return;
       }
-      await withBusyButton(billingInvoiceCloseBtn, "Closing...", async () => {
+      await withBusyButton(billingInvoiceCloseBtn, "关闭中...", async () => {
         try {
           const row = await request(`/api/billing/invoices/${invoiceId}:close`, "POST", {
-            note: "ui commercial close",
+            note: "控制台关闭账单",
           });
           if (billingInvoiceBox) {
             billingInvoiceBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Invoice closed: ${row.id}`);
+          showResult("success", `账单已关闭: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -356,23 +356,23 @@
   if (billingInvoiceVoidBtn && billingInvoiceId) {
     billingInvoiceVoidBtn.addEventListener("click", async () => {
       if (!canBillingWrite) {
-        showResult("warn", "billing.write is required.");
+        showResult("warn", "需要 billing.write 权限。");
         return;
       }
       const invoiceId = (billingInvoiceId.value || "").trim();
       if (!invoiceId) {
-        showResult("warn", "Invoice ID is required.");
+        showResult("warn", "必须填写账单 ID。");
         return;
       }
-      await withBusyButton(billingInvoiceVoidBtn, "Voiding...", async () => {
+      await withBusyButton(billingInvoiceVoidBtn, "作废中...", async () => {
         try {
           const row = await request(`/api/billing/invoices/${invoiceId}:void`, "POST", {
-            reason: "ui commercial void",
+            reason: "控制台作废账单",
           });
           if (billingInvoiceBox) {
             billingInvoiceBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Invoice voided: ${row.id}`);
+          showResult("success", `账单已作废: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }

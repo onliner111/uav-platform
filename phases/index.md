@@ -50,6 +50,14 @@ Codex MUST execute phases sequentially.
 40. phase-29-data-ai-governance-ui.md
 41. phase-30-commercial-platform-ops-ui.md
 42. phase-31-observability-reliability-ops-console.md
+43. phase-32-role-workbench-productization.md
+44. phase-33-one-map-command-center-v2.md
+45. phase-34-guided-task-workflow-usability.md
+46. phase-35-mobile-field-operations.md
+47. phase-36-business-closure-outcomes-consumption.md
+48. phase-37-notification-collaboration-hub.md
+49. phase-38-delivery-onboarding-operations.md
+50. phase-39-release-adoption-lifecycle.md
 
 ---
 

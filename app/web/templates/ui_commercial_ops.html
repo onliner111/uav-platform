@@ -1,154 +1,195 @@
 {% extends "console_base.html" %}
 
 {% block content %}
+<div class="selection-banner admin-rail">
+  <strong>管理员技术页：</strong>此页面面向平台管理员和运营配置角色，不作为普通业务人员的日常入口。
+</div>
+<div class="stack-gap-md"></div>
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>管理员关联入口</h2>
+    <p class="table-panel-note">当前位置：运营配置分组。建议与商业运营、开放平台和平台治理配合使用。</p>
+  </div>
+  <div class="admin-link-grid">
+    <a class="admin-link-card active" href="/ui/commercial-ops?token={{ token }}">
+      <span class="admin-link-title">商业运营</span>
+      <span class="admin-link-desc">维护套餐、订阅、用量与账单。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/open-platform?token={{ token }}">
+      <span class="admin-link-title">开放平台</span>
+      <span class="admin-link-desc">管理第三方接入与回调链路。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/platform?token={{ token }}">
+      <span class="admin-link-title">平台治理</span>
+      <span class="admin-link-desc">查看租户身份与治理配置。</span>
+    </a>
+  </div>
+</div>
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>Plans</div>
+    <div>套餐</div>
     <div class="value">{{ plans|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Subscriptions</div>
+    <div>订阅</div>
     <div class="value">{{ subscriptions|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Invoices</div>
+    <div>账单</div>
     <div class="value">{{ invoices|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Write Access</div>
-    <div class="value">{{ "YES" if can_billing_write else "NO" }}</div>
+    <div>写入权限</div>
+    <div class="value">{{ "已开启" if can_billing_write else "只读" }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Billing + Quota Operations</h2>
+  <h2>计费与配额操作</h2>
   <div class="grid cols-2">
-    <div>
-      <h3>Create Plan</h3>
-      <label>Plan Code</label>
+    <div class="form-stack">
+      <h3>创建套餐</h3>
+      <label>套餐编码（系统）</label>
       <input id="billing-plan-code" placeholder="PRO_MONTHLY" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Display Name</label>
+      <label class="stack-gap-sm">套餐显示名称</label>
       <input id="billing-plan-name" placeholder="Pro Monthly" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Billing Cycle</label>
+      <label class="stack-gap-sm">计费周期</label>
       <select id="billing-plan-cycle" {% if not can_billing_write %}disabled{% endif %}>
         {% for item in billing_cycle_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Price Cents</label>
+      <label class="stack-gap-sm">价格（分）</label>
       <input id="billing-plan-price-cents" type="number" min="0" value="29900" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Currency</label>
+      <label class="stack-gap-sm">币种</label>
       <input id="billing-plan-currency" value="CNY" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Quotas JSON</label>
+      <label class="stack-gap-sm">配额模板（JSON，高级配置）</label>
       <textarea id="billing-plan-quotas-json" rows="4" {% if not can_billing_write %}disabled{% endif %}>[{"quota_key":"users","quota_limit":50,"enforcement_mode":"HARD_LIMIT"}]</textarea>
-      <button id="billing-plan-create-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Create Plan</button>
+      <p class="hint admin-note stack-gap-sm">配额模板用于定义套餐默认上限，建议由平台管理员统一维护。</p>
+      <button id="billing-plan-create-btn" type="button" class="stack-gap-sm" {% if not can_billing_write %}disabled{% endif %}>创建套餐</button>
     </div>
-    <div>
-      <h3>Subscription + Overrides</h3>
-      <label>Plan ID</label>
-      <input id="billing-subscription-plan-id" placeholder="plan id" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Subscription Status</label>
+    <div class="form-stack">
+      <h3>订阅与覆盖策略</h3>
+      <label>套餐标识</label>
+      <input id="billing-subscription-plan-id" placeholder="输入要开通的套餐标识" {% if not can_billing_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">订阅状态</label>
       <select id="billing-subscription-status" {% if not can_billing_write %}disabled{% endif %}>
         {% for item in billing_subscription_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Auto Renew</label>
+      <label class="stack-gap-sm">自动续费</label>
       <select id="billing-subscription-auto-renew" {% if not can_billing_write %}disabled{% endif %}>
-        <option value="true">true</option>
-        <option value="false">false</option>
+        <option value="true">是</option>
+        <option value="false">否</option>
       </select>
-      <button id="billing-subscription-create-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Create Subscription</button>
-      <label style="margin-top:8px;">Quota Overrides JSON</label>
+      <button id="billing-subscription-create-btn" type="button" class="stack-gap-sm" {% if not can_billing_write %}disabled{% endif %}>创建订阅</button>
+      <label class="stack-gap-sm">配额覆盖规则（JSON，高级配置）</label>
       <textarea id="billing-overrides-json" rows="4" {% if not can_billing_write %}disabled{% endif %}>[{"quota_key":"devices","override_limit":120,"enforcement_mode":"SOFT_LIMIT","is_active":true}]</textarea>
-      <button id="billing-override-upsert-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Upsert Overrides</button>
-      <pre id="billing-subscription-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No subscription action result.</pre>
+      <button id="billing-override-upsert-btn" type="button" class="stack-gap-sm" {% if not can_billing_write %}disabled{% endif %}>更新覆盖策略</button>
+      <pre id="billing-subscription-box" class="hint pre-box result-surface stack-gap-sm">尚未执行订阅动作。</pre>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Usage + Invoice Governance</h2>
+  <h2>用量与账单治理</h2>
   <div class="grid cols-2">
-    <div>
-      <h3>Usage Ingest + Quota Check</h3>
-      <label>Meter Key</label>
+    <div class="form-stack">
+      <h3>用量写入与配额校验</h3>
+      <label>计量项标识</label>
       <input id="billing-usage-meter-key" value="users" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Quantity</label>
+      <label class="stack-gap-sm">数量</label>
       <input id="billing-usage-quantity" type="number" min="1" value="1" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Source Event ID</label>
+      <label class="stack-gap-sm">来源事件标识</label>
       <input id="billing-usage-source-event-id" placeholder="evt-demo-001" {% if not can_billing_write %}disabled{% endif %}>
-      <button id="billing-usage-ingest-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Ingest Usage</button>
-      <button id="billing-usage-summary-btn" type="button" style="margin-top:10px;">Load Usage Summary</button>
-      <button id="billing-quota-check-btn" type="button" style="margin-top:10px;">Check Quota</button>
-      <pre id="billing-usage-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No usage action result.</pre>
+      <button id="billing-usage-ingest-btn" type="button" class="stack-gap-sm" {% if not can_billing_write %}disabled{% endif %}>写入用量</button>
+      <button id="billing-usage-summary-btn" type="button" class="stack-gap-sm">查看用量汇总</button>
+      <button id="billing-quota-check-btn" type="button" class="stack-gap-sm">校验配额</button>
+      <pre id="billing-usage-box" class="hint pre-box result-surface stack-gap-sm">尚未执行用量动作。</pre>
     </div>
-    <div>
-      <h3>Invoice Lifecycle</h3>
-      <label>Period Start (ISO)</label>
+    <div class="form-stack">
+      <h3>账单生命周期</h3>
+      <label>账期开始（ISO 时间）</label>
       <input id="billing-invoice-period-start" placeholder="2026-03-01T00:00:00+00:00" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Period End (ISO)</label>
+      <label class="stack-gap-sm">账期结束（ISO 时间）</label>
       <input id="billing-invoice-period-end" placeholder="2026-04-01T00:00:00+00:00" {% if not can_billing_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Adjustments Cents</label>
+      <label class="stack-gap-sm">调账金额（分）</label>
       <input id="billing-invoice-adjustments" type="number" value="0" {% if not can_billing_write %}disabled{% endif %}>
-      <button id="billing-invoice-generate-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Generate Invoice</button>
-      <label style="margin-top:8px;">Invoice ID</label>
-      <input id="billing-invoice-id" placeholder="invoice id">
-      <button id="billing-invoice-detail-btn" type="button" style="margin-top:10px;">Load Invoice Detail</button>
-      <button id="billing-invoice-close-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Close Invoice</button>
-      <button id="billing-invoice-void-btn" type="button" style="margin-top:10px;" {% if not can_billing_write %}disabled{% endif %}>Void Invoice</button>
-      <pre id="billing-invoice-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No invoice action result.</pre>
+      <button id="billing-invoice-generate-btn" type="button" class="stack-gap-sm" {% if not can_billing_write %}disabled{% endif %}>生成账单</button>
+      <label class="stack-gap-sm">账单标识</label>
+      <input id="billing-invoice-id" placeholder="可由生成账单自动带入">
+      <button id="billing-invoice-detail-btn" type="button" class="stack-gap-sm">查看账单详情</button>
+      <button id="billing-invoice-close-btn" type="button" class="stack-gap-sm" {% if not can_billing_write %}disabled{% endif %}>关闭账单</button>
+      <button id="billing-invoice-void-btn" type="button" class="stack-gap-sm" {% if not can_billing_write %}disabled{% endif %}>作废账单</button>
+      <pre id="billing-invoice-box" class="hint pre-box result-surface stack-gap-sm">尚未执行账单动作。</pre>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Tenant Ops Snapshot</h2>
+  <h2>租户运营快照</h2>
   {% if can_identity_read %}
   <div class="cards ui-kpi-grid">
     <div class="card ui-kpi-card">
-      <div>Users</div>
+      <div>用户</div>
       <div class="value">{{ users|length }}</div>
     </div>
     <div class="card ui-kpi-card">
-      <div>Roles</div>
+      <div>角色</div>
       <div class="value">{{ roles|length }}</div>
     </div>
     <div class="card ui-kpi-card">
-      <div>Org Units</div>
+      <div>组织单元</div>
       <div class="value">{{ org_units|length }}</div>
     </div>
   </div>
-  <p class="hint" style="margin-top:10px;">Identity details are available in Platform Governance page.</p>
-  <a class="button-link" href="/ui/platform?token={{ token }}">Open Platform Governance</a>
+  <p class="hint stack-gap-sm">租户身份详情请在平台治理页查看。</p>
+  <a class="button-link" href="/ui/platform?token={{ token }}">打开平台治理页</a>
   {% else %}
-  <p class="hint">This account lacks <code>identity.read</code>; tenant identity overview is hidden.</p>
+  <p class="hint">当前账号缺少 <code>identity.read</code> 权限，租户身份概览已隐藏。</p>
   {% endif %}
 </div>
 
 <div class="panel">
-  <h2>Plan Catalog</h2>
+  <div class="table-panel-head">
+    <h2>套餐目录</h2>
+    <p class="table-panel-note">查看当前租户可用的套餐定义、价格和默认配额。</p>
+  </div>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>Plan ID</th>
-          <th>Code</th>
-          <th>Display Name</th>
-          <th>Cycle</th>
-          <th>Price</th>
-          <th>Quota Keys</th>
+          <th>套餐标识</th>
+          <th>编码</th>
+          <th>显示名称</th>
+          <th>周期</th>
+          <th>价格</th>
+          <th>配额项</th>
         </tr>
       </thead>
       <tbody>
         {% for plan, quotas in plans %}
         <tr>
           <td><code>{{ plan.id }}</code></td>
-          <td>{{ plan.plan_code }}</td>
+          <td>
+            <span class="cell-main">套餐编码</span>
+            <code class="cell-subtle">{{ plan.plan_code }}</code>
+          </td>
           <td>{{ plan.display_name }}</td>
-          <td>{{ plan.billing_cycle }}</td>
-          <td>{{ plan.price_cents }} {{ plan.currency }}</td>
-          <td>{{ quotas|map(attribute='quota_key')|join(', ') }}</td>
+          <td>
+            <span class="status-pill info">
+              {{ "月付" if plan.billing_cycle == "MONTHLY" else "季付" if plan.billing_cycle == "QUARTERLY" else "年付" if plan.billing_cycle == "YEARLY" else plan.billing_cycle }}
+            </span>
+          </td>
+          <td>{{ plan.price_cents }} {{ "人民币" if plan.currency == "CNY" else plan.currency }}</td>
+          <td>
+            {% for quota in quotas %}
+            <span class="status-pill info">
+              {{ "用户数" if quota.quota_key == "users" else "设备数" if quota.quota_key == "devices" else quota.quota_key }}
+            </span>
+            {% endfor %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -157,22 +198,29 @@
 </div>
 
 <div class="panel">
-  <h2>Recent Invoices</h2>
+  <div class="table-panel-head">
+    <h2>近期账单</h2>
+    <p class="table-panel-note">展示最近生成的账单状态与账期范围。</p>
+  </div>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>Invoice ID</th>
-          <th>Status</th>
-          <th>Period</th>
-          <th>Total Cents</th>
+          <th>账单标识</th>
+          <th>状态</th>
+          <th>账期</th>
+          <th>总金额（分）</th>
         </tr>
       </thead>
       <tbody>
         {% for item in invoices %}
         <tr>
           <td><code>{{ item.id }}</code></td>
-          <td>{{ item.status }}</td>
+          <td>
+            <span class="status-pill {{ 'danger' if item.status in ['VOID', 'FAILED', 'OVERDUE'] else 'warn' if item.status in ['DRAFT', 'PENDING'] else 'success' }}">
+              {{ "已作废" if item.status == "VOID" else "失败" if item.status == "FAILED" else "逾期" if item.status == "OVERDUE" else "草稿" if item.status == "DRAFT" else "待处理" if item.status == "PENDING" else "已关闭" if item.status == "CLOSED" else "已结清" if item.status in ["PAID", "SETTLED"] else item.status }}
+            </span>
+          </td>
           <td>{{ item.period_start }} ~ {{ item.period_end }}</td>
           <td>{{ item.total_amount_cents }}</td>
         </tr>
@@ -182,7 +230,7 @@
   </div>
 </div>
 
-<pre id="commercial-result" class="hint" style="min-height:22px;"></pre>
+<pre id="commercial-result" class="hint pre-box action-result result-box result-surface"></pre>
 {% endblock %}
 
 {% block scripts %}

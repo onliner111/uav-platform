@@ -8,6 +8,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.domain.models import (
+    AirspaceZone,
     AlertRecord,
     AlertStatus,
     Asset,
@@ -23,6 +24,7 @@ from app.domain.models import (
     MapTrackPointRead,
     MapTrackReplayRead,
     Mission,
+    OutcomeCatalogRecord,
     TelemetryNormalized,
 )
 from app.infra.db import get_engine
@@ -32,6 +34,7 @@ POINT_WKT_PATTERN = re.compile(
     r"^POINT\s*\(\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s*\)$",
     re.IGNORECASE,
 )
+POLYGON_COORD_PATTERN = re.compile(r"([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)")
 
 
 class MapError(Exception):
@@ -66,14 +69,22 @@ class MapService:
         if drone is None:
             raise NotFoundError("drone not found")
 
-    def _parse_point_wkt(self, value: str | None) -> MapPointRead | None:
+    def _parse_wkt_focus_point(self, value: str | None) -> MapPointRead | None:
         if value is None:
             return None
-        match = POINT_WKT_PATTERN.match(value.strip())
+        text = value.strip()
+        match = POINT_WKT_PATTERN.match(text)
         if match is None:
-            return None
-        lon = float(match.group(1))
-        lat = float(match.group(2))
+            if not text.upper().startswith("POLYGON"):
+                return None
+            coords = [(float(lon), float(lat)) for lon, lat in POLYGON_COORD_PATTERN.findall(text)]
+            if not coords:
+                return None
+            lon = sum(item[0] for item in coords) / len(coords)
+            lat = sum(item[1] for item in coords) / len(coords)
+        else:
+            lon = float(match.group(1))
+            lat = float(match.group(2))
         return MapPointRead(lat=lat, lon=lon)
 
     def _payload_to_telemetry(self, payload: dict[str, Any], fallback_ts: datetime) -> _TelemetryPoint | None:
@@ -188,6 +199,8 @@ class MapService:
                         "plan_type": mission.plan_type.value,
                         "project_code": mission.project_code,
                         "area_code": mission.area_code,
+                        "updated_at": mission.updated_at.isoformat(),
+                        "created_at": mission.created_at.isoformat(),
                     },
                 )
             )
@@ -198,12 +211,13 @@ class MapService:
                     category="inspection_task",
                     label=task.name,
                     status=task.status.value,
-                    point=self._parse_point_wkt(task.area_geom),
+                    point=self._parse_wkt_focus_point(task.area_geom),
                     detail={
                         "mission_id": task.mission_id,
                         "template_id": task.template_id,
                         "project_code": task.project_code,
                         "area_code": task.area_code,
+                        "created_at": task.created_at.isoformat(),
                     },
                 )
             )
@@ -214,16 +228,53 @@ class MapService:
                     category="incident",
                     label=incident.title,
                     status=incident.status.value,
-                    point=self._parse_point_wkt(incident.location_geom),
+                    point=self._parse_wkt_focus_point(incident.location_geom),
                     detail={
                         "level": incident.level,
                         "linked_task_id": incident.linked_task_id,
                         "project_code": incident.project_code,
                         "area_code": incident.area_code,
+                        "created_at": incident.created_at.isoformat(),
                     },
                 )
             )
         return MapLayerRead(layer=MapLayerName.TASKS, total=len(items), items=items[:limit])
+
+    def airspace_layer(self, tenant_id: str, *, viewer_user_id: str | None, limit: int = 100) -> MapLayerRead:
+        with self._session() as session:
+            scope = self._data_perimeter.resolve_scope(session, tenant_id, viewer_user_id)
+            rows = list(session.exec(select(AirspaceZone).where(AirspaceZone.tenant_id == tenant_id)).all())
+
+        visible = [
+            item
+            for item in rows
+            if self._data_perimeter.allows(
+                scope,
+                org_unit_id=item.org_unit_id,
+                project_code=None,
+                area_code=item.area_code,
+                task_id=None,
+            )
+        ]
+        items = [
+            MapLayerItemRead(
+                id=row.id,
+                category="airspace",
+                label=row.name,
+                status="启用" if row.is_active else "停用",
+                point=self._parse_wkt_focus_point(row.geom_wkt),
+                detail={
+                    "zone_type": row.zone_type.value,
+                    "policy_layer": row.policy_layer.value,
+                    "policy_effect": row.policy_effect.value,
+                    "area_code": row.area_code,
+                    "updated_at": row.updated_at.isoformat(),
+                    "created_at": row.created_at.isoformat(),
+                },
+            )
+            for row in visible
+        ]
+        return MapLayerRead(layer=MapLayerName.AIRSPACE, total=len(items), items=items[:limit])
 
     def alerts_layer(self, tenant_id: str, *, limit: int = 100) -> MapLayerRead:
         with self._session() as session:
@@ -253,6 +304,8 @@ class MapService:
                         "drone_id": alert.drone_id,
                         "alert_type": alert.alert_type.value,
                         "severity": alert.severity.value,
+                        "last_seen_at": alert.last_seen_at.isoformat(),
+                        "first_seen_at": alert.first_seen_at.isoformat(),
                     },
                 )
             )
@@ -296,18 +349,53 @@ class MapService:
             )
         return MapLayerRead(layer=MapLayerName.EVENTS, total=len(items), items=items[:limit])
 
+    def outcomes_layer(self, tenant_id: str, *, limit: int = 100) -> MapLayerRead:
+        with self._session() as session:
+            rows = list(session.exec(select(OutcomeCatalogRecord).where(OutcomeCatalogRecord.tenant_id == tenant_id)).all())
+
+        ordered = sorted(rows, key=lambda item: item.updated_at, reverse=True)
+        items = [
+            MapLayerItemRead(
+                id=row.id,
+                category="outcome",
+                label=f"{row.outcome_type.value} / {row.source_type.value}",
+                status=row.status.value,
+                point=(
+                    MapPointRead(lat=row.point_lat, lon=row.point_lon, alt_m=row.alt_m)
+                    if row.point_lat is not None and row.point_lon is not None
+                    else None
+                ),
+                detail={
+                    "outcome_type": row.outcome_type.value,
+                    "source_type": row.source_type.value,
+                    "source_id": row.source_id,
+                    "task_id": row.task_id,
+                    "mission_id": row.mission_id,
+                    "confidence": row.confidence,
+                    "updated_at": row.updated_at.isoformat(),
+                    "created_at": row.created_at.isoformat(),
+                },
+            )
+            for row in ordered
+        ]
+        return MapLayerRead(layer=MapLayerName.OUTCOMES, total=len(items), items=items[:limit])
+
     def overview(self, tenant_id: str, *, viewer_user_id: str | None, limit_per_layer: int = 100) -> MapOverviewRead:
         resources = self.resources_layer(tenant_id, limit=limit_per_layer)
         tasks = self.tasks_layer(tenant_id, viewer_user_id=viewer_user_id, limit=limit_per_layer)
+        airspace = self.airspace_layer(tenant_id, viewer_user_id=viewer_user_id, limit=limit_per_layer)
         alerts = self.alerts_layer(tenant_id, limit=limit_per_layer)
         events = self.events_layer(tenant_id, viewer_user_id=viewer_user_id, limit=limit_per_layer)
+        outcomes = self.outcomes_layer(tenant_id, limit=limit_per_layer)
         return MapOverviewRead(
             generated_at=datetime.now(UTC),
             resources_total=resources.total,
             tasks_total=tasks.total,
+            airspace_total=airspace.total,
             alerts_total=alerts.total,
             events_total=events.total,
-            layers=[resources, tasks, alerts, events],
+            outcomes_total=outcomes.total,
+            layers=[resources, tasks, airspace, alerts, events, outcomes],
         )
 
     def replay_track(

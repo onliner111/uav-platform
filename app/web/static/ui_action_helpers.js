@@ -17,7 +17,7 @@
     }
     const originalText = button.textContent || "";
     button.disabled = true;
-    button.textContent = pendingLabel || "Processing...";
+    button.textContent = pendingLabel || "处理中...";
     try {
       await action();
     } finally {
@@ -28,13 +28,13 @@
 
   function toMessage(error) {
     if (!error) {
-      return "request failed";
+      return "请求失败，请稍后重试。";
     }
     if (typeof error === "string") {
       return error;
     }
     if (error instanceof Error) {
-      return error.message || "request failed";
+      return error.message || "请求失败，请稍后重试。";
     }
     return String(error);
   }

@@ -24,7 +24,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -55,7 +55,7 @@
     });
     const body = await response.json();
     if (!response.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败");
     }
     return body;
   }
@@ -73,17 +73,17 @@
   if (modelCreateBtn && modelKey && modelProvider && modelDisplayName) {
     modelCreateBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const key = (modelKey.value || "").trim();
       const provider = (modelProvider.value || "").trim();
       const displayName = (modelDisplayName.value || "").trim();
       if (!key || !provider || !displayName) {
-        showResult("warn", "Model key/provider/display name are required.");
+        showResult("warn", "必须填写模型标识、供应商和显示名称。");
         return;
       }
-      await withBusyButton(modelCreateBtn, "Creating...", async () => {
+      await withBusyButton(modelCreateBtn, "创建中...", async () => {
         try {
           const row = await request("/api/ai/models", "POST", {
             model_key: key,
@@ -92,7 +92,7 @@
             description: (modelDescription && modelDescription.value ? modelDescription.value : "").trim() || null,
             is_active: true,
           });
-          showResult("success", `Model created: ${row.id}`);
+          showResult("success", `模型已创建: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -103,10 +103,10 @@
   if (modelListBtn && modelBox) {
     modelListBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
-      await withBusyButton(modelListBtn, "Loading...", async () => {
+      await withBusyButton(modelListBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const key = (modelFilterKey && modelFilterKey.value ? modelFilterKey.value : "").trim();
@@ -120,9 +120,9 @@
           const query = params.toString();
           const rows = await request(`/api/ai/models${query ? `?${query}` : ""}`, "GET");
           modelBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No model rows."
+            ? "暂无模型记录。"
             : rows.map((item) => `${item.id} ${item.model_key} ${item.provider} ${item.display_name}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} model rows.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条模型记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -144,16 +144,16 @@
   if (versionCreateBtn && versionModelId && versionValue && versionStatus && versionBox) {
     versionCreateBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const modelId = (versionModelId.value || "").trim();
       const version = (versionValue.value || "").trim();
       if (!modelId || !version) {
-        showResult("warn", "Model ID and version are required.");
+        showResult("warn", "必须填写模型 ID 和版本号。");
         return;
       }
-      await withBusyButton(versionCreateBtn, "Creating...", async () => {
+      await withBusyButton(versionCreateBtn, "创建中...", async () => {
         try {
           const row = await request(`/api/ai/models/${modelId}/versions`, "POST", {
             version,
@@ -161,11 +161,11 @@
             threshold_defaults: parseJsonOrDefault(versionThresholds && versionThresholds.value, {}),
             detail: {},
           });
-          versionBox.textContent = `version_id: ${row.id}\nstatus: ${row.status}\nversion: ${row.version}`;
+          versionBox.textContent = `版本 ID: ${row.id}\n状态: ${row.status}\n版本号: ${row.version}`;
           if (promoteVersionId) {
             promoteVersionId.value = row.id;
           }
-          showResult("success", `Version created: ${row.id}`);
+          showResult("success", `版本已创建: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -176,21 +176,21 @@
   if (promoteBtn && versionModelId && promoteVersionId && promoteStatus) {
     promoteBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const modelId = (versionModelId.value || "").trim();
       const versionId = (promoteVersionId.value || "").trim();
       if (!modelId || !versionId) {
-        showResult("warn", "Model ID and version ID are required.");
+        showResult("warn", "必须填写模型 ID 和版本 ID。");
         return;
       }
-      await withBusyButton(promoteBtn, "Promoting...", async () => {
+      await withBusyButton(promoteBtn, "发布中...", async () => {
         try {
           const row = await request(`/api/ai/models/${modelId}/versions/${versionId}:promote`, "POST", {
             target_status: promoteStatus.value,
           });
-          showResult("success", `Version promoted: ${row.id} -> ${row.status}`);
+          showResult("success", `版本状态已更新: ${row.id} -> ${row.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -201,21 +201,21 @@
   if (versionListBtn && versionModelId && versionBox) {
     versionListBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
       const modelId = (versionModelId.value || "").trim();
       if (!modelId) {
-        showResult("warn", "Model ID is required.");
+        showResult("warn", "必须填写模型 ID。");
         return;
       }
-      await withBusyButton(versionListBtn, "Loading...", async () => {
+      await withBusyButton(versionListBtn, "加载中...", async () => {
         try {
           const rows = await request(`/api/ai/models/${modelId}/versions`, "GET");
           versionBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No versions."
+            ? "暂无版本记录。"
             : rows.map((item) => `${item.id} ${item.version} ${item.status}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} versions.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条版本记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -237,15 +237,15 @@
   if (policyUpsertBtn && policyModelId && policyBox) {
     policyUpsertBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const modelId = (policyModelId.value || "").trim();
       if (!modelId) {
-        showResult("warn", "Model ID is required.");
+        showResult("warn", "必须填写模型 ID。");
         return;
       }
-      await withBusyButton(policyUpsertBtn, "Saving...", async () => {
+      await withBusyButton(policyUpsertBtn, "保存中...", async () => {
         try {
           const payload = {
             traffic_allocation: parseJsonOrDefault(policyTraffic && policyTraffic.value, []),
@@ -259,7 +259,7 @@
           }
           const row = await request(`/api/ai/models/${modelId}/rollout-policy`, "PUT", payload);
           policyBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", "Rollout policy updated.");
+          showResult("success", "发布策略已更新。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -270,19 +270,19 @@
   if (policyGetBtn && policyModelId && policyBox) {
     policyGetBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
       const modelId = (policyModelId.value || "").trim();
       if (!modelId) {
-        showResult("warn", "Model ID is required.");
+        showResult("warn", "必须填写模型 ID。");
         return;
       }
-      await withBusyButton(policyGetBtn, "Loading...", async () => {
+      await withBusyButton(policyGetBtn, "加载中...", async () => {
         try {
           const row = await request(`/api/ai/models/${modelId}/rollout-policy`, "GET");
           policyBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", "Rollout policy loaded.");
+          showResult("success", "已加载发布策略。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -293,23 +293,23 @@
   if (rollbackBtn && policyModelId && rollbackTargetVersionId && policyBox) {
     rollbackBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const modelId = (policyModelId.value || "").trim();
       const targetVersionId = (rollbackTargetVersionId.value || "").trim();
       if (!modelId || !targetVersionId) {
-        showResult("warn", "Model ID and target version ID are required.");
+        showResult("warn", "必须填写模型 ID 和目标版本 ID。");
         return;
       }
-      await withBusyButton(rollbackBtn, "Rolling back...", async () => {
+      await withBusyButton(rollbackBtn, "回滚中...", async () => {
         try {
           const row = await request(`/api/ai/models/${modelId}/rollout-policy:rollback`, "POST", {
             target_version_id: targetVersionId,
             reason: (rollbackReason && rollbackReason.value ? rollbackReason.value : "").trim() || null,
           });
           policyBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", "Rollback completed.");
+          showResult("success", "版本回滚已完成。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -329,10 +329,10 @@
   if (recomputeBtn && evalBox) {
     recomputeBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
-      await withBusyButton(recomputeBtn, "Recomputing...", async () => {
+      await withBusyButton(recomputeBtn, "重算中...", async () => {
         try {
           const payload = {};
           const modelId = (recomputeModelId && recomputeModelId.value ? recomputeModelId.value : "").trim();
@@ -345,7 +345,7 @@
           }
           const rows = await request("/api/ai/evaluations:recompute", "POST", payload);
           evalBox.textContent = JSON.stringify(rows, null, 2);
-          showResult("success", `Recomputed ${Array.isArray(rows) ? rows.length : 0} evaluation summaries.`);
+          showResult("success", `已重算 ${Array.isArray(rows) ? rows.length : 0} 条评估摘要。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -356,16 +356,16 @@
   if (compareBtn && compareLeftVersionId && compareRightVersionId && evalBox) {
     compareBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
       const leftVersionId = (compareLeftVersionId.value || "").trim();
       const rightVersionId = (compareRightVersionId.value || "").trim();
       if (!leftVersionId || !rightVersionId) {
-        showResult("warn", "Left and right version IDs are required.");
+        showResult("warn", "必须填写左右对比版本 ID。");
         return;
       }
-      await withBusyButton(compareBtn, "Comparing...", async () => {
+      await withBusyButton(compareBtn, "对比中...", async () => {
         try {
           const params = new URLSearchParams();
           params.set("left_version_id", leftVersionId);
@@ -376,7 +376,7 @@
           }
           const body = await request(`/api/ai/evaluations/compare?${params.toString()}`, "GET");
           evalBox.textContent = JSON.stringify(body, null, 2);
-          showResult("success", "Evaluation compare completed.");
+          showResult("success", "评估对比已完成。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -402,10 +402,10 @@
   if (jobCreateBtn && jobRunBox) {
     jobCreateBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
-      await withBusyButton(jobCreateBtn, "Creating...", async () => {
+      await withBusyButton(jobCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             job_type: (jobType && jobType.value ? jobType.value : "SUMMARY"),
@@ -432,7 +432,7 @@
             jobIdInput.value = row.id;
           }
           jobRunBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", `Job created: ${row.id}`);
+          showResult("success", `作业已创建: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -443,10 +443,10 @@
   if (jobsListBtn && jobRunBox) {
     jobsListBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
-      await withBusyButton(jobsListBtn, "Loading...", async () => {
+      await withBusyButton(jobsListBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const taskId = (jobTaskId && jobTaskId.value ? jobTaskId.value : "").trim();
@@ -460,9 +460,9 @@
           const query = params.toString();
           const rows = await request(`/api/ai/jobs${query ? `?${query}` : ""}`, "GET");
           jobRunBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No jobs."
+            ? "暂无作业记录。"
             : rows.map((item) => `${item.id} ${item.job_type} ${item.trigger_mode} ${item.model_version_id || "-"}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} jobs.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条作业记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -473,21 +473,21 @@
   if (runsListBtn && jobIdInput && jobRunBox) {
     runsListBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
       const jobId = (jobIdInput.value || "").trim();
       if (!jobId) {
-        showResult("warn", "Job ID is required.");
+        showResult("warn", "必须填写作业 ID。");
         return;
       }
-      await withBusyButton(runsListBtn, "Loading...", async () => {
+      await withBusyButton(runsListBtn, "加载中...", async () => {
         try {
           const rows = await request(`/api/ai/jobs/${jobId}/runs`, "GET");
           jobRunBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No runs."
+            ? "暂无运行记录。"
             : rows.map((item) => `${item.id} ${item.status} retry=${item.retry_count}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} runs.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条运行记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -498,22 +498,22 @@
   if (runTriggerBtn && jobIdInput && jobRunBox) {
     runTriggerBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const jobId = (jobIdInput.value || "").trim();
       if (!jobId) {
-        showResult("warn", "Job ID is required.");
+        showResult("warn", "必须填写作业 ID。");
         return;
       }
-      await withBusyButton(runTriggerBtn, "Triggering...", async () => {
+      await withBusyButton(runTriggerBtn, "触发中...", async () => {
         try {
           const row = await request(`/api/ai/jobs/${jobId}/runs`, "POST", {
             force_fail: false,
             context: { source: "ui-phase29" },
           });
           jobRunBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", `Run triggered: ${row.id}`);
+          showResult("success", `运行已触发: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -524,22 +524,22 @@
   if (runRetryBtn && retryRunId && jobRunBox) {
     runRetryBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const runId = (retryRunId.value || "").trim();
       if (!runId) {
-        showResult("warn", "Run ID is required.");
+        showResult("warn", "必须填写运行 ID。");
         return;
       }
-      await withBusyButton(runRetryBtn, "Retrying...", async () => {
+      await withBusyButton(runRetryBtn, "重试中...", async () => {
         try {
           const row = await request(`/api/ai/runs/${runId}/retry`, "POST", {
             force_fail: false,
             context: { source: "ui-phase29-retry" },
           });
           jobRunBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", `Run retry executed: ${row.id}`);
+          showResult("success", `运行重试已执行: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -562,10 +562,10 @@
   if (outputsListBtn && outputBox) {
     outputsListBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
-      await withBusyButton(outputsListBtn, "Loading...", async () => {
+      await withBusyButton(outputsListBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const jobId = (outputFilterJobId && outputFilterJobId.value ? outputFilterJobId.value : "").trim();
@@ -583,9 +583,9 @@
           const query = params.toString();
           const rows = await request(`/api/ai/outputs${query ? `?${query}` : ""}`, "GET");
           outputBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No outputs."
-            : rows.map((item) => `${item.id} ${item.review_status} ${item.control_allowed ? "CTRL" : "NO_CTRL"}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} outputs.`);
+            ? "暂无输出记录。"
+            : rows.map((item) => `${item.id} ${item.review_status} ${item.control_allowed ? "可控" : "不可控"}`).join("\n");
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条输出记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -596,28 +596,28 @@
   if (outputReviewGetBtn && outputIdInput && outputBox) {
     outputReviewGetBtn.addEventListener("click", async () => {
       if (!canRead) {
-        showResult("warn", "Read permission is required.");
+        showResult("warn", "需要读取权限。");
         return;
       }
       const outputId = (outputIdInput.value || "").trim();
       if (!outputId) {
-        showResult("warn", "Output ID is required.");
+        showResult("warn", "必须填写输出 ID。");
         return;
       }
-      await withBusyButton(outputReviewGetBtn, "Loading...", async () => {
+      await withBusyButton(outputReviewGetBtn, "加载中...", async () => {
         try {
           const body = await request(`/api/ai/outputs/${outputId}/review`, "GET");
           outputBox.textContent = [
-            `output_id: ${body.output.id}`,
-            `review_status: ${body.output.review_status}`,
-            `action_count: ${Array.isArray(body.actions) ? body.actions.length : 0}`,
-            `evidence_count: ${Array.isArray(body.evidences) ? body.evidences.length : 0}`,
-            "--- evidences ---",
+            `输出 ID: ${body.output.id}`,
+            `审核状态: ${body.output.review_status}`,
+            `动作数: ${Array.isArray(body.actions) ? body.actions.length : 0}`,
+            `证据数: ${Array.isArray(body.evidences) ? body.evidences.length : 0}`,
+            "--- 证据 ---",
             Array.isArray(body.evidences) && body.evidences.length
               ? body.evidences.map((item) => `${item.evidence_type} ${item.content_hash}`).join("\n")
-              : "No evidences.",
+              : "暂无证据。",
           ].join("\n");
-          showResult("success", "Review bundle loaded.");
+          showResult("success", "已加载审核资料。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -628,15 +628,15 @@
   if (outputReviewSubmitBtn && outputIdInput && reviewAction && outputBox) {
     outputReviewSubmitBtn.addEventListener("click", async () => {
       if (!canWrite) {
-        showResult("warn", "Write permission is required.");
+        showResult("warn", "需要写入权限。");
         return;
       }
       const outputId = (outputIdInput.value || "").trim();
       if (!outputId) {
-        showResult("warn", "Output ID is required.");
+        showResult("warn", "必须填写输出 ID。");
         return;
       }
-      await withBusyButton(outputReviewSubmitBtn, "Submitting...", async () => {
+      await withBusyButton(outputReviewSubmitBtn, "提交中...", async () => {
         try {
           const row = await request(`/api/ai/outputs/${outputId}/review`, "POST", {
             action_type: reviewAction.value,
@@ -645,7 +645,7 @@
             detail: {},
           });
           outputBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", `Review action submitted: ${row.id}`);
+          showResult("success", `审核动作已提交: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -654,6 +654,6 @@
   }
 
   if (!canWrite) {
-    showResult("warn", "Read-only mode: AI write actions are disabled.");
+    showResult("warn", "当前为只读模式，AI 写入操作已禁用。");
   }
 })();

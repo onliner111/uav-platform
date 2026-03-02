@@ -22,7 +22,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -53,14 +53,14 @@
     });
     const body = await response.json();
     if (!response.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败");
     }
     return body;
   }
 
   function renderLines(rows, formatter) {
     if (!Array.isArray(rows) || !rows.length) {
-      return "No records.";
+      return "暂无记录。";
     }
     return rows.map(formatter).join("\n");
   }
@@ -93,10 +93,10 @@
   if (openCredentialCreateBtn && openCredentialBox) {
     openCredentialCreateBtn.addEventListener("click", async () => {
       if (!canOpenPlatformWrite) {
-        showResult("warn", "reporting.write is required.");
+        showResult("warn", "需要 reporting.write 权限。");
         return;
       }
-      await withBusyButton(openCredentialCreateBtn, "Creating...", async () => {
+      await withBusyButton(openCredentialCreateBtn, "创建中...", async () => {
         try {
           const payload = {};
           const keyId = (openCredentialKeyId && openCredentialKeyId.value ? openCredentialKeyId.value : "").trim();
@@ -117,7 +117,7 @@
           }
           const row = await request("/api/open-platform/credentials", "POST", payload);
           openCredentialBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", `Credential created: ${row.id}`);
+          showResult("success", `访问凭据已创建: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -127,14 +127,14 @@
 
   if (openCredentialListBtn && openCredentialBox) {
     openCredentialListBtn.addEventListener("click", async () => {
-      await withBusyButton(openCredentialListBtn, "Loading...", async () => {
+      await withBusyButton(openCredentialListBtn, "加载中...", async () => {
         try {
           const rows = await request("/api/open-platform/credentials", "GET");
           openCredentialBox.textContent = renderLines(
             rows,
             (item) => `${item.id} ${item.key_id} active=${item.is_active}`,
           );
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} credentials.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条访问凭据。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -154,17 +154,17 @@
   if (openWebhookCreateBtn && openWebhookName && openWebhookUrl && openWebhookEventType) {
     openWebhookCreateBtn.addEventListener("click", async () => {
       if (!canOpenPlatformWrite) {
-        showResult("warn", "reporting.write is required.");
+        showResult("warn", "需要 reporting.write 权限。");
         return;
       }
       const name = (openWebhookName.value || "").trim();
       const endpointUrl = (openWebhookUrl.value || "").trim();
       const eventType = (openWebhookEventType.value || "").trim();
       if (!name || !endpointUrl || !eventType) {
-        showResult("warn", "Name, endpoint URL, and event type are required.");
+        showResult("warn", "必须填写名称、回调地址和事件类型。");
         return;
       }
-      await withBusyButton(openWebhookCreateBtn, "Creating...", async () => {
+      await withBusyButton(openWebhookCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             name,
@@ -182,7 +182,7 @@
           if (openWebhookBox) {
             openWebhookBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Webhook created: ${row.id}`);
+          showResult("success", `Webhook 已创建: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -192,14 +192,14 @@
 
   if (openWebhookListBtn && openWebhookBox) {
     openWebhookListBtn.addEventListener("click", async () => {
-      await withBusyButton(openWebhookListBtn, "Loading...", async () => {
+      await withBusyButton(openWebhookListBtn, "加载中...", async () => {
         try {
           const rows = await request("/api/open-platform/webhooks", "GET");
           openWebhookBox.textContent = renderLines(
             rows,
             (item) => `${item.id} ${item.name} ${item.event_type} credential=${item.credential_id || "-"}`,
           );
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} webhooks.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条 Webhook 配置。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -215,21 +215,21 @@
   if (openWebhookDispatchBtn && openDispatchEndpointId && openDispatchBox) {
     openWebhookDispatchBtn.addEventListener("click", async () => {
       if (!canOpenPlatformWrite) {
-        showResult("warn", "reporting.write is required.");
+        showResult("warn", "需要 reporting.write 权限。");
         return;
       }
       const endpointId = (openDispatchEndpointId.value || "").trim();
       if (!endpointId) {
-        showResult("warn", "Endpoint ID is required.");
+        showResult("warn", "必须填写端点 ID。");
         return;
       }
-      await withBusyButton(openWebhookDispatchBtn, "Dispatching...", async () => {
+      await withBusyButton(openWebhookDispatchBtn, "派发中...", async () => {
         try {
           const row = await request(`/api/open-platform/webhooks/${endpointId}/dispatch-test`, "POST", {
             payload: parseJsonOrDefault(openDispatchPayload && openDispatchPayload.value, {}),
           });
           openDispatchBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", `Dispatch status: ${row.status}`);
+          showResult("success", `测试派发状态: ${row.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -249,7 +249,7 @@
   if (openAdapterIngestBtn && openAdapterKeyId && openAdapterApiKey && openAdapterSigningSecret) {
     openAdapterIngestBtn.addEventListener("click", async () => {
       if (!canOpenPlatformWrite) {
-        showResult("warn", "reporting.write is required.");
+        showResult("warn", "需要 reporting.write 权限。");
         return;
       }
       const keyId = (openAdapterKeyId.value || "").trim();
@@ -257,10 +257,10 @@
       const signingSecret = (openAdapterSigningSecret.value || "").trim();
       const eventType = (openAdapterEventType && openAdapterEventType.value ? openAdapterEventType.value : "").trim();
       if (!keyId || !apiKey || !signingSecret || !eventType) {
-        showResult("warn", "Key ID, API key, signing secret, and event type are required.");
+        showResult("warn", "必须填写 Key ID、API Key、签名密钥和事件类型。");
         return;
       }
-      await withBusyButton(openAdapterIngestBtn, "Ingesting...", async () => {
+      await withBusyButton(openAdapterIngestBtn, "写入中...", async () => {
         try {
           const body = JSON.stringify({
             event_type: eventType,
@@ -279,12 +279,12 @@
           });
           const row = await response.json();
           if (!response.ok) {
-            throw new Error(row.detail || "request failed");
+            throw new Error(row.detail || "请求失败");
           }
           if (openAdapterBox) {
             openAdapterBox.textContent = JSON.stringify(row, null, 2);
           }
-          showResult("success", `Adapter ingest accepted: ${row.id}`);
+          showResult("success", `适配器事件已接收: ${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -294,14 +294,14 @@
 
   if (openAdapterEventsBtn && openAdapterBox) {
     openAdapterEventsBtn.addEventListener("click", async () => {
-      await withBusyButton(openAdapterEventsBtn, "Loading...", async () => {
+      await withBusyButton(openAdapterEventsBtn, "加载中...", async () => {
         try {
           const rows = await request("/api/open-platform/adapters/events", "GET");
           openAdapterBox.textContent = renderLines(
             rows,
             (item) => `${item.id} ${item.event_type} ${item.status} key=${item.key_id}`,
           );
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} adapter events.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条适配器事件。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }

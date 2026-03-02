@@ -3,37 +3,47 @@
 {% block content %}
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>Total Assets</div>
+    <div>资产总量</div>
     <div class="value">{{ assets|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Available</div>
+    <div>可用资产</div>
     <div class="value">{{ available_count }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Healthy</div>
+    <div>健康资产</div>
     <div class="value">{{ healthy_count }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Regions</div>
+    <div>覆盖区域</div>
     <div class="value">{{ region_count }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Resource Pool Summary By Region</h2>
+  <div class="ui-section-head">
+    <div>
+      <h2>资源池概览</h2>
+      <p class="page-note">先选中资产，再完成可用性、健康度和工单处理。</p>
+    </div>
+  </div>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>Region</th>
-          <th>Total</th>
-          <th>Available</th>
-          <th>Healthy</th>
-          <th>By Type</th>
+          <th>区域</th>
+          <th>总量</th>
+          <th>可用</th>
+          <th>健康</th>
+          <th>类型分布</th>
         </tr>
       </thead>
       <tbody>
+        {% if not pool_summary %}
+        <tr>
+          <td colspan="5" class="empty-state">当前租户暂无资源池汇总，待资产入库后自动展示。</td>
+        </tr>
+        {% endif %}
         {% for item in pool_summary %}
         <tr>
           <td>{{ item.region_code }}</td>
@@ -50,99 +60,126 @@
 
 {% if can_asset_write %}
 <div class="panel">
-  <h2>Quick Actions</h2>
-  <div class="grid cols-2">
-    <div>
-      <h3>Update Availability</h3>
-      <label>Asset ID</label>
-      <input id="asset-availability-id" placeholder="asset id">
-      <label style="margin-top:8px;">Availability</label>
+  <h2>资产处理工作区</h2>
+  <input id="asset-availability-id" type="hidden">
+  <input id="mw-create-asset-id" type="hidden">
+  <input id="mw-transition-id" type="hidden">
+  <input id="mw-history-id" type="hidden">
+  <div class="selection-banner" id="asset-selection-banner">
+    <strong>当前资产：</strong>请先从下方资产台账中选择一条资产。
+  </div>
+  <div class="selection-banner stack-gap-sm" id="workorder-selection-banner">
+    <strong>当前工单：</strong>如需流转或关闭工单，请先从下方工单列表中选择。
+  </div>
+  <div class="action-deck stack-gap-md">
+    <section class="action-cluster primary">
+      <h3>主处理动作</h3>
+      <p>将基于当前选中资产执行状态更新，无需手动填写资产 ID。</p>
+      <label>可用状态</label>
       <select id="asset-availability-status">
         {% for status in availability_options %}
         <option value="{{ status }}">{{ status }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Region Code (optional)</label>
-      <input id="asset-availability-region" placeholder="region code">
-      <button id="asset-availability-btn" type="button" style="margin-top:10px;">Apply Availability</button>
-    </div>
-    <div>
-      <h3>Update Health</h3>
-      <label>Asset ID</label>
-      <input id="asset-health-id" placeholder="asset id">
-      <label style="margin-top:8px;">Health Status</label>
+      <label class="stack-gap-sm">所属区域（可选）</label>
+      <input id="asset-availability-region" placeholder="区域编码">
+      <button id="asset-availability-btn" type="button" class="stack-gap-sm">更新可用状态</button>
+
+      <div class="section-split"></div>
+
+      <label>健康状态</label>
       <select id="asset-health-status">
         {% for status in health_options %}
         <option value="{{ status }}">{{ status }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Health Score (0-100)</label>
-      <input id="asset-health-score" type="number" min="0" max="100" placeholder="optional">
-      <button id="asset-health-btn" type="button" style="margin-top:10px;">Apply Health</button>
-    </div>
-  </div>
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>Create Maintenance Workorder</h3>
-      <label>Asset ID</label>
-      <input id="mw-create-asset-id" placeholder="asset id">
-      <label style="margin-top:8px;">Title</label>
-      <input id="mw-create-title" placeholder="workorder title">
-      <label style="margin-top:8px;">Priority (1-10)</label>
+      <label class="stack-gap-sm">健康分值（0-100）</label>
+      <input id="asset-health-score" type="number" min="0" max="100" placeholder="可选">
+      <button id="asset-health-btn" type="button" class="stack-gap-sm">更新健康状态</button>
+    </section>
+
+    <section class="action-cluster primary">
+      <h3>工单处理</h3>
+      <p>新建工单将自动关联当前选中资产。</p>
+      <label>工单标题</label>
+      <input id="mw-create-title" placeholder="例如：例行保养">
+      <label class="stack-gap-sm">优先级（1-10）</label>
       <input id="mw-create-priority" type="number" min="1" max="10" value="5">
-      <label style="margin-top:8px;">Assigned To (optional)</label>
-      <input id="mw-create-assigned-to" placeholder="user id">
-      <label style="margin-top:8px;">Note (optional)</label>
-      <input id="mw-create-note" placeholder="note">
-      <button id="mw-create-btn" type="button" style="margin-top:10px;">Create Workorder</button>
-    </div>
-    <div>
-      <h3>Transition / Close Workorder</h3>
-      <label>Workorder ID</label>
-      <input id="mw-transition-id" placeholder="workorder id">
-      <label style="margin-top:8px;">Target Status</label>
+      <label class="stack-gap-sm">指派给（可选）</label>
+      <input id="mw-create-assigned-to" placeholder="人员账号">
+      <label class="stack-gap-sm">处理说明（可选）</label>
+      <input id="mw-create-note" placeholder="补充说明">
+      <button id="mw-create-btn" type="button" class="stack-gap-sm">新建维护工单</button>
+    </section>
+  </div>
+
+  <details class="details-shell stack-gap-md">
+    <summary>更多工单操作</summary>
+    <div class="details-shell-body">
+      <p>以下操作将基于当前选中工单执行。</p>
+      <label>目标状态</label>
       <select id="mw-transition-status">
         {% for status in maintenance_status_options %}
         <option value="{{ status }}">{{ status }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Assigned To (optional)</label>
-      <input id="mw-transition-assigned-to" placeholder="user id">
-      <label style="margin-top:8px;">Note (optional)</label>
-      <input id="mw-transition-note" placeholder="note">
-      <div class="ui-action-row" style="margin-top:10px;">
-        <button id="mw-transition-btn" type="button">Apply Transition</button>
-        <button id="mw-close-btn" type="button">Close Workorder</button>
+      <label class="stack-gap-sm">接手人（可选）</label>
+      <input id="mw-transition-assigned-to" placeholder="人员账号">
+      <label class="stack-gap-sm">处理说明（可选）</label>
+      <input id="mw-transition-note" placeholder="补充说明">
+      <div class="ui-action-row stack-gap-sm">
+        <button id="mw-transition-btn" type="button">更新工单状态</button>
+        <button id="mw-close-btn" type="button">关闭工单</button>
       </div>
-      <label style="margin-top:8px;">History Workorder ID</label>
-      <input id="mw-history-id" placeholder="workorder id">
-      <button id="mw-history-btn" type="button" style="margin-top:10px;">Load History</button>
-      <pre id="mw-history-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No history loaded.</pre>
+      <div class="section-split"></div>
+      <button id="mw-history-btn" type="button" class="stack-gap-sm">查看处理历史</button>
+      <pre id="mw-history-box" class="hint details-shell-body stack-gap-sm pre-box">尚未加载工单历史。</pre>
     </div>
-  </div>
+  </details>
+
   <div class="hint action-result" id="assets-result" role="status" aria-live="polite"></div>
 </div>
 {% endif %}
 
 <div class="panel">
-  <h2>Asset Ledger</h2>
+  <h2>资产台账</h2>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
+          {% if can_asset_write %}<th>选择</th>{% endif %}
           <th>ID</th>
-          <th>Type</th>
-          <th>Code</th>
-          <th>Lifecycle</th>
-          <th>Availability</th>
-          <th>Health</th>
-          <th>Score</th>
-          <th>Region</th>
+          <th>类型</th>
+          <th>编码</th>
+          <th>生命周期</th>
+          <th>可用状态</th>
+          <th>健康状态</th>
+          <th>分值</th>
+          <th>区域</th>
         </tr>
       </thead>
       <tbody>
+        {% if not assets %}
+        <tr>
+          <td colspan="{{ 9 if can_asset_write else 8 }}" class="empty-state">当前暂无资产，请先完成资产入库。</td>
+        </tr>
+        {% endif %}
         {% for item in assets %}
         <tr>
+          {% if can_asset_write %}
+          <td>
+            <button
+              type="button"
+              class="table-select js-select-asset"
+              data-asset-id="{{ item.id }}"
+              data-asset-code="{{ item.asset_code }}"
+              data-asset-type="{{ item.asset_type }}"
+              data-region-code="{{ item.region_code or '' }}"
+            >
+              选中
+            </button>
+          </td>
+          {% endif %}
           <td><code>{{ item.id }}</code></td>
           <td>{{ item.asset_type }}</td>
           <td>{{ item.asset_code }}</td>
@@ -159,23 +196,43 @@
 </div>
 
 <div class="panel">
-  <h2>Maintenance Workorders</h2>
+  <h2>维护工单</h2>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
+          {% if can_asset_write %}<th>选择</th>{% endif %}
           <th>ID</th>
-          <th>Asset</th>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Priority</th>
-          <th>Assigned</th>
-          <th>Updated</th>
+          <th>关联资产</th>
+          <th>标题</th>
+          <th>状态</th>
+          <th>优先级</th>
+          <th>处理人</th>
+          <th>更新时间</th>
         </tr>
       </thead>
       <tbody>
+        {% if not maintenance_workorders %}
+        <tr>
+          <td colspan="{{ 8 if can_asset_write else 7 }}" class="empty-state">当前暂无维护工单，可先选择资产后创建。</td>
+        </tr>
+        {% endif %}
         {% for item in maintenance_workorders %}
         <tr>
+          {% if can_asset_write %}
+          <td>
+            <button
+              type="button"
+              class="table-select js-select-workorder"
+              data-workorder-id="{{ item.id }}"
+              data-asset-id="{{ item.asset_id }}"
+              data-status="{{ item.status }}"
+              data-assigned-to="{{ item.assigned_to or '' }}"
+            >
+              选中
+            </button>
+          </td>
+          {% endif %}
           <td><code>{{ item.id }}</code></td>
           <td><code>{{ item.asset_id }}</code></td>
           <td>{{ item.title }}</td>

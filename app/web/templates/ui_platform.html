@@ -3,25 +3,25 @@
 {% block content %}
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>Tenants</div>
+    <div>租户</div>
     <div class="value">{{ tenants|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Users</div>
+    <div>用户</div>
     <div class="value">{{ users|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Roles</div>
+    <div>角色</div>
     <div class="value">{{ roles|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Org Units</div>
+    <div>组织单元</div>
     <div class="value">{{ org_units|length }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Tenant</h2>
+  <h2>租户</h2>
   <div class="table-scroll">
     <table>
       <thead>
@@ -45,7 +45,7 @@
 </div>
 
 <div class="panel">
-  <h2>Users</h2>
+  <h2>用户</h2>
   <div class="table-scroll">
     <table>
       <thead>
@@ -71,7 +71,7 @@
 </div>
 
 <div class="panel">
-  <h2>Roles</h2>
+  <h2>角色</h2>
   <div class="table-scroll">
     <table>
       <thead>
@@ -97,7 +97,7 @@
 </div>
 
 <div class="panel">
-  <h2>Organization Units</h2>
+  <h2>组织单元</h2>
   <div class="table-scroll">
     <table>
       <thead>
@@ -125,7 +125,7 @@
 </div>
 
 <div class="panel">
-  <h2>Role Templates</h2>
+  <h2>角色模板</h2>
   <div class="table-scroll">
     <table>
       <thead>
@@ -151,8 +151,8 @@
 </div>
 
 <div class="panel">
-  <h2>RBAC UI Visibility Matrix</h2>
-  <p class="hint">Page-level and action-level visibility is determined by explicit read/write permissions.</p>
+  <h2>RBAC 可见性矩阵</h2>
+  <p class="hint">该页是管理员工具，用于查看页面级和动作级可见性规则，不面向普通业务用户。</p>
   <div class="table-scroll">
     <table>
       <thead>
@@ -186,14 +186,14 @@
 </div>
 
 <div class="panel">
-  <h2>Governance Shortcuts</h2>
+  <h2>治理快捷入口</h2>
   <div class="hero-actions">
-    <a class="button-link ghost-link" href="/api/identity/role-templates" target="_blank" rel="noopener noreferrer">Role Templates API</a>
-    <a class="button-link ghost-link" href="/api/identity/permissions" target="_blank" rel="noopener noreferrer">Permissions API</a>
-    <a class="button-link ghost-link" href="/api/tenants/{{ tenant_id }}/export" target="_blank" rel="noopener noreferrer">Tenant Export</a>
+    <a class="button-link ghost-link" href="/api/identity/role-templates" target="_blank" rel="noopener noreferrer">角色模板 API</a>
+    <a class="button-link ghost-link" href="/api/identity/permissions" target="_blank" rel="noopener noreferrer">权限 API</a>
+    <a class="button-link ghost-link" href="/api/tenants/{{ tenant_id }}/export" target="_blank" rel="noopener noreferrer">租户导出</a>
   </div>
   {% if can_identity_write %}
-  <p class="hint">This account has <code>identity.write</code> and can perform mutating governance operations via API/UI actions.</p>
+  <p class="hint">当前账号拥有 <code>identity.write</code> 权限，可执行平台治理写操作。</p>
   {% endif %}
 </div>
 {% endblock %}

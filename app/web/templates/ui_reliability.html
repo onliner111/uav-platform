@@ -1,0 +1,288 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="selection-banner admin-rail">
+  <strong>管理员技术页：</strong>此页面面向平台管理员和技术值守，不作为普通业务人员的日常入口。
+</div>
+<div class="stack-gap-md"></div>
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>管理员关联入口</h2>
+    <p class="table-panel-note">当前位置：技术值守分组。建议按“可观测 -> 可靠性 -> 平台治理”顺序处理异常。</p>
+  </div>
+  <div class="admin-link-grid">
+    <a class="admin-link-card" href="/ui/observability?token={{ token }}">
+      <span class="admin-link-title">可观测值守</span>
+      <span class="admin-link-desc">先确认信号、SLO 和告警变化。</span>
+    </a>
+    <a class="admin-link-card active" href="/ui/reliability?token={{ token }}">
+      <span class="admin-link-title">可靠性运行</span>
+      <span class="admin-link-desc">处理备份、恢复和容量动作。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/platform?token={{ token }}">
+      <span class="admin-link-title">平台治理</span>
+      <span class="admin-link-desc">联动查看权限和治理设置。</span>
+    </a>
+  </div>
+</div>
+{% set latest_forecast = capacity_forecasts[0] if capacity_forecasts else none %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>备份记录</div>
+    <div class="value">{{ backups|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>恢复演练</div>
+    <div class="value">{{ restore_drills|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>安全巡检</div>
+    <div class="value">{{ security_runs|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>容量策略</div>
+    <div class="value">{{ capacity_policies|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>最新决策</div>
+    <div class="value">{{ latest_forecast.decision if latest_forecast else "无" }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>写入权限</div>
+    <div class="value">{{ "已开启" if can_observability_write else "只读" }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>可靠性运行手册</h2>
+  <div class="grid cols-2">
+    <div class="form-stack">
+      <h3>备份与恢复演练</h3>
+      <label>备份类型</label>
+      <select id="rel-backup-run-type" {% if not can_observability_write %}disabled{% endif %}>
+        {% for item in reliability_backup_run_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label class="stack-gap-sm">备份位置（可选）</label>
+      <input id="rel-backup-storage-uri" placeholder="s3://tenant-backup/latest" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">演练模式</label>
+      <select id="rel-backup-is-drill" {% if not can_observability_write %}disabled{% endif %}>
+        <option value="true">是</option>
+        <option value="false">否</option>
+      </select>
+      <button id="rel-backup-run-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>执行备份</button>
+      <label class="stack-gap-sm">备份任务标识</label>
+      <input id="rel-restore-backup-id" placeholder="可由上一步自动带入" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">目标 RTO（秒）</label>
+      <input id="rel-restore-objective-rto" type="number" min="1" value="300" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">模拟恢复耗时（秒）</label>
+      <input id="rel-restore-simulated-rto" type="number" min="0" value="180" {% if not can_observability_write %}disabled{% endif %}>
+      <button id="rel-restore-run-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>执行恢复演练</button>
+      <pre id="rel-backup-box" class="hint pre-box result-surface stack-gap-sm">尚未执行备份或恢复动作。</pre>
+    </div>
+    <div class="form-stack">
+      <h3>安全巡检与预测</h3>
+      <label>基线版本</label>
+      <input id="rel-security-baseline" value="phase31-v1" {% if not can_observability_write %}disabled{% endif %}>
+      <button id="rel-security-run-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>执行安全巡检</button>
+      <label class="stack-gap-sm">预测指标</label>
+      <input id="rel-forecast-meter-key" value="cpu.utilization" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">预测窗口（分钟）</label>
+      <input id="rel-forecast-window-minutes" type="number" min="5" max="1440" value="60" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">样本跨度（分钟）</label>
+      <input id="rel-forecast-sample-minutes" type="number" min="5" max="10080" value="180" {% if not can_observability_write %}disabled{% endif %}>
+      <button id="rel-forecast-run-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>执行预测</button>
+      <pre id="rel-security-box" class="hint pre-box result-surface stack-gap-sm">尚未执行巡检或预测动作。</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>容量策略控制</h2>
+  <div class="grid cols-2">
+    <div class="form-stack">
+      <label>容量指标</label>
+      <input id="rel-capacity-meter-key" value="cpu.utilization" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">目标利用率 %</label>
+      <input id="rel-capacity-target" type="number" min="1" max="100" value="75" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">扩容阈值 %</label>
+      <input id="rel-capacity-scale-out" type="number" min="1" max="100" value="85" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">缩容阈值 %</label>
+      <input id="rel-capacity-scale-in" type="number" min="1" max="100" value="50" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">最小副本数</label>
+      <input id="rel-capacity-min-replicas" type="number" min="1" value="1" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">最大副本数</label>
+      <input id="rel-capacity-max-replicas" type="number" min="1" value="5" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">当前副本数</label>
+      <input id="rel-capacity-current-replicas" type="number" min="1" value="2" {% if not can_observability_write %}disabled{% endif %}>
+      <button id="rel-capacity-upsert-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>更新容量策略</button>
+      <pre id="rel-capacity-box" class="hint pre-box result-surface stack-gap-sm">尚未执行容量策略动作。</pre>
+    </div>
+    <div class="form-stack">
+      <h3>值守建议</h3>
+      <ul class="hint hint-list">
+        {% for item in operator_suggestions %}
+        <li class="{{ item.severity }} hint-list-item">
+          <strong>{{ item.title }}</strong><br>
+          {{ item.detail }}
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="hint stack-gap-md">
+        当前可用容量决策: {{ observability_capacity_decision_options | join(", ") }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>近期备份与演练记录</h2>
+    <p class="table-panel-note">汇总最近的备份执行和恢复演练结果，便于值守复盘。</p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>备份标识</th>
+          <th>类型</th>
+          <th>状态</th>
+          <th>演练</th>
+          <th>创建时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in backups %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>
+            <span class="status-pill info">
+              {{ "全量" if item.run_type == "FULL" else "增量" if item.run_type == "INCREMENTAL" else item.run_type }}
+            </span>
+          </td>
+          <td>
+            <span class="status-pill {{ 'danger' if item.status in ['FAILED', 'ERROR'] else 'warn' if item.status in ['RUNNING', 'PENDING'] else 'success' }}">
+              {{ "失败" if item.status in ["FAILED", "ERROR"] else "执行中" if item.status == "RUNNING" else "待执行" if item.status == "PENDING" else "已完成" if item.status in ["COMPLETED", "SUCCEEDED"] else item.status }}
+            </span>
+          </td>
+          <td><span class="status-pill {{ 'info' if item.is_drill else 'muted' }}">{{ "是" if item.is_drill else "否" }}</span></td>
+          <td>{{ item.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-scroll table-stack">
+    <table>
+      <thead>
+        <tr>
+          <th>演练标识</th>
+          <th>关联备份</th>
+          <th>状态</th>
+          <th>目标</th>
+          <th>实际</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in restore_drills %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.backup_run_id }}</td>
+          <td>
+            <span class="status-pill {{ 'danger' if item.status in ['FAILED', 'ERROR'] else 'warn' if item.status in ['RUNNING', 'PENDING'] else 'success' }}">
+              {{ "失败" if item.status in ["FAILED", "ERROR"] else "执行中" if item.status == "RUNNING" else "待执行" if item.status == "PENDING" else "已完成" if item.status in ["COMPLETED", "SUCCEEDED"] else item.status }}
+            </span>
+          </td>
+          <td>{{ item.objective_rto_seconds }}s</td>
+          <td>{{ item.actual_rto_seconds }}s</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>安全巡检报告</h2>
+    <p class="table-panel-note">展示最近安全基线巡检的得分和失败项。</p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>巡检标识</th>
+          <th>基线</th>
+          <th>得分</th>
+          <th>失败项</th>
+          <th>总项数</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in security_runs %}
+        <tr>
+          <td><code>{{ item.run.id }}</code></td>
+          <td>
+            <span class="cell-main">巡检基线</span>
+            <code class="cell-subtle">{{ item.run.baseline_version }}</code>
+          </td>
+          <td>{{ "%.1f"|format(item.run.score_percent) }}%</td>
+          <td>{{ item.run.failed_checks }}</td>
+          <td>{{ item.run.total_checks }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>容量预测面板</h2>
+    <p class="table-panel-note">集中查看最新预测结果与建议副本数。</p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th>预测值</th>
+          <th>决策</th>
+          <th>建议副本</th>
+          <th>生成时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in capacity_forecasts %}
+        <tr>
+          <td>
+            <span class="cell-main">
+              {{ "CPU 利用率" if item.meter_key == "cpu.utilization" else "用户数" if item.meter_key == "users" else "设备数" if item.meter_key == "devices" else "容量指标" }}
+            </span>
+            <code class="cell-subtle">{{ item.meter_key }}</code>
+          </td>
+          <td>{{ "%.1f"|format(item.predicted_usage) }}</td>
+          <td>
+            <span class="status-pill {{ 'danger' if item.decision == 'SCALE_OUT' else 'warn' if item.decision == 'SCALE_IN' else 'info' }}">
+              {{ "建议扩容" if item.decision == "SCALE_OUT" else "建议缩容" if item.decision == "SCALE_IN" else "保持观察" if item.decision in ["HOLD", "NO_CHANGE"] else item.decision }}
+            </span>
+          </td>
+          <td>{{ item.recommended_replicas }}</td>
+          <td>{{ item.generated_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<pre class="hint pre-box action-result result-box result-surface" id="reliability-result" role="status" aria-live="polite"></pre>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_OBSERVABILITY_WRITE = {{ can_observability_write | tojson }};
+</script>
+<script src="/static/reliability_ui.js"></script>
+{% endblock %}

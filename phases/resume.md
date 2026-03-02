@@ -42,6 +42,14 @@ This file is the single restart entrypoint. On every fresh Codex session, read f
 38. `phases/phase-29-data-ai-governance-ui.md`
 39. `phases/phase-30-commercial-platform-ops-ui.md`
 40. `phases/phase-31-observability-reliability-ops-console.md`
+41. `phases/phase-32-role-workbench-productization.md`
+42. `phases/phase-33-one-map-command-center-v2.md`
+43. `phases/phase-34-guided-task-workflow-usability.md`
+44. `phases/phase-35-mobile-field-operations.md`
+45. `phases/phase-36-business-closure-outcomes-consumption.md`
+46. `phases/phase-37-notification-collaboration-hub.md`
+47. `phases/phase-38-delivery-onboarding-operations.md`
+48. `phases/phase-39-release-adoption-lifecycle.md`
 
 Optional when tenant-boundary scope is active:
 - `governance/tenant_boundary_matrix.md`
@@ -62,16 +70,17 @@ Optional when tenant-boundary scope is active:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Current Snapshot
-- updated_at_utc: `2026-03-01T13:19:33Z`
-- current_phase: `phase-31-observability-reliability-ops-console.md`
+- updated_at_utc: `2026-03-02T02:17:06.2632841Z`
+- current_phase: `phase-36-business-closure-outcomes-consumption.md`
 - phase_status: `READY`
-- last_success_phase: `phase-30-commercial-platform-ops-ui.md`
-- current_focus: `Phase 30 closed as DONE; checkpoint advanced to Phase 31 (READY)`
+- last_success_phase: `phase-35-mobile-field-operations.md`
+- current_focus: `Phase 35 is closed; next checkpoint is Phase 36 READY, starting with business closure and outcome-consumption views`
 
 ## Next TODO (Execution Target)
-1. Start `phase-31-observability-reliability-ops-console.md` in sequence `P0 -> P1 -> P2 -> 31-WP6`.
-2. Complete `31-WP1` observability reliability core console and `31-WP2` SLO/incidents operations closure.
-3. Keep Docker Compose baseline gate commands below as regression checklist for phase closeout.
+1. Start from `phase-33-one-map-command-center-v2.md` when implementation resumes.
+2. Reuse the Docker Compose regression checklist below for any future changes.
+3. Use `phases/state.md` as the execution SSOT; do not reopen completed phases unless explicitly requested.
+4. Keep all later-phase UI changes at or above the Phase 32 productization baseline; do not allow UX regressions.
 
 ## Quality Gate Commands
 Use Docker Compose commands directly in this environment:
@@ -87,6 +96,7 @@ Use Docker Compose commands directly in this environment:
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase25_observability_reliability.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase29_data_ai_governance_ui.py`
 - `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase30_commercial_platform_ops_ui.py`
+- `docker compose -f infra/docker-compose.yml run --rm --build -e APP_BASE_URL=http://app:8000 app-tools python infra/scripts/demo_phase31_observability_reliability_ops_console.py`
 
 ## Docker Permission Rule (Mandatory)
 - For all Docker-related quality-gate commands in this environment, run with escalated permissions by default.
@@ -100,4 +110,4 @@ Use Docker Compose commands directly in this environment:
 - This rule is persistent and must be applied on every restarted session.
 
 ## Copy-Paste Prompt For Next Session
-`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=phase-31-observability-reliability-ops-console.md，status=READY，last_success_phase=phase-30-commercial-platform-ops-ui.md；请按 P0->P1->P2->31-WP6 连续执行并通过全量门禁。`
+`先读取 phases/resume.md 和 phases/state.md。当前 current_phase=phase-36-business-closure-outcomes-consumption.md，status=READY，last_success_phase=phase-35-mobile-field-operations.md；Phase 35 已完成并关账，按不低于 Phase 32 产品化效果的标准从 36-WP1 开始推进业务闭环与成果消费体验。`

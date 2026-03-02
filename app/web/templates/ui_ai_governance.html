@@ -1,210 +1,247 @@
 {% extends "console_base.html" %}
 
 {% block content %}
+<div class="selection-banner admin-rail">
+  <strong>管理员技术页：</strong>此页面面向平台管理员和算法治理角色，不作为普通业务人员的日常入口。
+</div>
+<div class="stack-gap-md"></div>
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>管理员关联入口</h2>
+    <p class="table-panel-note">当前位置：算法治理分组。可与 AI 治理、成果报表和平台治理联动使用。</p>
+  </div>
+  <div class="admin-link-grid">
+    <a class="admin-link-card active" href="/ui/ai-governance?token={{ token }}">
+      <span class="admin-link-title">AI 治理</span>
+      <span class="admin-link-desc">管理模型、版本、发布和审核。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/reports?token={{ token }}">
+      <span class="admin-link-title">成果数据</span>
+      <span class="admin-link-desc">查看输出成果和报表消费链路。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/platform?token={{ token }}">
+      <span class="admin-link-title">平台治理</span>
+      <span class="admin-link-desc">核对权限、审计与治理策略。</span>
+    </a>
+  </div>
+</div>
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>Models</div>
+    <div>模型目录</div>
     <div class="value">{{ model_catalogs|length if can_ai_data_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Jobs</div>
+    <div>作业</div>
     <div class="value">{{ jobs|length if can_ai_data_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Outputs</div>
+    <div>输出结果</div>
     <div class="value">{{ outputs|length if can_ai_data_read else 0 }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Write Access</div>
-    <div class="value">{{ "YES" if can_ai_data_write else "NO" }}</div>
+    <div>写入权限</div>
+    <div class="value">{{ "已开启" if can_ai_data_write else "只读" }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Model Catalog + Version Governance</h2>
+  <h2>模型目录与版本治理</h2>
   {% if can_ai_data_read %}
   <div class="grid cols-2">
-    <div>
-      <h3>Create Model Catalog</h3>
-      <label>Model Key</label>
+    <div class="form-stack">
+      <h3>创建模型目录</h3>
+      <label>模型标识（系统）</label>
       <input id="ai-model-key" placeholder="builtin:uav-assistant-lite" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Provider</label>
+      <label class="stack-gap-sm">供应商来源</label>
       <input id="ai-model-provider" value="builtin" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Display Name</label>
+      <label class="stack-gap-sm">模型显示名称</label>
       <input id="ai-model-display-name" value="uav-assistant-lite" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Description</label>
-      <input id="ai-model-description" placeholder="optional" {% if not can_ai_data_write %}disabled{% endif %}>
-      <button id="ai-model-create-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Create Model</button>
-      <label style="margin-top:8px;">Filter: Model Key</label>
-      <input id="ai-model-filter-key" placeholder="model key">
-      <label style="margin-top:8px;">Filter: Provider</label>
-      <input id="ai-model-filter-provider" placeholder="provider">
-      <button id="ai-model-list-btn" type="button" style="margin-top:10px;">Load Models</button>
-      <pre id="ai-model-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No model query result.</pre>
+      <label class="stack-gap-sm">说明（可选）</label>
+      <input id="ai-model-description" placeholder="可选说明" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-model-create-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>创建模型</button>
+      <label class="stack-gap-sm">筛选：模型标识</label>
+      <input id="ai-model-filter-key" placeholder="按模型标识筛选">
+      <label class="stack-gap-sm">筛选：供应商来源</label>
+      <input id="ai-model-filter-provider" placeholder="按供应商筛选">
+      <button id="ai-model-list-btn" type="button" class="stack-gap-sm">加载模型</button>
+      <pre id="ai-model-box" class="hint pre-box result-surface stack-gap-sm">尚未发起模型查询。</pre>
     </div>
-    <div>
-      <h3>Version + Promotion</h3>
-      <label>Model ID</label>
-      <input id="ai-version-model-id" placeholder="model id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Version</label>
+    <div class="form-stack">
+      <h3>版本与晋升</h3>
+      <label>模型标识</label>
+      <input id="ai-version-model-id" placeholder="输入关联模型标识" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">版本号</label>
       <input id="ai-version-value" placeholder="phase29.v1" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Initial Status</label>
+      <label class="stack-gap-sm">初始状态</label>
       <select id="ai-version-status" {% if not can_ai_data_write %}disabled{% endif %}>
         {% for item in ai_version_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Threshold JSON</label>
+      <label class="stack-gap-sm">阈值配置（JSON，高级配置）</label>
       <textarea id="ai-version-thresholds" rows="3" placeholder='{"confidence_min":0.8}' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
-      <button id="ai-version-create-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Create Version</button>
-      <label style="margin-top:8px;">Version ID</label>
-      <input id="ai-promote-version-id" placeholder="version id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Target Status</label>
+      <button id="ai-version-create-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>创建版本</button>
+      <label class="stack-gap-sm">待发布版本标识</label>
+      <input id="ai-promote-version-id" placeholder="可由创建版本自动带入" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">目标状态</label>
       <select id="ai-promote-status" {% if not can_ai_data_write %}disabled{% endif %}>
         {% for item in ai_version_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <button id="ai-promote-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Promote Version</button>
-      <button id="ai-version-list-btn" type="button" style="margin-top:10px;">List Versions</button>
-      <pre id="ai-version-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No version result.</pre>
+      <button id="ai-promote-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>晋升版本</button>
+      <button id="ai-version-list-btn" type="button" class="stack-gap-sm">查看版本列表</button>
+      <pre id="ai-version-box" class="hint pre-box result-surface stack-gap-sm">尚未发起版本查询。</pre>
     </div>
   </div>
   {% else %}
-  <p class="hint">This account lacks <code>ai.read</code> or <code>reporting.read</code>; AI datasets are hidden.</p>
+  <p class="hint">当前账号缺少 <code>ai.read</code> 或 <code>reporting.read</code>，AI 数据已隐藏。</p>
   {% endif %}
 </div>
 
 <div class="panel">
-  <h2>Rollout Policy + Compare + Rollback</h2>
+  <h2>发布策略、对比与回滚</h2>
   <div class="grid cols-2">
-    <div>
-      <h3>Policy Upsert / Get</h3>
-      <label>Model ID</label>
-      <input id="ai-policy-model-id" placeholder="model id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Default Version ID</label>
-      <input id="ai-policy-default-version-id" placeholder="version id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Traffic Allocation JSON</label>
+    <div class="form-stack">
+      <h3>发布策略</h3>
+      <label>模型标识</label>
+      <input id="ai-policy-model-id" placeholder="输入模型标识" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">默认版本标识</label>
+      <input id="ai-policy-default-version-id" placeholder="可选" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">流量分配（JSON，高级配置）</label>
       <textarea id="ai-policy-traffic" rows="3" placeholder='[{"version_id":"...","weight":100}]' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
-      <label style="margin-top:8px;">Threshold Overrides JSON</label>
+      <label class="stack-gap-sm">阈值覆盖（JSON，高级配置）</label>
       <textarea id="ai-policy-threshold" rows="3" placeholder='{"confidence_min":0.75}' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
-      <button id="ai-policy-upsert-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Upsert Policy</button>
-      <button id="ai-policy-get-btn" type="button" style="margin-top:10px;">Get Policy</button>
-      <label style="margin-top:8px;">Rollback Target Version ID</label>
-      <input id="ai-rollback-target-version-id" placeholder="target version id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Rollback Reason</label>
-      <input id="ai-rollback-reason" placeholder="reason" {% if not can_ai_data_write %}disabled{% endif %}>
-      <button id="ai-rollback-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Rollback</button>
-      <pre id="ai-policy-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No policy result.</pre>
+      <p class="hint admin-note stack-gap-sm">流量与阈值 JSON 仅建议算法治理管理员修改，普通运营不应直接编辑。</p>
+      <button id="ai-policy-upsert-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>保存策略</button>
+      <button id="ai-policy-get-btn" type="button" class="stack-gap-sm">查看策略</button>
+      <label class="stack-gap-sm">回滚目标版本标识</label>
+      <input id="ai-rollback-target-version-id" placeholder="输入目标版本标识" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">回滚原因</label>
+      <input id="ai-rollback-reason" placeholder="填写原因" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-rollback-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>执行回滚</button>
+      <pre id="ai-policy-box" class="hint pre-box result-surface stack-gap-sm">尚未执行发布策略动作。</pre>
     </div>
-    <div>
-      <h3>Evaluation Recompute / Compare</h3>
-      <label>Recompute Model ID (optional)</label>
-      <input id="ai-recompute-model-id" placeholder="model id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Recompute Job ID (optional)</label>
-      <input id="ai-recompute-job-id" placeholder="job id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <button id="ai-recompute-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Recompute</button>
-      <label style="margin-top:8px;">Left Version ID</label>
-      <input id="ai-compare-left-version-id" placeholder="left version id">
-      <label style="margin-top:8px;">Right Version ID</label>
-      <input id="ai-compare-right-version-id" placeholder="right version id">
-      <label style="margin-top:8px;">Compare Job ID (optional)</label>
-      <input id="ai-compare-job-id" placeholder="job id">
-      <button id="ai-compare-btn" type="button" style="margin-top:10px;">Compare</button>
-      <pre id="ai-eval-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No evaluation result.</pre>
+    <div class="form-stack">
+      <h3>评估重算与版本对比</h3>
+      <label>重算模型标识（可选）</label>
+      <input id="ai-recompute-model-id" placeholder="按模型范围重算" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">重算作业标识（可选）</label>
+      <input id="ai-recompute-job-id" placeholder="按作业范围重算" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-recompute-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>执行重算</button>
+      <label class="stack-gap-sm">左侧版本标识</label>
+      <input id="ai-compare-left-version-id" placeholder="基准版本">
+      <label class="stack-gap-sm">右侧版本标识</label>
+      <input id="ai-compare-right-version-id" placeholder="对比版本">
+      <label class="stack-gap-sm">对比作业标识（可选）</label>
+      <input id="ai-compare-job-id" placeholder="可留空">
+      <button id="ai-compare-btn" type="button" class="stack-gap-sm">执行对比</button>
+      <pre id="ai-eval-box" class="hint pre-box result-surface stack-gap-sm">尚未执行评估动作。</pre>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Jobs / Runs / Evidence Replay</h2>
+  <h2>作业、运行与证据回放</h2>
   <div class="grid cols-2">
-    <div>
-      <h3>Job + Run Operations</h3>
-      <label>Job Task ID (optional)</label>
-      <input id="ai-job-task-id" placeholder="task id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Job Mission ID (optional)</label>
-      <input id="ai-job-mission-id" placeholder="mission id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Job Topic (optional)</label>
+    <div class="form-stack">
+      <h3>作业与运行操作</h3>
+      <label>关联任务标识（可选）</label>
+      <input id="ai-job-task-id" placeholder="按任务绑定" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">关联任务批次标识（可选）</label>
+      <input id="ai-job-mission-id" placeholder="按任务批次绑定" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">主题（可选）</label>
       <input id="ai-job-topic" placeholder="defect" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Job Type</label>
+      <label class="stack-gap-sm">作业类型</label>
       <select id="ai-job-type" {% if not can_ai_data_write %}disabled{% endif %}>
-        <option value="SUMMARY">SUMMARY</option>
-        <option value="SUGGESTION">SUGGESTION</option>
+        <option value="SUMMARY">摘要</option>
+        <option value="SUGGESTION">建议</option>
       </select>
-      <label style="margin-top:8px;">Trigger Mode</label>
+      <label class="stack-gap-sm">触发方式</label>
       <select id="ai-job-trigger-mode" {% if not can_ai_data_write %}disabled{% endif %}>
-        <option value="MANUAL">MANUAL</option>
-        <option value="SCHEDULED">SCHEDULED</option>
-        <option value="NEAR_REALTIME">NEAR_REALTIME</option>
+        <option value="MANUAL">手动</option>
+        <option value="SCHEDULED">定时</option>
+        <option value="NEAR_REALTIME">准实时</option>
       </select>
-      <label style="margin-top:8px;">Bind Model Version ID (optional)</label>
-      <input id="ai-job-model-version-id" placeholder="model version id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <button id="ai-job-create-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Create Job</button>
-      <label style="margin-top:8px;">Job ID</label>
-      <input id="ai-job-id" placeholder="job id">
-      <button id="ai-jobs-list-btn" type="button" style="margin-top:10px;">List Jobs</button>
-      <button id="ai-runs-list-btn" type="button" style="margin-top:10px;">List Runs</button>
-      <button id="ai-run-trigger-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Trigger Run</button>
-      <label style="margin-top:8px;">Retry Run ID</label>
-      <input id="ai-retry-run-id" placeholder="run id" {% if not can_ai_data_write %}disabled{% endif %}>
-      <button id="ai-run-retry-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Retry Run</button>
-      <pre id="ai-job-run-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No job/run result.</pre>
+      <label class="stack-gap-sm">绑定模型版本标识（可选）</label>
+      <input id="ai-job-model-version-id" placeholder="按指定版本运行" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-job-create-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>创建作业</button>
+      <label class="stack-gap-sm">作业标识</label>
+      <input id="ai-job-id" placeholder="可由创建作业自动带入">
+      <button id="ai-jobs-list-btn" type="button" class="stack-gap-sm">查看作业</button>
+      <button id="ai-runs-list-btn" type="button" class="stack-gap-sm">查看运行</button>
+      <button id="ai-run-trigger-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>触发运行</button>
+      <label class="stack-gap-sm">重试运行标识</label>
+      <input id="ai-retry-run-id" placeholder="输入运行标识" {% if not can_ai_data_write %}disabled{% endif %}>
+      <button id="ai-run-retry-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>重试运行</button>
+      <pre id="ai-job-run-box" class="hint pre-box result-surface stack-gap-sm">尚未执行作业或运行动作。</pre>
     </div>
-    <div>
-      <h3>Output Review + Evidence Chain</h3>
-      <label>Output Filter: Job ID</label>
-      <input id="ai-output-filter-job-id" placeholder="job id">
-      <label style="margin-top:8px;">Output Filter: Run ID</label>
-      <input id="ai-output-filter-run-id" placeholder="run id">
-      <label style="margin-top:8px;">Review Status</label>
+    <div class="form-stack">
+      <h3>输出审核与证据链</h3>
+      <label>按作业标识筛选</label>
+      <input id="ai-output-filter-job-id" placeholder="可留空">
+      <label class="stack-gap-sm">按运行标识筛选</label>
+      <input id="ai-output-filter-run-id" placeholder="可留空">
+      <label class="stack-gap-sm">审核状态</label>
       <select id="ai-output-filter-status">
-        <option value="">ALL</option>
+        <option value="">全部</option>
         {% for item in ai_output_review_status_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <button id="ai-outputs-list-btn" type="button" style="margin-top:10px;">List Outputs</button>
-      <label style="margin-top:8px;">Output ID</label>
-      <input id="ai-output-id" placeholder="output id">
-      <button id="ai-output-review-get-btn" type="button" style="margin-top:10px;">Load Review Bundle</button>
-      <label style="margin-top:8px;">Review Action</label>
+      <button id="ai-outputs-list-btn" type="button" class="stack-gap-sm">查看输出</button>
+      <label class="stack-gap-sm">输出标识</label>
+      <input id="ai-output-id" placeholder="输入输出标识">
+      <button id="ai-output-review-get-btn" type="button" class="stack-gap-sm">加载审核资料</button>
+      <label class="stack-gap-sm">审核动作</label>
       <select id="ai-review-action" {% if not can_ai_data_write %}disabled{% endif %}>
         {% for item in ai_review_action_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Review Note</label>
-      <input id="ai-review-note" placeholder="note" {% if not can_ai_data_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Override Payload JSON</label>
+      <label class="stack-gap-sm">审核备注</label>
+      <input id="ai-review-note" placeholder="填写审核说明" {% if not can_ai_data_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">人工覆盖内容（JSON，高级配置）</label>
       <textarea id="ai-review-override" rows="3" placeholder='{"summary":"manual summary","suggestion":"manual suggestion"}' {% if not can_ai_data_write %}disabled{% endif %}></textarea>
-      <button id="ai-output-review-submit-btn" type="button" style="margin-top:10px;" {% if not can_ai_data_write %}disabled{% endif %}>Submit Review</button>
-      <pre id="ai-output-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No output review data.</pre>
+      <p class="hint admin-note stack-gap-sm">人工覆盖内容仅在需替换模型输出时使用，常规审核建议只填写审核动作和备注。</p>
+      <button id="ai-output-review-submit-btn" type="button" class="stack-gap-sm" {% if not can_ai_data_write %}disabled{% endif %}>提交审核</button>
+      <pre id="ai-output-box" class="hint pre-box result-surface stack-gap-sm">尚未加载输出审核数据。</pre>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Model Catalog Snapshot</h2>
+  <div class="table-panel-head">
+    <h2>模型目录快照</h2>
+    <p class="table-panel-note">便于管理员快速核对当前模型目录、供应商和启用状态。</p>
+  </div>
   <div class="table-scroll">
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Model Key</th>
-          <th>Provider</th>
-          <th>Display Name</th>
-          <th>Active</th>
+          <th>标识</th>
+          <th>模型标识</th>
+          <th>供应商</th>
+          <th>显示名称</th>
+          <th>启用</th>
         </tr>
       </thead>
       <tbody>
         {% for item in model_catalogs %}
         <tr>
           <td><code>{{ item.id }}</code></td>
-          <td>{{ item.model_key }}</td>
-          <td>{{ item.provider }}</td>
+          <td>
+            <span class="cell-main">模型标识</span>
+            <code class="cell-subtle">{{ item.model_key }}</code>
+          </td>
+          <td>
+            <span class="cell-main">
+              {{ "内置模型" if item.provider == "builtin" else "外部供应商" if item.provider else "未标注" }}
+            </span>
+            <code class="cell-subtle">{{ item.provider or "-" }}</code>
+          </td>
           <td>{{ item.display_name }}</td>
-          <td>{{ item.is_active }}</td>
+          <td><span class="status-pill {{ 'success' if item.is_active else 'muted' }}">{{ "已启用" if item.is_active else "已停用" }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -212,7 +249,7 @@
   </div>
 </div>
 
-<div class="hint action-result" id="ai-governance-result" role="status" aria-live="polite"></div>
+<pre class="hint pre-box action-result result-box result-surface" id="ai-governance-result" role="status" aria-live="polite"></pre>
 {% endblock %}
 
 {% block scripts %}

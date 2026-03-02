@@ -26,7 +26,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败，请稍后重试。");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -69,7 +69,7 @@
     });
     const body = await response.json();
     if (!response.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -87,10 +87,10 @@
   if (rawFilterBtn && rawBox) {
     rawFilterBtn.addEventListener("click", async () => {
       if (!canInspectionRead) {
-        showResult("warn", "inspection:read is required.");
+        showResult("warn", "当前账号缺少 inspection:read 权限。");
         return;
       }
-      await withBusyButton(rawFilterBtn, "Loading...", async () => {
+      await withBusyButton(rawFilterBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const taskId = (rawFilterTaskId && rawFilterTaskId.value ? rawFilterTaskId.value : "").trim();
@@ -108,9 +108,9 @@
           const query = params.toString();
           const rows = await request(`/api/outcomes/raw${query ? `?${query}` : ""}`, "GET");
           rawBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No raw data."
+            ? "暂无原始记录。"
             : rows.map((item) => `${item.id} ${item.data_type} ${item.access_tier} ${item.storage_region || "-"}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} raw records.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条原始记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -121,15 +121,15 @@
   if (rawStorageBtn && rawStorageId && rawStorageTier) {
     rawStorageBtn.addEventListener("click", async () => {
       if (!canInspectionWrite) {
-        showResult("warn", "inspection:write is required.");
+        showResult("warn", "当前账号缺少 inspection:write 权限。");
         return;
       }
       const rawId = (rawStorageId.value || "").trim();
       if (!rawId) {
-        showResult("warn", "Raw ID is required.");
+        showResult("warn", "请先选择原始记录。");
         return;
       }
-      await withBusyButton(rawStorageBtn, "Submitting...", async () => {
+      await withBusyButton(rawStorageBtn, "提交中...", async () => {
         try {
           const payload = {
             access_tier: rawStorageTier.value,
@@ -139,7 +139,7 @@
             payload.storage_region = storageRegion;
           }
           const row = await request(`/api/outcomes/raw/${rawId}/storage`, "PATCH", payload);
-          showResult("success", `Raw storage transitioned: ${row.id} -> ${row.access_tier}`);
+          showResult("success", `已调整原始记录存储层级：${row.id} -> ${row.access_tier}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -158,10 +158,10 @@
   if (outcomeFilterBtn && outcomeBox) {
     outcomeFilterBtn.addEventListener("click", async () => {
       if (!canInspectionRead) {
-        showResult("warn", "inspection:read is required.");
+        showResult("warn", "当前账号缺少 inspection:read 权限。");
         return;
       }
-      await withBusyButton(outcomeFilterBtn, "Loading...", async () => {
+      await withBusyButton(outcomeFilterBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const taskId = (outcomeFilterTaskId && outcomeFilterTaskId.value ? outcomeFilterTaskId.value : "").trim();
@@ -187,9 +187,9 @@
           const query = params.toString();
           const rows = await request(`/api/outcomes/records${query ? `?${query}` : ""}`, "GET");
           outcomeBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No outcomes."
+            ? "暂无成果记录。"
             : rows.map((item) => `${item.id} ${item.source_type} ${item.outcome_type} ${item.status}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} outcomes.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条成果记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -208,15 +208,15 @@
   if (outcomeCreateBtn && outcomeCreateSource && outcomeCreateSourceId && outcomeCreateType) {
     outcomeCreateBtn.addEventListener("click", async () => {
       if (!canInspectionWrite) {
-        showResult("warn", "inspection:write is required.");
+        showResult("warn", "当前账号缺少 inspection:write 权限。");
         return;
       }
       const sourceId = (outcomeCreateSourceId.value || "").trim();
       if (!sourceId) {
-        showResult("warn", "Source ID is required.");
+        showResult("warn", "请填写来源对象标识。");
         return;
       }
-      await withBusyButton(outcomeCreateBtn, "Creating...", async () => {
+      await withBusyButton(outcomeCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             source_type: outcomeCreateSource.value,
@@ -233,7 +233,7 @@
             payload.mission_id = missionId;
           }
           const row = await request("/api/outcomes/records", "POST", payload);
-          showResult("success", `Outcome created: ${row.id}`);
+          showResult("success", `已创建成果记录：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -249,21 +249,21 @@
   if (outcomeStatusBtn && outcomeStatusId && outcomeStatusTarget) {
     outcomeStatusBtn.addEventListener("click", async () => {
       if (!canInspectionWrite) {
-        showResult("warn", "inspection:write is required.");
+        showResult("warn", "当前账号缺少 inspection:write 权限。");
         return;
       }
       const outcomeId = (outcomeStatusId.value || "").trim();
       if (!outcomeId) {
-        showResult("warn", "Outcome ID is required.");
+        showResult("warn", "请先选择成果记录。");
         return;
       }
-      await withBusyButton(outcomeStatusBtn, "Submitting...", async () => {
+      await withBusyButton(outcomeStatusBtn, "提交中...", async () => {
         try {
           const row = await request(`/api/outcomes/records/${outcomeId}/status`, "PATCH", {
             status: outcomeStatusTarget.value,
             note: (outcomeStatusNote && outcomeStatusNote.value ? outcomeStatusNote.value : "").trim() || null,
           });
-          showResult("success", `Outcome status updated: ${row.id} -> ${row.status}`);
+          showResult("success", `已更新成果状态：${row.id} -> ${row.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -278,21 +278,21 @@
   if (outcomeVersionsBtn && outcomeVersionsId && outcomeVersionsBox) {
     outcomeVersionsBtn.addEventListener("click", async () => {
       if (!canInspectionRead) {
-        showResult("warn", "inspection:read is required.");
+        showResult("warn", "当前账号缺少 inspection:read 权限。");
         return;
       }
       const outcomeId = (outcomeVersionsId.value || "").trim();
       if (!outcomeId) {
-        showResult("warn", "Outcome ID is required.");
+        showResult("warn", "请先选择成果记录。");
         return;
       }
-      await withBusyButton(outcomeVersionsBtn, "Loading...", async () => {
+      await withBusyButton(outcomeVersionsBtn, "加载中...", async () => {
         try {
           const rows = await request(`/api/outcomes/records/${outcomeId}/versions`, "GET");
           outcomeVersionsBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No versions."
+            ? "暂无版本记录。"
             : rows.map((item) => `v${item.version_no} ${item.change_type} ${item.status} ${item.created_at}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} versions.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条版本记录。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -309,15 +309,15 @@
   if (reportTemplateCreateBtn && reportTemplateName && reportTemplateFormat && reportTemplateTitle && reportTemplateBody) {
     reportTemplateCreateBtn.addEventListener("click", async () => {
       if (!canReportingWrite) {
-        showResult("warn", "reporting.write is required.");
+        showResult("warn", "当前账号缺少 reporting.write 权限。");
         return;
       }
       const name = (reportTemplateName.value || "").trim();
       if (!name) {
-        showResult("warn", "Template name is required.");
+        showResult("warn", "请填写模板名称。");
         return;
       }
-      await withBusyButton(reportTemplateCreateBtn, "Creating...", async () => {
+      await withBusyButton(reportTemplateCreateBtn, "创建中...", async () => {
         try {
           const row = await request("/api/reporting/outcome-report-templates", "POST", {
             name,
@@ -326,7 +326,7 @@
             body_template: (reportTemplateBody.value || "").trim(),
             is_active: true,
           });
-          showResult("success", `Report template created: ${row.id}`);
+          showResult("success", `已创建报告模板：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -344,15 +344,15 @@
   if (reportExportCreateBtn && reportExportTemplateId && reportExportBox) {
     reportExportCreateBtn.addEventListener("click", async () => {
       if (!canReportingWrite) {
-        showResult("warn", "reporting.write is required.");
+        showResult("warn", "当前账号缺少 reporting.write 权限。");
         return;
       }
       const templateId = (reportExportTemplateId.value || "").trim();
       if (!templateId) {
-        showResult("warn", "Template ID is required.");
+        showResult("warn", "请先选择报告模板。");
         return;
       }
-      await withBusyButton(reportExportCreateBtn, "Creating...", async () => {
+      await withBusyButton(reportExportCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             template_id: templateId,
@@ -371,12 +371,12 @@
           }
           const row = await request("/api/reporting/outcome-report-exports", "POST", payload);
           reportExportBox.textContent = [
-            `export_id: ${row.id}`,
-            `status: ${row.status}`,
-            `format: ${row.report_format}`,
-            `file_path: ${row.file_path || "-"}`,
+            `导出任务: ${row.id}`,
+            `当前状态: ${row.status}`,
+            `导出格式: ${row.report_format}`,
+            `文件路径: ${row.file_path || "-"}`,
           ].join("\n");
-          showResult("success", `Export task created: ${row.id}`);
+          showResult("success", `已创建导出任务：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -394,10 +394,10 @@
   if (reportExportsLoadBtn && reportExportDetailBox) {
     reportExportsLoadBtn.addEventListener("click", async () => {
       if (!canReportingRead) {
-        showResult("warn", "reporting.read is required.");
+        showResult("warn", "当前账号缺少 reporting.read 权限。");
         return;
       }
-      await withBusyButton(reportExportsLoadBtn, "Loading...", async () => {
+      await withBusyButton(reportExportsLoadBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const statusFilter = (reportExportsStatus && reportExportsStatus.value ? reportExportsStatus.value : "").trim();
@@ -408,9 +408,9 @@
           params.set("limit", String(limit));
           const rows = await request(`/api/reporting/outcome-report-exports?${params.toString()}`, "GET");
           reportExportDetailBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No export rows."
+            ? "暂无导出任务。"
             : rows.map((item) => `${item.id} ${item.status} ${item.report_format} ${item.file_path || "-"}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} export rows.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条导出任务。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -421,19 +421,19 @@
   if (reportExportGetBtn && reportExportId && reportExportDetailBox) {
     reportExportGetBtn.addEventListener("click", async () => {
       if (!canReportingRead) {
-        showResult("warn", "reporting.read is required.");
+        showResult("warn", "当前账号缺少 reporting.read 权限。");
         return;
       }
       const exportId = (reportExportId.value || "").trim();
       if (!exportId) {
-        showResult("warn", "Export ID is required.");
+        showResult("warn", "请填写导出任务标识。");
         return;
       }
-      await withBusyButton(reportExportGetBtn, "Loading...", async () => {
+      await withBusyButton(reportExportGetBtn, "加载中...", async () => {
         try {
           const row = await request(`/api/reporting/outcome-report-exports/${exportId}`, "GET");
           reportExportDetailBox.textContent = JSON.stringify(row, null, 2);
-          showResult("success", `Loaded export detail: ${row.id}`);
+          showResult("success", `已加载导出任务详情：${row.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -449,17 +449,17 @@
   if (reportRetentionBtn && reportRetentionBox) {
     reportRetentionBtn.addEventListener("click", async () => {
       if (!canReportingWrite) {
-        showResult("warn", "reporting.write is required.");
+        showResult("warn", "当前账号缺少 reporting.write 权限。");
         return;
       }
-      await withBusyButton(reportRetentionBtn, "Running...", async () => {
+      await withBusyButton(reportRetentionBtn, "执行中...", async () => {
         try {
           const body = await request("/api/reporting/outcome-report-exports:retention", "POST", {
             retention_days: parseIntOr(reportRetentionDays && reportRetentionDays.value, 30),
             dry_run: parseBool(reportRetentionDry && reportRetentionDry.value),
           });
           reportRetentionBox.textContent = JSON.stringify(body, null, 2);
-          showResult("success", "Retention run completed.");
+          showResult("success", "保留期治理已执行完成。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }

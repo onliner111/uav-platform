@@ -4,6 +4,7 @@
   const token = window.__TOKEN || auth.token;
   const csrfToken = auth.csrfToken || "";
   const canAlertWrite = Boolean(window.__CAN_ALERT_WRITE);
+  const selectionBanner = document.getElementById("alert-selection-banner");
 
   const resultNode = document.getElementById("alerts-result");
 
@@ -93,7 +94,7 @@
     if (ui && typeof ui.toMessage === "function") {
       return ui.toMessage(err);
     }
-    return String((err && err.message) || err || "request failed");
+    return String((err && err.message) || err || "请求失败，请稍后重试。");
   }
 
   async function withBusyButton(button, pendingLabel, action) {
@@ -116,7 +117,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -130,7 +131,7 @@
     });
     const body = await resp.json();
     if (!resp.ok) {
-      throw new Error(body.detail || "request failed");
+      throw new Error(body.detail || "请求失败，请稍后重试。");
     }
     return body;
   }
@@ -164,13 +165,16 @@
     if (alertActionId) {
       alertActionId.value = rowId;
     }
+    if (selectionBanner) {
+      selectionBanner.innerHTML = `<strong>当前选中告警：${rowId}</strong><div class="selection-meta">处理区已自动带入当前告警，可直接执行确认、关闭或复盘。</div>`;
+    }
   }
 
   document.querySelectorAll(".js-alert-select").forEach((button) => {
     button.addEventListener("click", () => {
       const rowId = button.getAttribute("data-alert-id") || "";
       setAlertId(rowId);
-      showResult("success", `Selected alert: ${rowId}`);
+      showResult("success", `已选中告警：${rowId}`);
     });
   });
 
@@ -178,19 +182,19 @@
     ackBtn.addEventListener("click", async () => {
       const alertId = (ackId.value || "").trim();
       if (!alertId) {
-        showResult("warn", "Alert ID is required.");
+        showResult("warn", "请先选择告警。");
         return;
       }
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
-      await withBusyButton(ackBtn, "Acknowledging...", async () => {
+      await withBusyButton(ackBtn, "确认中...", async () => {
         try {
           const body = await post(`/api/alert/alerts/${alertId}/ack`, {
             comment: (ackComment && ackComment.value ? ackComment.value : "").trim() || null,
           });
-          showResult("success", `Acked alert ${body.id} -> ${body.status}`);
+          showResult("success", `已确认告警：${body.id} -> ${body.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -202,19 +206,19 @@
     closeBtn.addEventListener("click", async () => {
       const alertId = (closeId.value || "").trim();
       if (!alertId) {
-        showResult("warn", "Alert ID is required.");
+        showResult("warn", "请先选择告警。");
         return;
       }
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
-      await withBusyButton(closeBtn, "Closing...", async () => {
+      await withBusyButton(closeBtn, "关闭中...", async () => {
         try {
           const body = await post(`/api/alert/alerts/${alertId}/close`, {
             comment: (closeComment && closeComment.value ? closeComment.value : "").trim() || null,
           });
-          showResult("success", `Closed alert ${body.id} -> ${body.status}`);
+          showResult("success", `已关闭告警：${body.id} -> ${body.status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -225,15 +229,15 @@
   if (routingCreateBtn && routingPriority && routingChannel && routingTarget) {
     routingCreateBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
       const target = (routingTarget.value || "").trim();
       if (!target) {
-        showResult("warn", "Routing target is required.");
+        showResult("warn", "请填写通知目标。");
         return;
       }
-      await withBusyButton(routingCreateBtn, "Creating...", async () => {
+      await withBusyButton(routingCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             priority_level: routingPriority.value,
@@ -247,7 +251,7 @@
             payload.alert_type = typeValue;
           }
           const body = await post("/api/alert/routing-rules", payload);
-          showResult("success", `Routing rule created: ${body.id}`);
+          showResult("success", `已创建路由规则：${body.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -258,7 +262,7 @@
   if (oncallCreateBtn && oncallName && oncallTarget && oncallStartsAt && oncallEndsAt && oncallTimezone) {
     oncallCreateBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
       const shiftName = (oncallName.value || "").trim();
@@ -266,10 +270,10 @@
       const startsAt = (oncallStartsAt.value || "").trim();
       const endsAt = (oncallEndsAt.value || "").trim();
       if (!shiftName || !target || !startsAt || !endsAt) {
-        showResult("warn", "Shift name, target, starts_at and ends_at are required.");
+        showResult("warn", "请填写班次名称、通知目标、开始时间和结束时间。");
         return;
       }
-      await withBusyButton(oncallCreateBtn, "Creating...", async () => {
+      await withBusyButton(oncallCreateBtn, "创建中...", async () => {
         try {
           const body = await post("/api/alert/oncall/shifts", {
             shift_name: shiftName,
@@ -280,7 +284,7 @@
             is_active: true,
             detail: {},
           });
-          showResult("success", `Oncall shift created: ${body.id}`);
+          showResult("success", `已创建值守班次：${body.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -299,10 +303,10 @@
   ) {
     escalationCreateBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
-      await withBusyButton(escalationCreateBtn, "Creating...", async () => {
+      await withBusyButton(escalationCreateBtn, "创建中...", async () => {
         try {
           const body = await post("/api/alert/escalation-policies", {
             priority_level: escalationPriority.value,
@@ -314,7 +318,7 @@
             is_active: true,
             detail: {},
           });
-          showResult("success", `Escalation policy created: ${body.id}`);
+          showResult("success", `已创建升级策略：${body.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -325,10 +329,10 @@
   if (escalationRunBtn && escalationRunDry && escalationRunLimit && escalationRunBox) {
     escalationRunBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
-      await withBusyButton(escalationRunBtn, "Running...", async () => {
+      await withBusyButton(escalationRunBtn, "执行中...", async () => {
         try {
           const body = await post("/api/alert/alerts:escalation-run", {
             dry_run: parseBool(escalationRunDry.value),
@@ -336,15 +340,15 @@
           });
           const items = Array.isArray(body.items) ? body.items : [];
           escalationRunBox.textContent = [
-            `scanned_count: ${body.scanned_count}`,
-            `escalated_count: ${body.escalated_count}`,
-            `dry_run: ${body.dry_run}`,
-            "--- items ---",
+            `扫描数量: ${body.scanned_count}`,
+            `升级数量: ${body.escalated_count}`,
+            `演练模式: ${body.dry_run}`,
+            "--- 明细 ---",
             items.length
               ? items.map((item) => `${item.alert_id} ${item.reason} ${item.from_target || "-"} -> ${item.to_target}`).join("\n")
-              : "No escalation items.",
+              : "暂无升级项。",
           ].join("\n");
-          showResult("success", `Escalation run completed: ${body.escalated_count} escalated.`);
+          showResult("success", `升级策略执行完成：已升级 ${body.escalated_count} 条。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -355,15 +359,15 @@
   if (silenceCreateBtn && silenceName) {
     silenceCreateBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
       const name = (silenceName.value || "").trim();
       if (!name) {
-        showResult("warn", "Silence rule name is required.");
+        showResult("warn", "请填写静默规则名称。");
         return;
       }
-      await withBusyButton(silenceCreateBtn, "Creating...", async () => {
+      await withBusyButton(silenceCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             name,
@@ -387,7 +391,7 @@
             payload.ends_at = endsAt;
           }
           const body = await post("/api/alert/silence-rules", payload);
-          showResult("success", `Silence rule created: ${body.id}`);
+          showResult("success", `已创建静默规则：${body.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -398,15 +402,15 @@
   if (aggregationCreateBtn && aggregationName && aggregationWindow) {
     aggregationCreateBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
       const name = (aggregationName.value || "").trim();
       if (!name) {
-        showResult("warn", "Aggregation rule name is required.");
+        showResult("warn", "请填写聚合规则名称。");
         return;
       }
-      await withBusyButton(aggregationCreateBtn, "Creating...", async () => {
+      await withBusyButton(aggregationCreateBtn, "创建中...", async () => {
         try {
           const payload = {
             name,
@@ -419,7 +423,7 @@
             payload.alert_type = typeValue;
           }
           const body = await post("/api/alert/aggregation-rules", payload);
-          showResult("success", `Aggregation rule created: ${body.id}`);
+          showResult("success", `已创建聚合规则：${body.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -435,16 +439,16 @@
     alertRoutesBtn.addEventListener("click", async () => {
       const alertId = reviewedAlertId();
       if (!alertId) {
-        showResult("warn", "Alert ID is required.");
+        showResult("warn", "请先选择告警。");
         return;
       }
-      await withBusyButton(alertRoutesBtn, "Loading...", async () => {
+      await withBusyButton(alertRoutesBtn, "加载中...", async () => {
         try {
           const rows = await get(`/api/alert/alerts/${alertId}/routes`);
           alertReviewBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No route logs."
+            ? "暂无路由日志。"
             : rows.map((item) => `[${item.created_at}] ${item.channel} ${item.target} ${item.delivery_status}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} route logs.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条路由日志。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -456,16 +460,16 @@
     alertActionsBtn.addEventListener("click", async () => {
       const alertId = reviewedAlertId();
       if (!alertId) {
-        showResult("warn", "Alert ID is required.");
+        showResult("warn", "请先选择告警。");
         return;
       }
-      await withBusyButton(alertActionsBtn, "Loading...", async () => {
+      await withBusyButton(alertActionsBtn, "加载中...", async () => {
         try {
           const rows = await get(`/api/alert/alerts/${alertId}/actions`);
           alertReviewBox.textContent = !Array.isArray(rows) || !rows.length
-            ? "No action logs."
+            ? "暂无动作日志。"
             : rows.map((item) => `[${item.created_at}] ${item.action_type} ${item.actor_id || "-"} ${item.note || ""}`).join("\n");
-          showResult("success", `Loaded ${Array.isArray(rows) ? rows.length : 0} action logs.`);
+          showResult("success", `已加载 ${Array.isArray(rows) ? rows.length : 0} 条动作日志。`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -477,23 +481,23 @@
     alertReviewBtn.addEventListener("click", async () => {
       const alertId = reviewedAlertId();
       if (!alertId) {
-        showResult("warn", "Alert ID is required.");
+        showResult("warn", "请先选择告警。");
         return;
       }
-      await withBusyButton(alertReviewBtn, "Loading...", async () => {
+      await withBusyButton(alertReviewBtn, "加载中...", async () => {
         try {
           const body = await get(`/api/alert/alerts/${alertId}/review`);
           const routes = Array.isArray(body.routes) ? body.routes.length : 0;
           const actions = Array.isArray(body.actions) ? body.actions.length : 0;
           alertReviewBox.textContent = [
-            `alert_id: ${body.alert.id}`,
-            `type: ${body.alert.alert_type}`,
-            `priority: ${body.alert.priority_level}`,
-            `status: ${body.alert.status}`,
-            `route_count: ${routes}`,
-            `action_count: ${actions}`,
+            `告警标识: ${body.alert.id}`,
+            `告警类型: ${body.alert.alert_type}`,
+            `优先级: ${body.alert.priority_level}`,
+            `当前状态: ${body.alert.status}`,
+            `路由数量: ${routes}`,
+            `动作数量: ${actions}`,
           ].join("\n");
-          showResult("success", "Loaded alert review.");
+          showResult("success", "已加载告警复盘。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -504,22 +508,22 @@
   if (alertActionBtn && alertActionId && alertActionType) {
     alertActionBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
       const alertId = (alertActionId.value || "").trim();
       if (!alertId) {
-        showResult("warn", "Alert ID is required.");
+        showResult("warn", "请先选择告警。");
         return;
       }
-      await withBusyButton(alertActionBtn, "Submitting...", async () => {
+      await withBusyButton(alertActionBtn, "提交中...", async () => {
         try {
           const body = await post(`/api/alert/alerts/${alertId}/actions`, {
             action_type: alertActionType.value,
             note: (alertActionNote && alertActionNote.value ? alertActionNote.value : "").trim() || null,
             detail: {},
           });
-          showResult("success", `Action added: ${body.id}`);
+          showResult("success", `已补充处理动作：${body.id}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -530,22 +534,22 @@
   if (routeReceiptBtn && routeReceiptId && routeReceiptStatus) {
     routeReceiptBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
       const routeId = (routeReceiptId.value || "").trim();
       if (!routeId) {
-        showResult("warn", "Route log ID is required.");
+        showResult("warn", "请填写路由日志标识。");
         return;
       }
-      await withBusyButton(routeReceiptBtn, "Submitting...", async () => {
+      await withBusyButton(routeReceiptBtn, "提交中...", async () => {
         try {
           const body = await post(`/api/alert/routes/${routeId}:receipt`, {
             delivery_status: routeReceiptStatus.value,
             receipt_id: null,
             detail: {},
           });
-          showResult("success", `Route receipt updated: ${body.id} -> ${body.delivery_status}`);
+          showResult("success", `已更新回执状态：${body.id} -> ${body.delivery_status}`);
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -555,7 +559,7 @@
 
   if (slaLoadBtn && slaBox) {
     slaLoadBtn.addEventListener("click", async () => {
-      await withBusyButton(slaLoadBtn, "Loading...", async () => {
+      await withBusyButton(slaLoadBtn, "加载中...", async () => {
         try {
           const params = new URLSearchParams();
           const fromTs = (slaFromTs && slaFromTs.value ? slaFromTs.value : "").trim();
@@ -569,15 +573,15 @@
           const query = params.toString();
           const body = await get(`/api/alert/sla/overview${query ? `?${query}` : ""}`);
           slaBox.textContent = [
-            `total_alerts: ${body.total_alerts}`,
-            `acked_alerts: ${body.acked_alerts}`,
-            `closed_alerts: ${body.closed_alerts}`,
-            `timeout_escalated_alerts: ${body.timeout_escalated_alerts}`,
-            `mtta_seconds_avg: ${body.mtta_seconds_avg}`,
-            `mttr_seconds_avg: ${body.mttr_seconds_avg}`,
-            `timeout_escalation_rate: ${body.timeout_escalation_rate}`,
+            `告警总量: ${body.total_alerts}`,
+            `已确认: ${body.acked_alerts}`,
+            `已关闭: ${body.closed_alerts}`,
+            `超时升级: ${body.timeout_escalated_alerts}`,
+            `平均确认时长(秒): ${body.mtta_seconds_avg}`,
+            `平均恢复时长(秒): ${body.mttr_seconds_avg}`,
+            `超时升级占比: ${body.timeout_escalation_rate}`,
           ].join("\n");
-          showResult("success", "Loaded SLA overview.");
+          showResult("success", "已加载值守 SLA 概览。");
         } catch (err) {
           showResult("danger", toMessage(err));
         }
@@ -588,7 +592,7 @@
   if (batchCloseBtn && batchCloseIds) {
     batchCloseBtn.addEventListener("click", async () => {
       if (!canAlertWrite) {
-        showResult("warn", "Read-only mode: alert write actions are disabled.");
+        showResult("warn", "当前为只读模式，告警写入动作已禁用。");
         return;
       }
       const ids = (batchCloseIds.value || "")
@@ -596,11 +600,11 @@
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
       if (!ids.length) {
-        showResult("warn", "At least one alert ID is required.");
+        showResult("warn", "请至少提供一条告警标识。");
         return;
       }
       const comment = (batchCloseComment && batchCloseComment.value ? batchCloseComment.value : "").trim() || null;
-      await withBusyButton(batchCloseBtn, "Closing...", async () => {
+      await withBusyButton(batchCloseBtn, "关闭中...", async () => {
         let success = 0;
         const failures = [];
         for (const alertId of ids) {
@@ -612,15 +616,15 @@
           }
         }
         if (!failures.length) {
-          showResult("success", `Batch close completed: ${success}/${ids.length} succeeded.`);
+          showResult("success", `批量关闭已完成：成功 ${success}/${ids.length}。`);
           return;
         }
-        showResult("warn", `Batch close partial: ${success}/${ids.length} succeeded. ${failures.join(" | ")}`);
+        showResult("warn", `批量关闭部分完成：成功 ${success}/${ids.length}。${failures.join(" | ")}`);
       });
     });
   }
 
   if (!canAlertWrite) {
-    showResult("warn", "Read-only mode: alert write actions are disabled.");
+    showResult("warn", "当前为只读模式，告警写入动作已禁用。");
   }
 })();

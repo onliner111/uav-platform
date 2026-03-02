@@ -1,60 +1,130 @@
 {% extends "console_base.html" %}
 
 {% block content %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>巡检任务</div>
+    <div class="value">{{ tasks|length }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>可用模板</div>
+    <div class="value">{{ templates|length }}</div>
+  </div>
+</div>
+
 <div class="panel">
-  <h2>Inspection Task List</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Status</th>
-        <th>Priority</th>
-        <th>Created</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for task in tasks %}
-      <tr>
-        <td>{{ task.id }}</td>
-        <td>{{ task.name }}</td>
-        <td><span class="status-pill">{{ task.status }}</span></td>
-        <td>{{ task.priority }}</td>
-        <td>{{ task.created_at }}</td>
-        <td><a href="/ui/inspection/tasks/{{ task.id }}">Open Map</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="ui-section-head">
+    <div>
+      <h2>巡检任务列表</h2>
+      <p class="ui-section-subtitle">从任务列表进入详情页，不再依赖手动记忆任务编号。</p>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>任务 ID</th>
+          <th>任务名称</th>
+          <th>状态</th>
+          <th>优先级</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in tasks %}
+        <tr>
+          <td><code>{{ task.id }}</code></td>
+          <td>{{ task.name }}</td>
+          <td><span class="status-pill">{{ task.status }}</span></td>
+          <td>{{ task.priority }}</td>
+          <td>{{ task.created_at }}</td>
+          <td><a class="console-link" href="/ui/inspection/tasks/{{ task.id }}">进入详情</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% if can_inspection_write %}
 <div class="panel">
-  <h2>Create Inspection Task</h2>
-  <div class="grid cols-2">
+  <div class="ui-section-head">
     <div>
-      <label>Template</label>
+      <h2>巡检任务创建向导</h2>
+      <p class="ui-section-subtitle">按步骤选择模板、补充任务信息并确认创建，默认不要求业务人员记忆底层参数。</p>
+    </div>
+  </div>
+  <div class="wizard-shell">
+    <div class="wizard-summary-card">
+      <strong id="inspection-wizard-status">第 1 步：选择巡检模板</strong>
+      <div id="inspection-wizard-summary" class="hint">先选定合适模板，系统会以模板为基础继续创建流程。</div>
+      <div id="inspection-wizard-error" class="hint" hidden></div>
+    </div>
+    <ol class="wizard-step-list" id="inspection-wizard-steps">
+      <li class="wizard-step-item active" data-step="1">1. 选择模板</li>
+      <li class="wizard-step-item" data-step="2">2. 填写任务信息</li>
+      <li class="wizard-step-item" data-step="3">3. 确认并创建</li>
+    </ol>
+
+    <section class="wizard-panel" data-step-panel="1">
+      <h3>第 1 步：选择模板</h3>
+      <p class="hint">优先选择最接近当前场景的模板，后续字段会按该模板继续填写。</p>
+      {% if templates %}
+      <label>巡检模板</label>
       <select id="inspection-create-template">
         {% for item in templates %}
         <option value="{{ item.id }}">{{ item.name }}</option>
         {% endfor %}
       </select>
-    </div>
-    <div>
-      <label>Task Name</label>
-      <input id="inspection-create-name" placeholder="inspection task name">
-    </div>
-    <div>
-      <label>Priority</label>
-      <input id="inspection-create-priority" type="number" min="1" max="10" value="5">
-    </div>
-    <div>
-      <label>Area Geometry (optional)</label>
-      <input id="inspection-create-geom" placeholder="POINT(114.30 30.59)">
-    </div>
+      <div class="wizard-actions">
+        <button id="inspection-step1-next" type="button">下一步：填写任务信息</button>
+      </div>
+      {% else %}
+      <div class="empty-state">当前暂无可用巡检模板，请先在模板管理中准备模板后再创建任务。</div>
+      {% endif %}
+    </section>
+
+    <section class="wizard-panel" data-step-panel="2" hidden>
+      <h3>第 2 步：填写任务信息</h3>
+      <p class="hint">补充本次巡检的任务名称、优先级和区域信息，系统会自动带入模板上下文。</p>
+      <div id="inspection-template-recommendation" class="selection-banner">
+        <strong>推荐提示：</strong>选定模板后，系统会优先建议一个默认任务名称。
+      </div>
+      <div class="grid cols-2">
+        <div>
+          <label>任务名称</label>
+          <input id="inspection-create-name" placeholder="例如：城北管线晨检">
+        </div>
+        <div>
+          <label>优先级</label>
+          <input id="inspection-create-priority" type="number" min="1" max="10" value="5">
+          <p id="inspection-priority-hint" class="hint">当前为标准优先级，适合常规巡检。</p>
+        </div>
+        <div class="span-2">
+          <label>区域几何（可选）</label>
+          <input id="inspection-create-geom" placeholder="例如 POINT(114.30 30.59)">
+          <p class="hint">没有明确坐标时可留空，后续仍可在任务详情里补充。</p>
+        </div>
+      </div>
+      <div class="wizard-actions">
+        <button id="inspection-step2-prev" type="button" class="button-secondary">上一步</button>
+        <button id="inspection-step2-next" type="button">下一步：确认创建</button>
+      </div>
+    </section>
+
+    <section class="wizard-panel" data-step-panel="3" hidden>
+      <h3>第 3 步：确认并创建</h3>
+      <p class="hint">确认本次任务摘要后再提交，避免直接暴露字段式创建操作。</p>
+      <div id="inspection-wizard-confirm" class="selection-banner">
+        当前尚未完成信息填写。
+      </div>
+      <div class="wizard-actions">
+        <button id="inspection-step3-prev" type="button" class="button-secondary">上一步</button>
+        <button id="inspection-create-btn" type="button">创建巡检任务</button>
+      </div>
+    </section>
+    <div class="hint action-result" id="inspection-list-result" role="status" aria-live="polite"></div>
   </div>
-  <button id="inspection-create-btn" type="button" style="margin-top:10px;">Create Task</button>
-  <div class="hint action-result" id="inspection-list-result" role="status" aria-live="polite"></div>
 </div>
 {% endif %}
 {% endblock %}

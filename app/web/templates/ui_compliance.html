@@ -3,227 +3,328 @@
 {% block content %}
 <div class="cards ui-kpi-grid">
   <div class="card ui-kpi-card">
-    <div>Approvals</div>
+    <div>审批记录</div>
     <div class="value">{{ approvals|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Airspace Zones</div>
+    <div>空域规则</div>
     <div class="value">{{ zones|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Preflight Templates</div>
+    <div>起飞前模板</div>
     <div class="value">{{ preflight_templates|length }}</div>
   </div>
   <div class="card ui-kpi-card">
-    <div>Decision Records</div>
+    <div>决策留痕</div>
     <div class="value">{{ decision_records|length }}</div>
   </div>
 </div>
 
 <div class="panel">
   <div class="hub-head ui-section-head">
-    <h2>Approvals</h2>
+    <div>
+      <h2>审批待办</h2>
+      <p class="page-note">先选中业务对象，再完成审批、发起流程或导出审计记录。</p>
+    </div>
     <div class="ui-action-row">
-      <input id="approval-filter-entity-type" placeholder="entity type">
-      <input id="approval-filter-entity-id" placeholder="entity id">
-      <button id="approval-filter-btn" type="button">Filter</button>
-      <button id="approval-export-btn" type="button">Export Audit</button>
+      <input id="approval-filter-entity-type" placeholder="业务对象类型">
+      <input id="approval-filter-entity-id" placeholder="业务对象标识">
+      <button id="approval-filter-btn" type="button">筛选审批</button>
+      <button id="approval-export-btn" type="button">导出审批审计</button>
     </div>
   </div>
-  <div class="table-scroll">
+  <input id="approval-create-entity-type" type="hidden">
+  <input id="approval-create-entity-id" type="hidden">
+  <input id="flow-instance-entity-type" type="hidden">
+  <input id="flow-instance-entity-id" type="hidden">
+  <input id="flow-action-instance-id" type="hidden">
+  <div class="selection-banner" id="approval-selection-banner">
+    <strong>当前业务对象：</strong>请先从下方审批记录中选择一条对象。
+  </div>
+  <div class="selection-banner stack-gap-sm" id="flow-selection-banner">
+    <strong>当前流程实例：</strong>如需推进流程，请先创建或加载流程实例。
+  </div>
+  <div class="stack-gap-md">
+    <div class="ui-section-head">
+      <div>
+        <h3>审批流可视化</h3>
+        <p class="ui-section-subtitle">把“选对象 -> 登记审批 -> 发起流程 -> 推进闭环”明确展示为连续步骤，减少业务人员理解成本。</p>
+      </div>
+    </div>
+    <div class="workflow-grid">
+      <div class="workflow-step" id="approval-flow-stage-entity">
+        <span class="workflow-index">1</span>
+        <div>
+          <h3>选中业务对象</h3>
+          <p>从审批记录中确定当前处理对象。</p>
+          <span id="approval-flow-state-entity" class="status-pill muted">待选择</span>
+        </div>
+      </div>
+      <div class="workflow-step" id="approval-flow-stage-approval">
+        <span class="workflow-index">2</span>
+        <div>
+          <h3>登记审批结果</h3>
+          <p>按当前业务对象记录审批状态。</p>
+          <span id="approval-flow-state-approval" class="status-pill muted">待处理</span>
+        </div>
+      </div>
+      <div class="workflow-step" id="approval-flow-stage-instance">
+        <span class="workflow-index">3</span>
+        <div>
+          <h3>发起审批流程</h3>
+          <p>基于已选对象创建或加载流程实例。</p>
+          <span id="approval-flow-state-instance" class="status-pill muted">待创建</span>
+        </div>
+      </div>
+      <div class="workflow-step" id="approval-flow-stage-close">
+        <span class="workflow-index">4</span>
+        <div>
+          <h3>推进流程闭环</h3>
+          <p>继续提交动作，直到流程完成。</p>
+          <span id="approval-flow-state-close" class="status-pill muted">待完成</span>
+        </div>
+      </div>
+    </div>
+    <div id="approval-flow-guidance" class="selection-banner stack-gap-sm">
+      <strong>流程提示：</strong>请先从审批记录中选中业务对象，再继续后续动作。
+    </div>
+  </div>
+  <div class="table-scroll stack-gap-md">
     <table>
       <thead>
         <tr>
+          <th>选择</th>
           <th>ID</th>
-          <th>Entity Type</th>
-          <th>Entity ID</th>
-          <th>Status</th>
-          <th>Approver</th>
-          <th>Created</th>
-          <th>Action</th>
+          <th>对象类型</th>
+          <th>对象标识</th>
+          <th>状态</th>
+          <th>审批人</th>
+          <th>创建时间</th>
         </tr>
       </thead>
       <tbody>
+        {% if not approvals %}
+        <tr>
+          <td colspan="7" class="empty-state">当前暂无审批记录，可先从业务流程中触发审批。</td>
+        </tr>
+        {% endif %}
         {% for item in approvals %}
         <tr>
+          <td>
+            <button
+              type="button"
+              class="table-select js-select-approval"
+              data-entity-type="{{ item.entity_type }}"
+              data-entity-id="{{ item.entity_id }}"
+            >
+              选中
+            </button>
+          </td>
           <td><code>{{ item.id }}</code></td>
           <td>{{ item.entity_type }}</td>
           <td>{{ item.entity_id }}</td>
           <td>{{ item.status }}</td>
           <td>{{ item.approved_by or "-" }}</td>
           <td>{{ item.created_at }}</td>
-          <td>
-            <button
-              type="button"
-              class="js-select-approval"
-              data-entity-type="{{ item.entity_type }}"
-              data-entity-id="{{ item.entity_id }}"
-            >
-              Select
-            </button>
-          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <pre id="approval-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No approval data loaded.</pre>
+  <pre id="approval-box" class="hint details-shell-body stack-gap-md pre-box">尚未加载审批数据。</pre>
 </div>
 
 <div class="panel">
-  <h2>Approval Flow Workbench</h2>
-  <div class="grid cols-2">
-    <div>
-      <h3>Create Approval Record</h3>
-      <label>Entity Type</label>
-      <input id="approval-create-entity-type" placeholder="MISSION">
-      <label style="margin-top:8px;">Entity ID</label>
-      <input id="approval-create-entity-id" placeholder="entity id">
-      <label style="margin-top:8px;">Status</label>
+  <h2>审批与流程处理</h2>
+  <div class="action-deck">
+    <section class="action-cluster primary">
+      <h3>主处理动作</h3>
+      <p>以下动作默认基于当前选中业务对象执行，不再要求手动填写对象标识。</p>
+      <label>审批状态</label>
       <input id="approval-create-status" value="APPROVED">
-      <button id="approval-create-btn" type="button" style="margin-top:10px;" {% if not can_approval_write %}disabled{% endif %}>Create Approval</button>
-      <p class="hint">Approval record API is scoped by `approval.write`.</p>
-    </div>
-    <div>
-      <h3>Batch Create Approvals</h3>
-      <label>Entity Type</label>
-      <input id="approval-batch-entity-type" placeholder="MISSION">
-      <label style="margin-top:8px;">Status</label>
-      <input id="approval-batch-status" value="APPROVED">
-      <label style="margin-top:8px;">Entity IDs (one per line)</label>
-      <textarea id="approval-batch-entity-ids" rows="4" placeholder="entity-id-a&#10;entity-id-b"></textarea>
-      <button id="approval-batch-create-btn" type="button" style="margin-top:10px;" {% if not can_approval_write %}disabled{% endif %}>Batch Create</button>
-    </div>
-  </div>
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>Create Flow Template</h3>
-      <label>Name</label>
-      <input id="flow-template-name" placeholder="mission-two-step">
-      <label style="margin-top:8px;">Entity Type</label>
-      <input id="flow-template-entity-type" value="MISSION">
-      <label style="margin-top:8px;">Steps JSON</label>
-      <textarea id="flow-template-steps" rows="4" placeholder='[{"name":"L1","reviewer_user_ids":[]}]'></textarea>
-      <button id="flow-template-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Template</button>
-    </div>
-    <div>
-      <h3>Create Flow Instance</h3>
-      <label>Template ID</label>
-      <input id="flow-instance-template-id" placeholder="template id">
-      <label style="margin-top:8px;">Entity Type</label>
-      <input id="flow-instance-entity-type" value="MISSION">
-      <label style="margin-top:8px;">Entity ID</label>
-      <input id="flow-instance-entity-id" placeholder="mission id">
-      <button id="flow-instance-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Instance</button>
-    </div>
-  </div>
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>Act Flow Instance</h3>
-      <label>Instance ID</label>
-      <input id="flow-action-instance-id" placeholder="instance id">
-      <label style="margin-top:8px;">Action</label>
+      <button id="approval-create-btn" type="button" class="stack-gap-sm" {% if not can_approval_write %}disabled{% endif %}>登记审批结果</button>
+      <p class="hint">审批写入受 <code>approval.write</code> 控制。</p>
+
+      <div class="section-split"></div>
+
+      <label>当前流程模板</label>
+      <input id="flow-instance-template-id" placeholder="请先在管理员配置中准备模板" readonly>
+      <button id="flow-instance-create-btn" type="button" class="stack-gap-sm" {% if not can_mission_write %}disabled{% endif %}>发起审批流程</button>
+    </section>
+
+    <section class="action-cluster primary">
+      <h3>流程推进</h3>
+      <p>流程动作将基于当前流程实例执行。</p>
+      <label>处理动作</label>
       <select id="flow-action-type" {% if not can_mission_write %}disabled{% endif %}>
         {% for item in approval_flow_action_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Note</label>
-      <input id="flow-action-note" placeholder="optional note" {% if not can_mission_write %}disabled{% endif %}>
-      <button id="flow-action-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Apply Action</button>
-      <button id="flow-load-btn" type="button" style="margin-top:10px;">Load Instance</button>
-    </div>
-    <div>
-      <h3>Batch Flow Action</h3>
-      <label>Instance IDs (one per line)</label>
+      <label class="stack-gap-sm">处理说明</label>
+      <input id="flow-action-note" placeholder="可选" {% if not can_mission_write %}disabled{% endif %}>
+      <div class="ui-action-row stack-gap-sm">
+        <button id="flow-action-btn" type="button" {% if not can_mission_write %}disabled{% endif %}>提交流程动作</button>
+        <button id="flow-load-btn" type="button">查看流程详情</button>
+      </div>
+      {% if not can_approval_write and not can_mission_write %}
+      <p class="hint">当前为只读模式，审批和流程写入动作已禁用。</p>
+      {% endif %}
+    </section>
+  </div>
+
+  {% if can_approval_write or can_mission_write %}
+  <details class="details-shell stack-gap-md">
+    <summary>管理员高级配置</summary>
+    <div class="details-shell-body">
+      <p class="admin-note">此区域为管理员技术配置，不面向日常业务人员。</p>
+      <div class="grid cols-2">
+        <div>
+          <h3>批量审批</h3>
+          <label>业务对象类型</label>
+          <input id="approval-batch-entity-type" placeholder="例如：MISSION">
+          <label class="stack-gap-sm">审批状态</label>
+          <input id="approval-batch-status" value="APPROVED">
+          <label class="stack-gap-sm">业务对象标识（每行一个）</label>
+          <textarea id="approval-batch-entity-ids" rows="4" placeholder="entity-id-a&#10;entity-id-b"></textarea>
+          <button id="approval-batch-create-btn" type="button" class="stack-gap-sm" {% if not can_approval_write %}disabled{% endif %}>批量登记审批</button>
+        </div>
+        <div>
+          <h3>流程模板配置</h3>
+          <label>模板名称</label>
+          <input id="flow-template-name" placeholder="例如：mission-two-step">
+          <label class="stack-gap-sm">业务对象类型</label>
+          <input id="flow-template-entity-type" value="MISSION">
+          <label class="stack-gap-sm">流程步骤配置（高级）</label>
+          <textarea id="flow-template-steps" rows="4" placeholder='[{"name":"L1","reviewer_user_ids":[]}]'></textarea>
+          <button id="flow-template-create-btn" type="button" class="stack-gap-sm" {% if not can_mission_write %}disabled{% endif %}>创建流程模板</button>
+        </div>
+      </div>
+      <div class="section-split"></div>
+      <label>批量流程实例 ID（每行一个）</label>
       <textarea id="flow-batch-instance-ids" rows="4" placeholder="instance-id-a&#10;instance-id-b" {% if not can_mission_write %}disabled{% endif %}></textarea>
-      <label style="margin-top:8px;">Action</label>
+      <label class="stack-gap-sm">批量动作</label>
       <select id="flow-batch-action" {% if not can_mission_write %}disabled{% endif %}>
         {% for item in approval_flow_action_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <button id="flow-batch-action-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Batch Apply</button>
+      <button id="flow-batch-action-btn" type="button" class="stack-gap-sm" {% if not can_mission_write %}disabled{% endif %}>批量推进流程</button>
     </div>
-  </div>
-  {% if not can_approval_write and not can_mission_write %}
-  <p class="hint">Read-only mode: approval and flow write actions are disabled.</p>
+  </details>
   {% endif %}
-  <pre id="flow-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No flow data loaded.</pre>
+
+  <pre id="flow-box" class="hint details-shell-body stack-gap-md pre-box">尚未加载流程数据。</pre>
 </div>
 
 {% if can_mission_read %}
 <div class="panel">
-  <h2>Airspace Zones</h2>
-  <div class="grid cols-2">
-    <div>
-      <label>Name</label>
-      <input id="zone-create-name" placeholder="zone name">
-      <label style="margin-top:8px;">Zone Type</label>
+  <h2>空域规则</h2>
+  <div class="selection-banner" id="zone-selection-banner">
+    <strong>当前空域规则：</strong>可从下方规则列表选择，用于复用或对照。
+  </div>
+  <div class="action-deck stack-gap-md">
+    <section class="action-cluster primary">
+      <h3>新建规则</h3>
+      <label>规则名称</label>
+      <input id="zone-create-name" placeholder="例如：城区禁飞区">
+      <label class="stack-gap-sm">规则类型</label>
       <select id="zone-create-type" {% if not can_mission_write %}disabled{% endif %}>
         {% for item in zone_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Policy Layer</label>
+      <label class="stack-gap-sm">策略层级</label>
       <select id="zone-create-layer" {% if not can_mission_write %}disabled{% endif %}>
         {% for item in zone_layer_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Policy Effect</label>
+      <label class="stack-gap-sm">策略效果</label>
       <select id="zone-create-effect" {% if not can_mission_write %}disabled{% endif %}>
         {% for item in zone_effect_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Org Unit ID (optional)</label>
-      <input id="zone-create-org-unit-id" placeholder="org unit id" {% if not can_mission_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Area Code (optional)</label>
-      <input id="zone-create-area-code" placeholder="area code" {% if not can_mission_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Polygon WKT</label>
-      <input id="zone-create-wkt" placeholder="POLYGON((114.19 30.09,114.21 30.09,114.21 30.11,114.19 30.11,114.19 30.09))" {% if not can_mission_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Max Alt (optional)</label>
-      <input id="zone-create-max-alt" type="number" min="0" step="0.1" placeholder="120" {% if not can_mission_write %}disabled{% endif %}>
-      <button id="zone-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Zone</button>
-    </div>
-    <div>
-      <h3>Zone Filter</h3>
-      <label>Type</label>
+      {% if can_mission_write %}
+      <details class="details-shell stack-gap-sm">
+        <summary>管理员高级配置</summary>
+        <div class="details-shell-body">
+          <p class="admin-note">此区域为管理员技术配置，不面向日常业务人员。</p>
+          <label>组织单元 ID（可选）</label>
+          <input id="zone-create-org-unit-id" placeholder="组织单元 ID">
+          <label class="stack-gap-sm">区域编码（可选）</label>
+          <input id="zone-create-area-code" placeholder="区域编码">
+          <label class="stack-gap-sm">区域边界（高级）</label>
+          <input id="zone-create-wkt" placeholder="POLYGON((114.19 30.09,114.21 30.09,114.21 30.11,114.19 30.11,114.19 30.09))">
+          <label class="stack-gap-sm">最高高度（可选）</label>
+          <input id="zone-create-max-alt" type="number" min="0" step="0.1" placeholder="120">
+        </div>
+      </details>
+      {% else %}
+      <input id="zone-create-org-unit-id" type="hidden">
+      <input id="zone-create-area-code" type="hidden">
+      <input id="zone-create-wkt" type="hidden">
+      <input id="zone-create-max-alt" type="hidden">
+      {% endif %}
+      <button id="zone-create-btn" type="button" class="stack-gap-sm" {% if not can_mission_write %}disabled{% endif %}>新建空域规则</button>
+    </section>
+
+    <section class="action-cluster">
+      <h3>规则筛选</h3>
+      <label>规则类型</label>
       <select id="zone-filter-type">
-        <option value="">ALL</option>
+        <option value="">全部</option>
         {% for item in zone_type_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Layer</label>
+      <label class="stack-gap-sm">策略层级</label>
       <select id="zone-filter-layer">
-        <option value="">ALL</option>
+        <option value="">全部</option>
         {% for item in zone_layer_options %}
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <label style="margin-top:8px;">Org Unit ID</label>
-      <input id="zone-filter-org-unit-id" placeholder="org unit id">
-      <button id="zone-filter-btn" type="button" style="margin-top:10px;">Filter Zones</button>
-      <pre id="zone-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No zone query result.</pre>
-    </div>
+      <label class="stack-gap-sm">组织单元标识</label>
+        <input id="zone-filter-org-unit-id" placeholder="可选，填写组织单元标识">
+      <button id="zone-filter-btn" type="button" class="stack-gap-sm">筛选规则</button>
+      <pre id="zone-box" class="hint details-shell-body stack-gap-sm pre-box">尚未加载规则查询结果。</pre>
+    </section>
   </div>
-  <div class="table-scroll">
+  <div class="table-scroll stack-gap-md">
     <table>
       <thead>
         <tr>
+          <th>选择</th>
           <th>ID</th>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Layer</th>
-          <th>Effect</th>
-          <th>Active</th>
+          <th>名称</th>
+          <th>类型</th>
+          <th>层级</th>
+          <th>效果</th>
+          <th>启用</th>
         </tr>
       </thead>
       <tbody>
+        {% if not zones %}
+        <tr>
+          <td colspan="7" class="empty-state">当前暂无空域规则，可按需新建。</td>
+        </tr>
+        {% endif %}
         {% for item in zones %}
         <tr>
+          <td>
+            <button
+              type="button"
+              class="table-select js-select-zone"
+              data-zone-id="{{ item.id }}"
+              data-zone-name="{{ item.name }}"
+              data-zone-type="{{ item.zone_type }}"
+              data-zone-layer="{{ item.policy_layer }}"
+            >
+              选中
+            </button>
+          </td>
           <td><code>{{ item.id }}</code></td>
           <td>{{ item.name }}</td>
           <td>{{ item.zone_type }}</td>
@@ -238,63 +339,116 @@
 </div>
 
 <div class="panel">
-  <h2>Preflight Templates</h2>
-  <div class="grid cols-2">
-    <div>
-      <h3>Create Preflight Template</h3>
-      <label>Name</label>
-      <input id="preflight-template-name" placeholder="template name">
-      <label style="margin-top:8px;">Description</label>
-      <input id="preflight-template-description" placeholder="optional description">
-      <label style="margin-top:8px;">Template Version</label>
-      <input id="preflight-template-version" value="v1">
-      <label style="margin-top:8px;">Items JSON</label>
-      <textarea id="preflight-template-items" rows="4" placeholder='[{"code":"CHK-A","title":"airframe check"}]'></textarea>
-      <label style="margin-top:8px;">Evidence Requirements JSON</label>
-      <textarea id="preflight-template-evidence" rows="3" placeholder='{"required": true}'></textarea>
-      <button id="preflight-template-create-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Create Template</button>
-    </div>
-    <div>
-      <h3>Mission Preflight Execute</h3>
-      <label>Mission ID</label>
-      <input id="preflight-mission-id" placeholder="mission id">
-      <label style="margin-top:8px;">Template ID (optional)</label>
-      <input id="preflight-template-id" placeholder="template id">
-      <label style="margin-top:8px;">Required Items JSON (optional)</label>
-      <textarea id="preflight-required-items" rows="3" placeholder='[{"code":"CHK-A","title":"airframe"}]'></textarea>
-      <div class="ui-action-row" style="margin-top:10px;">
-        <button id="preflight-init-btn" type="button" {% if not can_mission_write %}disabled{% endif %}>Init</button>
-        <button id="preflight-load-btn" type="button">Load</button>
-      </div>
-      <label style="margin-top:8px;">Item Code</label>
-      <input id="preflight-item-code" placeholder="CHK-A">
-      <label style="margin-top:8px;">Checked</label>
-      <select id="preflight-item-checked" {% if not can_mission_write %}disabled{% endif %}>
-        <option value="true">true</option>
-        <option value="false">false</option>
-      </select>
-      <label style="margin-top:8px;">Note</label>
-      <input id="preflight-item-note" placeholder="optional note" {% if not can_mission_write %}disabled{% endif %}>
-      <label style="margin-top:8px;">Evidence JSON</label>
-      <textarea id="preflight-item-evidence" rows="3" placeholder='{"photo_url":"https://example.invalid/evidence.jpg"}' {% if not can_mission_write %}disabled{% endif %}></textarea>
-      <button id="preflight-check-btn" type="button" style="margin-top:10px;" {% if not can_mission_write %}disabled{% endif %}>Check Item</button>
-      <pre id="preflight-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No preflight data.</pre>
-    </div>
+  <h2>起飞前检查</h2>
+  <div class="selection-banner" id="preflight-selection-banner">
+    <strong>当前模板：</strong>可从下方模板列表选择并自动带入。
   </div>
-  <div class="table-scroll">
+  <div class="action-deck stack-gap-md">
+    <section class="action-cluster primary">
+      <h3>任务检查执行</h3>
+      <p>检查执行默认基于当前业务上下文，不建议手动输入任务 ID。</p>
+      <label>当前任务</label>
+      <input id="preflight-mission-id" placeholder="请先从任务中心或审批对象带入" readonly>
+      <label class="stack-gap-sm">当前模板</label>
+      <input id="preflight-template-id" placeholder="从下方模板列表选择后自动带入" readonly>
+      {% if can_mission_write %}
+      <details class="details-shell stack-gap-sm">
+        <summary>管理员高级配置</summary>
+        <div class="details-shell-body">
+          <p class="admin-note">此区域为管理员技术配置，不面向日常业务人员。</p>
+          <label>指定检查项（高级，可选）</label>
+          <textarea id="preflight-required-items" rows="3" placeholder='[{"code":"CHK-A","title":"airframe"}]'></textarea>
+        </div>
+      </details>
+      {% else %}
+      <textarea id="preflight-required-items" rows="3" class="visually-hidden"></textarea>
+      {% endif %}
+      <div class="ui-action-row stack-gap-sm">
+        <button id="preflight-init-btn" type="button" {% if not can_mission_write %}disabled{% endif %}>初始化检查</button>
+        <button id="preflight-load-btn" type="button">查看检查状态</button>
+      </div>
+
+      <div class="section-split"></div>
+
+      <label>检查项编码</label>
+      <input id="preflight-item-code" placeholder="例如：CHK-A">
+      <label class="stack-gap-sm">是否通过</label>
+      <select id="preflight-item-checked" {% if not can_mission_write %}disabled{% endif %}>
+        <option value="true">通过</option>
+        <option value="false">不通过</option>
+      </select>
+      <label class="stack-gap-sm">说明</label>
+      <input id="preflight-item-note" placeholder="可选" {% if not can_mission_write %}disabled{% endif %}>
+      {% if can_mission_write %}
+      <details class="details-shell stack-gap-sm">
+        <summary>证据配置</summary>
+        <div class="details-shell-body">
+          <p class="admin-note">此区域为管理员技术配置，不面向日常业务人员。</p>
+          <label>检查证据（高级）</label>
+          <textarea id="preflight-item-evidence" rows="3" placeholder='{"photo_url":"https://example.invalid/evidence.jpg"}' {% if not can_mission_write %}disabled{% endif %}></textarea>
+        </div>
+      </details>
+      {% else %}
+      <textarea id="preflight-item-evidence" rows="3" class="visually-hidden"></textarea>
+      {% endif %}
+      <button id="preflight-check-btn" type="button" class="stack-gap-sm" {% if not can_mission_write %}disabled{% endif %}>提交检查结果</button>
+      <pre id="preflight-box" class="hint details-shell-body stack-gap-sm pre-box">尚未加载起飞前检查数据。</pre>
+    </section>
+
+    {% if can_mission_write %}
+    <section class="action-cluster">
+      <h3>模板维护（管理员）</h3>
+      <p class="admin-note">此区域为管理员技术配置，不面向日常业务人员。</p>
+      <label>模板名称</label>
+      <input id="preflight-template-name" placeholder="模板名称">
+      <label class="stack-gap-sm">模板说明</label>
+      <input id="preflight-template-description" placeholder="可选">
+      <label class="stack-gap-sm">模板版本</label>
+      <input id="preflight-template-version" value="v1">
+      <details class="details-shell stack-gap-sm">
+        <summary>模板项高级配置</summary>
+        <div class="details-shell-body">
+          <label>检查项配置（高级）</label>
+          <textarea id="preflight-template-items" rows="4" placeholder='[{"code":"CHK-A","title":"airframe check"}]'></textarea>
+          <label class="stack-gap-sm">证据要求（高级）</label>
+          <textarea id="preflight-template-evidence" rows="3" placeholder='{"required": true}'></textarea>
+        </div>
+      </details>
+      <button id="preflight-template-create-btn" type="button" class="stack-gap-sm">创建检查模板</button>
+    </section>
+    {% endif %}
+  </div>
+  <div class="table-scroll stack-gap-md">
     <table>
       <thead>
         <tr>
+          <th>选择</th>
           <th>ID</th>
-          <th>Name</th>
-          <th>Version</th>
-          <th>Items</th>
-          <th>Active</th>
+          <th>名称</th>
+          <th>版本</th>
+          <th>检查项</th>
+          <th>启用</th>
         </tr>
       </thead>
       <tbody>
+        {% if not preflight_templates %}
+        <tr>
+          <td colspan="6" class="empty-state">当前暂无起飞前检查模板，请由管理员先完成配置。</td>
+        </tr>
+        {% endif %}
         {% for item in preflight_templates %}
         <tr>
+          <td>
+            <button
+              type="button"
+              class="table-select js-select-preflight-template"
+              data-template-id="{{ item.id }}"
+              data-template-name="{{ item.name }}"
+              data-template-version="{{ item.template_version }}"
+            >
+              选中
+            </button>
+          </td>
           <td><code>{{ item.id }}</code></td>
           <td>{{ item.name }}</td>
           <td>{{ item.template_version }}</td>
@@ -309,13 +463,13 @@
 
 <div class="panel">
   <div class="hub-head ui-section-head">
-    <h2>Decision Records</h2>
+    <h2>决策留痕</h2>
     <div class="ui-action-row">
-      <input id="decision-filter-source" placeholder="source">
-      <input id="decision-filter-entity-type" placeholder="entity type">
-      <input id="decision-filter-entity-id" placeholder="entity id">
-      <button id="decision-filter-btn" type="button">Filter</button>
-      <button id="decision-export-btn" type="button">Export Decisions</button>
+      <input id="decision-filter-source" placeholder="来源">
+      <input id="decision-filter-entity-type" placeholder="业务对象类型">
+      <input id="decision-filter-entity-id" placeholder="业务对象标识">
+      <button id="decision-filter-btn" type="button">筛选记录</button>
+      <button id="decision-export-btn" type="button">导出留痕</button>
     </div>
   </div>
   <div class="table-scroll">
@@ -323,14 +477,19 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Source</th>
-          <th>Entity</th>
-          <th>Decision</th>
-          <th>Reason</th>
-          <th>Created</th>
+          <th>来源</th>
+          <th>对象</th>
+          <th>决策</th>
+          <th>原因</th>
+          <th>创建时间</th>
         </tr>
       </thead>
       <tbody>
+        {% if not decision_records %}
+        <tr>
+          <td colspan="6" class="empty-state">当前暂无决策留痕，可在业务处理后回到此页查看。</td>
+        </tr>
+        {% endif %}
         {% for item in decision_records %}
         <tr>
           <td><code>{{ item.id }}</code></td>
@@ -344,12 +503,12 @@
       </tbody>
     </table>
   </div>
-  <pre id="decision-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No decision data loaded.</pre>
+  <pre id="decision-box" class="hint details-shell-body stack-gap-md pre-box">尚未加载决策留痕数据。</pre>
 </div>
 {% else %}
 <div class="panel">
-  <h2>Mission Compliance Data</h2>
-  <p class="hint">This account currently lacks <code>mission.read</code>, so zone/template/decision datasets are hidden.</p>
+  <h2>合规数据不可见</h2>
+  <p class="hint">当前账号缺少 <code>mission.read</code>，空域规则、起飞前检查和决策留痕已隐藏。</p>
 </div>
 {% endif %}
 

@@ -84,6 +84,19 @@ def get_alert_layer(
 
 
 @router.get(
+    "/layers/airspace",
+    response_model=MapLayerRead,
+    dependencies=[Depends(require_perm(PERM_DASHBOARD_READ))],
+)
+def get_airspace_layer(
+    claims: Claims,
+    service: Service,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> MapLayerRead:
+    return service.airspace_layer(claims["tenant_id"], viewer_user_id=claims["sub"], limit=limit)
+
+
+@router.get(
     "/layers/events",
     response_model=MapLayerRead,
     dependencies=[Depends(require_perm(PERM_DASHBOARD_READ))],
@@ -94,6 +107,19 @@ def get_event_layer(
     limit: int = Query(default=100, ge=1, le=500),
 ) -> MapLayerRead:
     return service.events_layer(claims["tenant_id"], viewer_user_id=claims["sub"], limit=limit)
+
+
+@router.get(
+    "/layers/outcomes",
+    response_model=MapLayerRead,
+    dependencies=[Depends(require_perm(PERM_DASHBOARD_READ))],
+)
+def get_outcomes_layer(
+    claims: Claims,
+    service: Service,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> MapLayerRead:
+    return service.outcomes_layer(claims["tenant_id"], limit=limit)
 
 
 @router.get(

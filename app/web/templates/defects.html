@@ -1,68 +1,117 @@
 {% extends "console_base.html" %}
 
 {% block content %}
-<div class="panel">
-  <div class="ui-section-head">
-    <h2>Defect List</h2>
-    <div class="ui-action-row">
-      <a class="console-link" href="/ui/inspection">Inspection Board</a>
-      <a class="console-link" href="/ui/task-center">Task Center</a>
-      <a class="console-link" href="/ui/emergency">Emergency</a>
-    </div>
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>缺陷数量</div>
+    <div class="value">{{ defects|length }}</div>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Severity</th>
-        <th>Status</th>
-        <th>Assigned</th>
-        <th>Observation</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in defects %}
-      <tr>
-        <td><code>{{ item.id }}</code></td>
-        <td>{{ item.severity }}</td>
-        <td>{{ item.status }}</td>
-        <td>{{ item.assigned_to }}</td>
-        <td><code>{{ item.observation_id }}</code></td>
-        <td>
-          <button
-            type="button"
-            class="js-prefill-defect"
-            data-defect-id="{{ item.id }}"
-            data-observation-id="{{ item.observation_id }}"
-          >
-            Select
-          </button>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
 </div>
 
 <div class="panel">
-  <h2>Quick Actions</h2>
-  <div class="grid cols-2">
-    <div>
-      <label>Defect ID</label>
-      <input id="defect-id" placeholder="defect id">
+  <div class="mobile-field-shell">
+    <div class="mobile-field-head">
+      <div>
+        <div class="mobile-field-kicker">现场缺陷处理</div>
+        <h2>移动端缺陷工作区</h2>
+        <p class="ui-section-subtitle">先选中缺陷，再完成分派、状态推进和现场补充，不需要进入复杂后台流程。</p>
+      </div>
+      <div class="mobile-field-quickbar">
+        <a class="button-link" href="/ui/inspection">巡检任务</a>
+        <a class="button-link" href="/ui/emergency">应急处置</a>
+      </div>
     </div>
-    <div>
-      <label>Assign To (user id)</label>
-      <input id="assigned-to" placeholder="user id">
+    <div id="defect-network-banner" class="selection-banner">
+      <strong>网络状态：</strong><span id="defect-network-text">在线，可直接提交缺陷处理动作。</span>
     </div>
   </div>
-  <label style="margin-top:8px;">Assign Note</label>
-  <input id="assign-note" placeholder="optional note">
-  <div class="grid cols-2" style="margin-top:12px;">
-    <button id="assign-btn" {% if not can_defect_write %}disabled{% endif %}>Assign</button>
+</div>
+
+<div class="panel">
+  <div class="ui-section-head">
     <div>
-      <label>New Status</label>
+      <h2>缺陷列表</h2>
+      <p class="ui-section-subtitle">先从列表选中缺陷，再执行分派、状态更新或查看详情。</p>
+    </div>
+    <div class="ui-action-row">
+      <a class="console-link" href="/ui/inspection">巡检任务</a>
+      <a class="console-link" href="/ui/task-center">任务中心</a>
+      <a class="console-link" href="/ui/emergency">应急处置</a>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>缺陷 ID</th>
+          <th>严重等级</th>
+          <th>状态</th>
+          <th>处理人</th>
+          <th>观察记录</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in defects %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.severity }}</td>
+          <td><span class="status-pill">{{ item.status }}</span></td>
+          <td>{{ item.assigned_to or "-" }}</td>
+          <td><code>{{ item.observation_id }}</code></td>
+          <td>
+            <button
+              type="button"
+              class="table-select js-prefill-defect"
+              data-defect-id="{{ item.id }}"
+              data-observation-id="{{ item.observation_id }}"
+            >
+              选中
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div id="defect-selection-banner" class="selection-banner">
+    <strong>当前未选中缺陷</strong>
+    <div class="selection-meta">建议先在上方列表点击“选中”，系统会自动带入当前缺陷。</div>
+  </div>
+
+  <div class="mobile-field-grid stack-gap-md">
+    <div class="action-cluster primary">
+      <h3>1. 分派缺陷</h3>
+      <p>围绕当前缺陷完成责任人分派，适合现场值守快速交接。</p>
+      <div class="grid cols-2">
+        <div>
+          <label>缺陷 ID</label>
+          <input id="defect-id" placeholder="可从上方列表自动带入">
+        </div>
+        <div>
+          <label>指派给（用户 ID）</label>
+          <input id="assigned-to" placeholder="请输入处理人用户 ID">
+        </div>
+      </div>
+      <label style="margin-top:8px;">分派说明</label>
+      <input id="assign-note" placeholder="可选，填写分派说明">
+      <div class="wizard-actions stack-gap-md">
+        <button id="assign-btn" {% if not can_defect_write %}disabled{% endif %}>分派缺陷</button>
+        <button id="assign-retry-btn" type="button" class="button-secondary">重试上一笔分派</button>
+      </div>
+      <div id="assign-retry-hint" class="hint">当前没有待重试的分派动作。</div>
+      {% if not can_defect_write %}
+      <p class="hint">当前为只读模式，需要 `defect.write` 权限才能执行写操作。</p>
+      {% endif %}
+    </div>
+
+    <div class="action-cluster primary">
+      <h3>2. 推进状态</h3>
+      <p>选中缺陷后直接推进状态，适合现场闭环确认。</p>
+      <label>目标状态</label>
       <select id="next-status" {% if not can_defect_write %}disabled{% endif %}>
         <option>ASSIGNED</option>
         <option>IN_PROGRESS</option>
@@ -70,29 +119,41 @@
         <option>VERIFIED</option>
         <option>CLOSED</option>
       </select>
+      <label style="margin-top:8px;">状态说明</label>
+      <input id="status-note" placeholder="可选，填写状态变更说明" {% if not can_defect_write %}disabled{% endif %}>
+      <div class="wizard-actions stack-gap-sm">
+        <button id="status-btn" {% if not can_defect_write %}disabled{% endif %}>更新状态</button>
+        <button id="status-retry-btn" type="button" class="button-secondary">重试上一笔状态更新</button>
+      </div>
+      <div id="status-retry-hint" class="hint">当前没有待重试的状态动作。</div>
+      {% if not can_defect_write %}
+      <p class="hint">当前为只读模式，需要 `defect.write` 权限才能执行写操作。</p>
+      {% endif %}
+    </div>
+
+    <div class="action-cluster">
+      <h3>3. 详情与现场补充</h3>
+      <p>查看处理历史，并快速回到关联的巡检页面。</p>
+      <div class="grid cols-2">
+        <div>
+          <label>缺陷 ID</label>
+          <input id="defect-detail-id" placeholder="可从上方列表自动带入">
+          <button id="defect-detail-btn" type="button" class="stack-gap-sm">加载详情</button>
+        </div>
+        <div>
+          <label>观察记录 ID</label>
+          <input id="defect-observation-id" placeholder="选中缺陷后自动带入">
+          <a class="console-link stack-gap-sm" href="/ui/inspection">回到巡检页</a>
+        </div>
+      </div>
+      <label class="stack-gap-sm">现场补充说明</label>
+      <input id="defect-field-note" placeholder="例如：已联系现场人员复核，待二次确认">
+      <button id="defect-field-note-btn" type="button" class="stack-gap-sm">保存现场补充</button>
+      <div id="defect-field-note-result" class="hint">尚未记录现场补充。</div>
+      <pre id="defect-detail-box" class="hint pre-box stack-gap-sm">尚未加载详情。</pre>
     </div>
   </div>
-  <label style="margin-top:8px;">Status Note</label>
-  <input id="status-note" placeholder="optional note" {% if not can_defect_write %}disabled{% endif %}>
-  <button id="status-btn" style="margin-top:10px;" {% if not can_defect_write %}disabled{% endif %}>Update Status</button>
-  {% if not can_defect_write %}
-  <p class="hint">`defect.write` permission is required for assign/status actions.</p>
-  {% endif %}
-  <div class="grid cols-2" style="margin-top:12px;">
-    <div>
-      <h3>Load Detail</h3>
-      <label>Defect ID</label>
-      <input id="defect-detail-id" placeholder="defect id">
-      <button id="defect-detail-btn" type="button" style="margin-top:10px;">Load Detail</button>
-    </div>
-    <div>
-      <h3>Cross-link</h3>
-      <label>Observation ID</label>
-      <input id="defect-observation-id" placeholder="observation id">
-      <a class="console-link" href="/ui/inspection" style="display:inline-block; margin-top:10px;">Go To Inspection</a>
-    </div>
-  </div>
-  <pre id="defect-detail-box" class="hint" style="white-space:pre-wrap; margin-top:8px;">No detail loaded.</pre>
+
   <div class="hint action-result" id="defect-result" role="status" aria-live="polite"></div>
 </div>
 {% endblock %}

@@ -6,101 +6,157 @@
 
 {% block content %}
 <div class="panel">
-  <div class="grid cols-2">
-    <div>
-      <div><strong>Task ID:</strong> {{ task.id }}</div>
-      <div><strong>Status:</strong> {{ task.status }}</div>
-      <div><strong>Mission:</strong> {{ task.mission_id }}</div>
-    </div>
-    <div>
-      <button id="export-btn" data-task-id="{{ task.id }}" data-token="{{ token }}" {% if not can_inspection_write %}disabled{% endif %}>Export HTML</button>
-      <div class="hint" id="export-result">No export yet.</div>
-      <div class="ui-action-row" style="margin-top:10px;">
-        <a class="console-link" href="/ui/defects">Open Defects</a>
-        <a class="console-link" href="/ui/task-center">Open Task Center</a>
+  <div class="mobile-field-shell">
+    <div class="mobile-field-head">
+      <div>
+        <div class="mobile-field-kicker">现场执行工作台</div>
+        <h2>巡检任务现场回传</h2>
+        <p class="ui-section-subtitle">围绕当前任务完成观察记录、缺陷上报和现场备注，不需要切回全量后台。</p>
+      </div>
+      <div class="mobile-field-quickbar">
+        <a class="button-link" href="/ui/defects">缺陷闭环</a>
+        <a class="button-link" href="/ui/task-center">任务中心</a>
       </div>
     </div>
+    <div class="workflow-grid">
+      <div class="workflow-step">
+        <span class="workflow-index">1</span>
+        <div>
+          <h3>当前任务</h3>
+          <p><code>{{ task.id }}</code></p>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-index">2</span>
+        <div>
+          <h3>任务状态</h3>
+          <p>{{ task.status }}</p>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <span class="workflow-index">3</span>
+        <div>
+          <h3>任务批次</h3>
+          <p>{{ task.mission_id or "-" }}</p>
+        </div>
+      </div>
+    </div>
+    <div id="inspection-network-banner" class="selection-banner">
+      <strong>网络状态：</strong><span id="inspection-network-text">在线，可直接提交现场记录。</span>
+    </div>
+    <div class="mobile-field-grid">
+      <div>
+        <button id="export-btn" data-task-id="{{ task.id }}" data-token="{{ token }}" {% if not can_inspection_write %}disabled{% endif %}>导出 HTML</button>
+        <div class="hint" id="export-result">尚未导出。</div>
+      </div>
+      <div id="inspection-last-capture" class="selection-banner">
+        <strong>最近一次现场记录：</strong><span id="inspection-last-capture-text">尚未提交新的观察记录。</span>
+      </div>
+    </div>
+    <div id="map" class="map-stage"></div>
   </div>
-  <div id="map"></div>
 </div>
 
 {% if can_inspection_write or can_defect_write %}
 <div class="panel">
-  <h2>Quick Actions</h2>
-  {% if can_inspection_write %}
-  <div class="grid cols-2">
+  <div class="ui-section-head">
     <div>
-      <h3>Create Observation</h3>
-      <label>Latitude</label>
+      <h2>现场高频动作</h2>
+      <p class="ui-section-subtitle">优先完成观察回传，再按需一键上报缺陷。</p>
+    </div>
+  </div>
+  <div class="mobile-field-grid">
+    {% if can_inspection_write %}
+    <div class="action-cluster primary">
+      <h3>1. 新建观察记录</h3>
+      <p>点击地图可自动带入坐标，适合单手快速上报。</p>
+      <label>纬度</label>
       <input id="observation-lat" type="number" step="0.000001" placeholder="30.592800">
-      <label style="margin-top:8px;">Longitude</label>
+      <label class="stack-gap-sm">经度</label>
       <input id="observation-lon" type="number" step="0.000001" placeholder="114.305500">
-      <label style="margin-top:8px;">Altitude (m)</label>
+      <label class="stack-gap-sm">高度（米）</label>
       <input id="observation-alt" type="number" step="0.1" value="50">
-      <label style="margin-top:8px;">Item Code</label>
+      <label class="stack-gap-sm">检查项编码</label>
       <input id="observation-item-code" placeholder="line-crack">
-      <label style="margin-top:8px;">Severity (1-5)</label>
+      <label class="stack-gap-sm">严重等级（1-5）</label>
       <input id="observation-severity" type="number" min="1" max="5" value="2">
-      <label style="margin-top:8px;">Note</label>
-      <input id="observation-note" placeholder="optional note">
-      <button id="observation-create-btn" type="button" style="margin-top:10px;">Create Observation</button>
-      <p class="hint">Tip: click map to fill lat/lon.</p>
+      <label class="stack-gap-sm">说明</label>
+      <input id="observation-note" placeholder="可选，填写观察说明">
+      <div class="wizard-actions stack-gap-sm">
+        <button id="observation-create-btn" type="button">创建观察记录</button>
+        <button id="observation-retry-btn" type="button" class="button-secondary">重试上一笔</button>
+      </div>
+      <p class="hint">提示：点击地图可自动带入经纬度；弱网时可使用“重试上一笔”。</p>
+      <div id="observation-retry-hint" class="hint">当前没有待重试的观察记录。</div>
     </div>
     {% endif %}
     {% if can_defect_write %}
-    <div>
-      <h3>Create Defect From Observation</h3>
-      <label>Observation ID</label>
-      <input id="defect-observation-id" placeholder="observation id">
-      <button id="defect-create-btn" type="button" style="margin-top:10px;">Create Defect</button>
-      <p class="hint">You can also create directly from observation table actions.</p>
+    <div class="action-cluster primary">
+      <h3>2. 从观察记录创建缺陷</h3>
+      <p>系统会自动带入最近一次观察记录，也可从下方列表直接选中。</p>
+      <label>观察记录 ID</label>
+      <input id="defect-observation-id" placeholder="优先自动带入最近一次观察记录">
+      <button id="defect-create-btn" type="button" class="stack-gap-sm">创建缺陷</button>
+      <p class="hint">也可以直接在下方观察记录表中点击按钮创建。</p>
     </div>
     {% endif %}
+    <div class="action-cluster">
+      <h3>3. 现场备注与媒体预留</h3>
+      <p>为后续移动采集端保留快捷入口，当前可先记录现场说明和照片地址。</p>
+      <label>现场备注</label>
+      <input id="field-media-note" placeholder="例如：现场风速较大，已改低空复检">
+      <label class="stack-gap-sm">照片地址（可选）</label>
+      <input id="field-media-photo-url" placeholder="可填写内部上传地址或临时链接">
+      <button id="field-media-save-btn" type="button" class="stack-gap-sm">保存现场备注</button>
+      <div id="field-media-result" class="hint">尚未记录现场备注。</div>
+    </div>
   </div>
   <div class="hint action-result" id="inspection-task-result" role="status" aria-live="polite"></div>
 </div>
 {% endif %}
 
 <div class="panel">
-  <h2>Observations</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Time</th>
-        <th>Item</th>
-        <th>Severity</th>
-        <th>Position</th>
-        <th>Note</th>
-        {% if can_defect_write %}
-        <th>Action</th>
-        {% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in observations %}
-      <tr>
-        <td><code>{{ item.id }}</code></td>
-        <td>{{ item.ts }}</td>
-        <td>{{ item.item_code }}</td>
-        <td>{{ item.severity }}</td>
-        <td>{{ item.position_lat }}, {{ item.position_lon }}</td>
-        <td>{{ item.note }}</td>
-        {% if can_defect_write %}
-        <td>
-          <button
-            type="button"
-            class="js-create-defect-from-observation"
-            data-observation-id="{{ item.id }}"
-          >
-            Create Defect
-          </button>
-        </td>
-        {% endif %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <h2>观察记录</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>时间</th>
+          <th>检查项</th>
+          <th>严重等级</th>
+          <th>位置</th>
+          <th>说明</th>
+          {% if can_defect_write %}
+          <th>操作</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in observations %}
+        <tr>
+          <td><code>{{ item.id }}</code></td>
+          <td>{{ item.ts }}</td>
+          <td>{{ item.item_code }}</td>
+          <td>{{ item.severity }}</td>
+          <td>{{ item.position_lat }}, {{ item.position_lon }}</td>
+          <td>{{ item.note }}</td>
+          {% if can_defect_write %}
+          <td>
+            <button
+              type="button"
+              class="js-create-defect-from-observation"
+              data-observation-id="{{ item.id }}"
+            >
+              创建缺陷
+            </button>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
 

@@ -1,0 +1,295 @@
+{% extends "console_base.html" %}
+
+{% block content %}
+<div class="selection-banner admin-rail">
+  <strong>管理员技术页：</strong>此页面面向平台管理员和技术值守，不作为普通业务人员的日常入口。
+</div>
+<div class="stack-gap-md"></div>
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>管理员关联入口</h2>
+    <p class="table-panel-note">当前位置：技术值守分组。可在可观测、可靠性和平台治理之间切换。</p>
+  </div>
+  <div class="admin-link-grid">
+    <a class="admin-link-card active" href="/ui/observability?token={{ token }}">
+      <span class="admin-link-title">可观测值守</span>
+      <span class="admin-link-desc">查看信号、SLO 和告警回放。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/reliability?token={{ token }}">
+      <span class="admin-link-title">可靠性运行</span>
+      <span class="admin-link-desc">执行备份、恢复演练与容量预测。</span>
+    </a>
+    <a class="admin-link-card" href="/ui/platform?token={{ token }}">
+      <span class="admin-link-title">平台治理</span>
+      <span class="admin-link-desc">查看权限、角色与治理配置。</span>
+    </a>
+  </div>
+</div>
+{% set open_alert_count = alert_events | rejectattr("status", "equalto", "CLOSED") | list | length %}
+<div class="cards ui-kpi-grid">
+  <div class="card ui-kpi-card">
+    <div>信号总量</div>
+    <div class="value">{{ overview.total_signals }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>异常信号</div>
+    <div class="value">{{ overview.error_signals }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>P95 时延</div>
+    <div class="value">{{ overview.p95_latency_ms or 0 }}ms</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>SLO 违约</div>
+    <div class="value">{{ slo_overview.breached_count }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>未关闭告警</div>
+    <div class="value">{{ open_alert_count }}</div>
+  </div>
+  <div class="card ui-kpi-card">
+    <div>写入权限</div>
+    <div class="value">{{ "已开启" if can_observability_write else "只读" }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>可观测与 SLO 值守</h2>
+  <div class="grid cols-2">
+    <div class="form-stack">
+      <h3>信号筛选</h3>
+      <label>业务服务</label>
+      <input id="obv-signal-service-name" value="mission-dispatch">
+      <label class="stack-gap-sm">信号名称</label>
+      <input id="obv-signal-name" value="request">
+      <label class="stack-gap-sm">信号类别</label>
+      <select id="obv-signal-type">
+        <option value="">全部</option>
+        {% for item in observability_signal_type_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label class="stack-gap-sm">严重级别</label>
+      <select id="obv-signal-level">
+        <option value="">全部</option>
+        {% for item in observability_signal_level_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label class="stack-gap-sm">返回条数</label>
+      <input id="obv-signal-limit" type="number" min="1" max="100" value="20">
+      <button id="obv-signal-load-btn" type="button" class="stack-gap-sm">加载信号</button>
+      <button id="obv-signal-ingest-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>写入模拟样本</button>
+      <pre id="obv-signal-box" class="hint pre-box result-surface stack-gap-sm">尚未发起信号查询。</pre>
+    </div>
+    <div class="form-stack">
+      <h3>SLO 策略与评估</h3>
+      <label>策略标识（技术）</label>
+      <input id="obv-slo-policy-key" value="ui-phase31-availability" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">业务服务</label>
+      <input id="obv-slo-service-name" value="mission-dispatch" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">关联信号</label>
+      <input id="obv-slo-signal-name" value="request" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">目标可用率</label>
+      <input id="obv-slo-target-ratio" type="number" min="0" max="1" step="0.01" value="0.95" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">统计窗口（分钟）</label>
+      <input id="obv-slo-window-minutes" type="number" min="1" max="1440" value="60" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">最低样本数</label>
+      <input id="obv-slo-min-samples" type="number" min="1" value="1" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">时延阈值（毫秒，可选）</label>
+      <input id="obv-slo-latency-threshold" type="number" min="1" placeholder="400" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">告警级别</label>
+      <select id="obv-slo-alert-severity" {% if not can_observability_write %}disabled{% endif %}>
+        {% for item in observability_alert_severity_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button id="obv-slo-create-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>创建 SLO 策略</button>
+      <label class="stack-gap-sm">指定策略标识（逗号分隔，可留空）</label>
+      <input id="obv-slo-policy-ids" placeholder="留空则评估全部策略" {% if not can_observability_write %}disabled{% endif %}>
+      <label class="stack-gap-sm">仅演练</label>
+      <select id="obv-slo-dry-run" {% if not can_observability_write %}disabled{% endif %}>
+        <option value="false">否</option>
+        <option value="true">是</option>
+      </select>
+      <button id="obv-slo-evaluate-btn" type="button" class="stack-gap-sm" {% if not can_observability_write %}disabled{% endif %}>执行 SLO 评估</button>
+      <pre id="obv-slo-box" class="hint pre-box result-surface stack-gap-sm">尚未执行 SLO 动作。</pre>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>值守回放与告警联动</h2>
+  <div class="grid cols-2">
+    <div class="form-stack">
+      <label>告警状态</label>
+      <select id="obv-alert-status">
+        <option value="">全部</option>
+        {% for item in observability_alert_status_options %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <label class="stack-gap-sm">来源</label>
+      <input id="obv-alert-source" value="SLO">
+      <label class="stack-gap-sm">返回条数</label>
+      <input id="obv-alert-limit" type="number" min="1" max="100" value="12">
+      <button id="obv-alert-load-btn" type="button" class="stack-gap-sm">加载告警</button>
+      <pre id="obv-alert-box" class="hint pre-box result-surface stack-gap-sm">尚未发起告警回放查询。</pre>
+    </div>
+    <div class="form-stack">
+      <h3>值守建议</h3>
+      <ul class="hint hint-list">
+        {% for item in operator_suggestions %}
+        <li class="{{ item.severity }} hint-list-item">
+          <strong>{{ item.title }}</strong><br>
+          {{ item.detail }}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>近期信号</h2>
+    <p class="table-panel-note">用于快速回看最近进入值守面的服务信号与时延状态。</p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>发生时间</th>
+          <th>业务服务</th>
+          <th>信号</th>
+          <th>类别</th>
+          <th>级别</th>
+          <th>状态码</th>
+          <th>时延</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in signals %}
+        <tr>
+          <td>{{ item.occurred_at }}</td>
+          <td>
+            <span class="cell-main">
+              {{ "任务调度服务" if item.service_name == "mission-dispatch" else "飞行控制服务" if item.service_name == "flight-control" else "业务服务" }}
+            </span>
+            <code class="cell-subtle">{{ item.service_name }}</code>
+          </td>
+          <td>
+            <span class="cell-main">
+              {{ "请求处理" if item.signal_name == "request" else "任务执行" if item.signal_name == "mission" else "业务信号" }}
+            </span>
+            <code class="cell-subtle">{{ item.signal_name }}</code>
+          </td>
+          <td>
+            <span class="status-pill info">
+              {{ "指标" if item.signal_type == "METRIC" else "链路" if item.signal_type == "TRACE" else "事件" if item.signal_type == "EVENT" else item.signal_type }}
+            </span>
+          </td>
+          <td>
+            <span class="status-pill {{ 'danger' if item.level in ['ERROR', 'CRITICAL'] else 'warn' if item.level in ['WARN', 'WARNING'] else 'info' }}">
+              {{ "严重" if item.level == "CRITICAL" else "错误" if item.level == "ERROR" else "告警" if item.level in ["WARN", "WARNING"] else "信息" if item.level == "INFO" else item.level }}
+            </span>
+          </td>
+          <td>{{ item.status_code or "-" }}</td>
+          <td>{{ item.duration_ms or "-" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>SLO 状态时间线</h2>
+    <p class="table-panel-note">展示策略评估结果、可用率变化和告警关联情况。</p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>策略</th>
+          <th>状态</th>
+          <th>可用率</th>
+          <th>错误率</th>
+          <th>样本数</th>
+          <th>告警</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in slo_evaluations %}
+        <tr>
+          <td><code>{{ item.policy_id }}</code></td>
+          <td>
+            <span class="status-pill {{ 'danger' if item.status in ['BREACHED', 'FAILED', 'VIOLATED'] else 'warn' if item.status in ['DEGRADED', 'WARNING'] else 'success' }}">
+              {{ "违约" if item.status in ["BREACHED", "VIOLATED"] else "失败" if item.status == "FAILED" else "降级" if item.status == "DEGRADED" else "预警" if item.status == "WARNING" else "正常" if item.status in ["HEALTHY", "OK"] else item.status }}
+            </span>
+          </td>
+          <td>{{ "%.2f"|format(item.availability_ratio * 100) }}%</td>
+          <td>{{ "%.2f"|format(item.error_ratio * 100) }}%</td>
+          <td>{{ item.total_samples }}</td>
+          <td>{{ item.alert_event_id or "-" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-panel-head">
+    <h2>已追踪 SLO 策略</h2>
+    <p class="table-panel-note">当前纳入监控的服务级目标策略清单。</p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>策略标识</th>
+          <th>业务服务</th>
+          <th>目标值</th>
+          <th>窗口</th>
+          <th>严重级别</th>
+          <th>启用</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in slo_policies %}
+        <tr>
+          <td>{{ item.policy_key }}</td>
+          <td>
+            <span class="cell-main">
+              {{ "任务调度服务" if item.service_name == "mission-dispatch" else "飞行控制服务" if item.service_name == "flight-control" else "业务服务" }}
+            </span>
+            <code class="cell-subtle">{{ item.service_name }}</code>
+          </td>
+          <td>{{ "%.2f"|format(item.target_ratio * 100) }}%</td>
+          <td>{{ item.window_minutes }}m</td>
+          <td>
+            <span class="status-pill {{ 'danger' if item.alert_severity == 'P1' else 'warn' if item.alert_severity == 'P2' else 'info' }}">
+              {{ "紧急" if item.alert_severity == "P1" else "高" if item.alert_severity == "P2" else "中" if item.alert_severity == "P3" else "低" if item.alert_severity == "P4" else item.alert_severity }}
+            </span>
+          </td>
+          <td>
+            <span class="status-pill {{ 'success' if item.is_active else 'muted' }}">{{ "已启用" if item.is_active else "已停用" }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<pre class="hint pre-box action-result result-box result-surface" id="observability-result" role="status" aria-live="polite"></pre>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CAN_OBSERVABILITY_WRITE = {{ can_observability_write | tojson }};
+</script>
+<script src="/static/observability_ui.js"></script>
+{% endblock %}
