@@ -1,4 +1,4 @@
-# UAV Platform
+# 1. UAV Platform
 
 运行方式1：完全绕过 沙箱限制、所有人工确认、权限控制
 codex --dangerously-bypass-approvals-and-sandbox
@@ -6,11 +6,8 @@ codex --dangerously-bypass-approvals-and-sandbox
 运行方式2：尽量自动执行，只修改工作目录下的文件
 codex -a never -s workspace-write
 
-
-重启先读取 `phases/resume.md`，及其相关文件，了解项目情况。
-
 ----------------------------------------------------------
-目前状态
+# 2. 目前状态
 01-39 阶段已完成，但这不等于“真实无人机、机巢/机场、视频链路都已生产级接入完毕”。当前更准确的状态是：平台产品化已闭环，真实设备与现场基础接入有最小链路，但仍有明显二期落地工作。
 
   最典型的遗留项有这几类。
@@ -80,3 +77,60 @@ codex -a never -s workspace-write
   2. 机巢/机场联动控制（从台账升级到控制与状态联动）
   3. 视频链路工程化（RTSP/WebRTC 稳定接入与展示）
   4. 现场试点与运行验证（真实客户环境压测、值守、异常演练）
+
+----------------------------------------------------------
+# 3. 需安装软件
+
+  最低需要这些：
+  1. Git
+  2. Docker Desktop（含 Docker Engine + docker compose v2 插件）
+  3. PowerShell（Windows 自带 5.1 可用）
+
+  可选但建议：
+  1. curl（做健康检查方便）
+  2. VS Code（看日志/改配置更方便）
+
+  快速自检命令：
+  git --version
+  docker --version
+  docker compose version
+  powershell -Version
+
+  如果要跑仓库里的 run_all_phases.sh / verify_all.sh，还需要：
+  1. bash 环境（Git Bash 或 WSL）
+  2. 可能需要 make（部分流程）
+  
+----------------------------------------------------------
+# 4. 获取项目并使用
+  1. 获取项目
+  git clone git@github.com:onliner111/uav-platform.git
+  
+  2. 系统一键脚本：`tooling/system_manager.ps1`
+
+  2.1 首次构建（启动 + 迁移 + 冒烟 + 默认账号初始化）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tooling/system_manager.ps1 -Action first-build
+```
+
+默认会生成租户和 5 个账号（admin/dispatcher/inspector/incident/auditor），输出到：
+
+- `logs/default_accounts.json`
+  包含租户、登录地址、账号密码
+
+  2.2 常态启动运行
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tooling/system_manager.ps1 -Action up
+```
+
+  2.3 关闭系统
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tooling/system_manager.ps1 -Action down
+```
+
+  2.4 可选：
+
+  - 关闭并清空数据卷：-PurgeData
+  - 首次构建跳过冒烟：-SkipValidation
