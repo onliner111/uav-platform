@@ -195,10 +195,10 @@ async def _run() -> None:
             raise RuntimeError("phase31 demo expected a scale-out recommendation")
 
         ui_checks = [
-            ("/ui/observability", "Observability + SLO Command"),
-            ("/ui/observability", "Oncall Replay + Alert Linkage"),
-            ("/ui/reliability", "Reliability Runbook Operations"),
-            ("/ui/reliability", "Capacity Forecast Board"),
+            ("/ui/observability", "可观测与 SLO 值守"),
+            ("/ui/observability", "值守回放与告警联动"),
+            ("/ui/reliability", "可靠性运行手册"),
+            ("/ui/reliability", "容量预测面板"),
         ]
         for path, expected_text in ui_checks:
             response = await client.get(f"{path}?token={token}")

@@ -218,10 +218,10 @@ async def _run() -> None:
             raise RuntimeError("phase30 demo expected accepted adapter event in list API")
 
         ui_checks = [
-            ("/ui/commercial-ops", "Billing + Quota Operations"),
-            ("/ui/commercial-ops", "Usage + Invoice Governance"),
-            ("/ui/open-platform", "Open Platform Access + Webhook Ops"),
-            ("/ui/open-platform", "Dispatch + Adapter Ingress"),
+            ("/ui/commercial-ops", "计费与配额操作"),
+            ("/ui/commercial-ops", "用量与账单治理"),
+            ("/ui/open-platform", "开放平台访问与 Webhook 管理"),
+            ("/ui/open-platform", "派发与适配器接入"),
         ]
         for path, expected_text in ui_checks:
             response = await client.get(f"{path}?token={token}")

@@ -337,10 +337,10 @@ async def _run() -> None:
             raise RuntimeError("phase29 demo expected rollback default version set to target")
 
         ui_checks = [
-            ("/ui/reports", "Data Outcomes Workbench"),
-            ("/ui/reports", "Reporting Center"),
-            ("/ui/ai-governance", "Model Catalog + Version Governance"),
-            ("/ui/ai-governance", "Output Review + Evidence Chain"),
+            ("/ui/reports", "问题闭环看板"),
+            ("/ui/reports", "成果审核与复核工作台"),
+            ("/ui/ai-governance", "模型目录与版本治理"),
+            ("/ui/ai-governance", "作业、运行与证据回放"),
         ]
         for path, expected_text in ui_checks:
             response = await client.get(f"{path}?token={token}")
